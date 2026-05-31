@@ -9,7 +9,10 @@
 #include <QMimeDatabase>
 #include <QPainter>
 #include <QPixmap>
+#include <QProcess>
 #include <QRegularExpression>
+#include <QStandardPaths>
+#include <QTemporaryDir>
 #include <QTextDocumentFragment>
 #include <QTextStream>
 #include <QToolButton>
@@ -23,12 +26,23 @@ QIcon previewSourceIcon()
     pixmap.fill(Qt::transparent);
     QPainter painter(&pixmap);
     painter.setRenderHint(QPainter::Antialiasing);
-    painter.setPen(QPen(QColor("#D7D7D7"), 2));
+    painter.setPen(QPen(QColor("#D9E1E8"), 2));
     painter.setBrush(Qt::NoBrush);
     painter.drawEllipse(QRectF(6, 9, 16, 10));
-    painter.setBrush(QColor("#D7D7D7"));
+    painter.setBrush(QColor("#D9E1E8"));
     painter.drawEllipse(QRectF(12, 12, 4, 4));
     return QIcon(pixmap);
+}
+
+bool hasTextPreviewSuffix(const QString &path)
+{
+    const QString suffix = QFileInfo(path).suffix().toLower();
+    return QStringList({
+        "md", "markdown", "mdown", "mkd",
+        "html", "htm",
+        "json", "xml", "js", "ts", "css",
+        "csv", "tsv", "txt", "log", "ini", "toml", "yaml", "yml"
+    }).contains(suffix);
 }
 }
 
@@ -99,6 +113,9 @@ void PreviewPane::previewPath(const QString &path)
     if (info.isFile() && showImage(path)) {
         return;
     }
+    if (info.isFile() && showPdf(path)) {
+        return;
+    }
     if (info.isFile() && showText(path)) {
         return;
     }
@@ -123,7 +140,7 @@ QString PreviewPane::renderHtmlForTextFile(const QString &path, const QString &c
 {
     const QString suffix = QFileInfo(path).suffix().toLower();
     if (suffix == "md" || suffix == "markdown" || suffix == "mdown" || suffix == "mkd") {
-        return QString("<body style='background:#000;color:#ddd;font-family:sans-serif;'>%1</body>")
+        return QString("<body style='background:#151a1e;color:#d9e1e8;font-family:sans-serif;line-height:1.5;'>%1</body>")
             .arg(QTextDocumentFragment::fromMarkdown(content).toHtml());
     }
     if (suffix == "html" || suffix == "htm") {
@@ -133,7 +150,8 @@ QString PreviewPane::renderHtmlForTextFile(const QString &path, const QString &c
         QJsonParseError error;
         const QJsonDocument document = QJsonDocument::fromJson(content.toUtf8(), &error);
         if (error.error == QJsonParseError::NoError) {
-            return QString("<pre>%1</pre>").arg(escapeHtml(QString::fromUtf8(document.toJson(QJsonDocument::Indented))));
+            return QString("<body style='background:#151a1e;color:#d9e1e8;'><pre>%1</pre></body>")
+                .arg(escapeHtml(QString::fromUtf8(document.toJson(QJsonDocument::Indented))));
         }
     }
     if (suffix == "csv") {
@@ -147,17 +165,17 @@ QString PreviewPane::renderHtmlForTextFile(const QString &path, const QString &c
 
 QString PreviewPane::csvToHtmlTable(const QString &content, QChar delimiter) const
 {
-    QString html = "<table cellspacing='0' cellpadding='6' style='border-collapse:collapse;color:#ddd;font-family:monospace;'>";
+    QString html = "<body style='background:#151a1e;'><table cellspacing='0' cellpadding='6' style='border-collapse:collapse;color:#d9e1e8;font-family:monospace;'>";
     const QStringList lines = content.split(QRegularExpression("[\r\n]+"), Qt::SkipEmptyParts);
     for (const QString &line : lines.mid(0, 200)) {
         html += "<tr>";
         const QStringList cells = line.split(delimiter);
         for (const QString &cell : cells) {
-            html += QString("<td style='border:1px solid #333;'>%1</td>").arg(escapeHtml(cell));
+            html += QString("<td style='border:1px solid #2a333a;'>%1</td>").arg(escapeHtml(cell));
         }
         html += "</tr>";
     }
-    html += "</table>";
+    html += "</table></body>";
     return html;
 }
 
@@ -187,6 +205,46 @@ bool PreviewPane::showImage(const QString &path)
     return true;
 }
 
+bool PreviewPane::showPdf(const QString &path)
+{
+    if (QFileInfo(path).suffix().toLower() != "pdf") {
+        return false;
+    }
+
+    const QString pdftoppm = QStandardPaths::findExecutable("pdftoppm");
+    if (pdftoppm.isEmpty()) {
+        m_text->setPlainText(UiText::t("PDF preview requires pdftoppm.", "PDF プレビューには pdftoppm が必要です。"));
+        setRenderAvailable(false);
+        m_stack->setCurrentWidget(m_text);
+        return true;
+    }
+
+    QTemporaryDir tempDir;
+    if (!tempDir.isValid()) {
+        return false;
+    }
+
+    const QString outputPrefix = tempDir.filePath("preview");
+    QProcess process;
+    process.start(pdftoppm, {"-f", "1", "-singlefile", "-png", "-scale-to", "900", path, outputPrefix});
+    if (!process.waitForStarted(1000) || !process.waitForFinished(5000) || process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
+        m_text->setPlainText(UiText::t("Could not render PDF preview.", "PDF プレビューを作成できませんでした。"));
+        setRenderAvailable(false);
+        m_stack->setCurrentWidget(m_text);
+        return true;
+    }
+
+    QPixmap pixmap(outputPrefix + ".png");
+    if (pixmap.isNull()) {
+        return false;
+    }
+
+    setRenderAvailable(false);
+    m_image->setPixmap(pixmap.scaled(720, 720, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    m_stack->setCurrentWidget(m_image);
+    return true;
+}
+
 bool PreviewPane::showText(const QString &path)
 {
     QMimeDatabase database;
@@ -195,7 +253,8 @@ bool PreviewPane::showText(const QString &path)
         || type.name().contains("json")
         || type.name().contains("xml")
         || type.name().contains("javascript")
-        || type.name().contains("x-shellscript");
+        || type.name().contains("x-shellscript")
+        || hasTextPreviewSuffix(path);
     if (!likelyText) {
         return false;
     }
@@ -211,6 +270,7 @@ bool PreviewPane::showText(const QString &path)
     const QString renderedHtml = renderHtmlForTextFile(path, content);
     setRenderAvailable(!renderedHtml.isEmpty());
     if (!renderedHtml.isEmpty()) {
+        m_rendered->document()->setBaseUrl(QUrl::fromLocalFile(QFileInfo(path).absolutePath() + "/"));
         m_rendered->setHtml(renderedHtml);
     } else {
         m_rendered->clear();

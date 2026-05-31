@@ -13,6 +13,9 @@ public:
     explicit TerminalPane(QWidget *parent = nullptr);
     void setWorkingDirectory(const QString &path);
 
+signals:
+    void closeRequested();
+
 private slots:
     void runCommand();
 

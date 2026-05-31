@@ -1,5 +1,6 @@
 #pragma once
 
+#include "AppConfig.h"
 #include "FilePane.h"
 #include "PreviewPane.h"
 #include "TerminalPane.h"
@@ -9,6 +10,7 @@
 #include <QListWidget>
 #include <QMainWindow>
 #include <QSplitter>
+#include <QString>
 #include <QToolBar>
 #include <QToolButton>
 #include <QTreeView>
@@ -37,6 +39,7 @@ private:
     void setTerminalVisible(bool visible);
     void setHiddenFilesVisible(bool visible);
     void setActivePane(FilePane *pane);
+    void focusOtherPane();
     void rememberSidebarWidth();
     int fileAreaMinimumWidth(bool splitVisible) const;
     int contentMinimumWidth(bool splitVisible, bool previewVisible) const;
@@ -69,6 +72,8 @@ private:
     QSplitter *m_fileSplitter;
     QSplitter *m_mainSplitter;
     QSplitter *m_verticalSplitter;
+    AppConfig m_config;
+    QString m_initialPath;
     bool m_showHiddenFiles = false;
     bool m_isRestoringSettings = true;
     int m_lastSidebarWidth = 240;

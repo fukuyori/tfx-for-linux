@@ -1,7 +1,7 @@
 # tfx for Linux
 
 **Linux 向け Terminal-inspired interface File eXplorer**  
-Version: **0.1.0**
+Version: **0.2.0**
 
 [English](README.md) | 日本語
 
@@ -19,15 +19,26 @@ Version: **0.1.0**
 ## ビルド
 
 ```sh
-cmake -S linux-qt -B /tmp/tfx-qt-build
-cmake --build /tmp/tfx-qt-build
-/tmp/tfx-qt-build/tfx-qt
+./build.sh
+./build/tfx
+```
+
+クリーンビルドする場合:
+
+```sh
+./build.sh --clean
+```
+
+ビルド後にそのまま起動する場合:
+
+```sh
+./build.sh --run
 ```
 
 フォルダを指定して起動する場合:
 
 ```sh
-/tmp/tfx-qt-build/tfx-qt /path/to/folder
+./build/tfx /path/to/folder
 ```
 
 フォルダ指定がない場合は、起動時のカレントディレクトリを表示します。
@@ -36,10 +47,13 @@ cmake --build /tmp/tfx-qt-build
 
 - フォルダツリーとピン留めフォルダ
 - 単独表示 / スプリット表示のファイル一覧
+- 起動パス制御: 左ペインは起動引数のフォルダ、指定がない場合は起動時のカレントディレクトリを表示
 - ソース表示 / レンダリング表示を切り替えられるプレビューペイン
 - 内蔵コマンドペイン
+- `~/.config/tfx/` に作成されるユーザー編集用 `config.toml`
 - ウインドウ、splitter、表示状態、タブ、表示項目設定の復元
 - ファイル操作: 開く、名前変更、新規ファイル/フォルダ、ゴミ箱、コピー/カット/ペースト、パスコピー
+- ファイル一覧でのマウス/キーボード選択と、選択行の保持表示
 - ファイル一覧の表示項目:
   - ファイル名
   - 種類
@@ -50,6 +64,30 @@ cmake --build /tmp/tfx-qt-build
   - Git ステータス
 
 ファイル一覧ヘッダのメニューから、表示項目の表示/非表示と順序変更ができます。順序変更は設定ダイアログ内で項目名をドラッグ&ドロップして行います。
+
+## 設定
+
+Linux 版も tfx for Windows と同じ考え方に合わせています。
+
+- `~/.config/tfx/config.toml` はユーザーが編集する設定ファイルです。
+- ウインドウ位置、最後に開いたパス、ペイン表示状態、splitter、ピン留めフォルダ、タブ、表示項目レイアウトはアプリ管理のセッション状態として保存します。
+
+起動時に `config.toml` が存在しない場合は自動作成します。既存ファイルは上書きしません。
+
+現在対応しているセクション:
+
+- トップレベル `version = 1`
+- `[font]`
+- `[colors]`
+- `[startup]`
+- `[shortcuts]`
+- `[terminal]` と `[openWith]` は互換用に解析します。詳細な動作への反映は今後拡張します。
+
+Linux 版の詳細は [docs/configuration.md](docs/configuration.md) を参照してください。
+
+## ロードマップ
+
+[docs/roadmap.md](docs/roadmap.md) を参照してください。
 
 ## リポジトリ
 

@@ -12,18 +12,23 @@
 #include <QDirIterator>
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QDebug>
 #include <QKeyEvent>
 #include <QMenu>
 #include <QMessageBox>
 #include <QMimeData>
+#include <QPainter>
 #include <QProcess>
 #include <QPushButton>
+#include <QStyledItemDelegate>
 #include <QSettings>
 #include <QSignalBlocker>
+#include <QTimer>
 #include <QStandardPaths>
 #include <QStyle>
 #include <QTextStream>
 #include <QUrl>
+#include <QMouseEvent>
 #include <QHBoxLayout>
 #include <QCheckBox>
 #include <QListWidget>
@@ -32,6 +37,55 @@
 #include <algorithm>
 
 namespace {
+bool selectionDebugEnabled()
+{
+    return qEnvironmentVariableIsSet("TFX_SELECTION_DEBUG");
+}
+
+void selectionDebugLog(const QString &message)
+{
+    if (!selectionDebugEnabled()) {
+        return;
+    }
+
+    qDebug().noquote() << message;
+
+    QFile file("/tmp/tfx-selection.log");
+    if (file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
+        QTextStream stream(&file);
+        stream << message << '\n';
+    }
+}
+
+void logSelectionState(const char *where, QTableView *view)
+{
+    if (!selectionDebugEnabled() || !view || !view->selectionModel()) {
+        return;
+    }
+
+    const QModelIndex current = view->currentIndex();
+    const QModelIndexList rows = view->selectionModel()->selectedRows();
+    const QModelIndexList indexes = view->selectionModel()->selectedIndexes();
+    QStringList selected;
+    selected.reserve(rows.size());
+    for (const QModelIndex &row : rows) {
+        selected << QString::number(row.row());
+    }
+    QStringList selectedIndexes;
+    selectedIndexes.reserve(indexes.size());
+    for (const QModelIndex &index : indexes) {
+        selectedIndexes << QString("(%1,%2)").arg(index.row()).arg(index.column());
+    }
+
+    selectionDebugLog(QString("[selection] %1 current=(%2,%3) selectedRows=[%4] selectedIndexes=[%5] hasFocus=%6")
+        .arg(where)
+        .arg(current.row())
+        .arg(current.column())
+        .arg(selected.join(','))
+        .arg(selectedIndexes.join(','))
+        .arg(view->hasFocus() ? "true" : "false"));
+}
+
 enum FileColumn {
     ColumnName = 0,
     ColumnType,
@@ -41,6 +95,126 @@ enum FileColumn {
     ColumnMode,
     ColumnGit,
     kColumnCount
+};
+
+class FileItemDelegate : public QStyledItemDelegate
+{
+public:
+    using QStyledItemDelegate::QStyledItemDelegate;
+
+    void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override
+    {
+        QStyleOptionViewItem adjusted(option);
+        initStyleOption(&adjusted, index);
+
+        const auto *view = qobject_cast<const QTableView *>(parent());
+        const QModelIndex current = view ? view->currentIndex() : QModelIndex();
+        const int logicalRow = view ? view->property("currentSelectionRow").toInt() : -1;
+        const bool currentRow = (logicalRow >= 0 && logicalRow == index.row())
+            || (logicalRow < 0 && current.isValid() && current.row() == index.row());
+        const bool selected = adjusted.state.testFlag(QStyle::State_Selected) || currentRow;
+        const bool hovered = adjusted.state.testFlag(QStyle::State_MouseOver);
+        if (selected || hovered) {
+            painter->save();
+            painter->fillRect(adjusted.rect, selected ? QColor("#31576B") : QColor("#1F2830"));
+            painter->restore();
+            adjusted.backgroundBrush = Qt::NoBrush;
+        }
+        if (selected) {
+            adjusted.palette.setColor(QPalette::Text, QColor("#FFFFFF"));
+            adjusted.palette.setColor(QPalette::HighlightedText, QColor("#FFFFFF"));
+            adjusted.state &= ~QStyle::State_Selected;
+        }
+
+        QStyledItemDelegate::paint(painter, adjusted, index);
+    }
+};
+
+QItemSelection rowSelection(const QModelIndex &index)
+{
+    if (!index.isValid()) {
+        return {};
+    }
+    return QItemSelection(index.sibling(index.row(), 0), index.sibling(index.row(), kColumnCount - 1));
+}
+
+class FileTableView : public QTableView
+{
+public:
+    using QTableView::QTableView;
+
+protected:
+    void mousePressEvent(QMouseEvent *event) override
+    {
+        m_pressedIndex = indexAt(event->pos());
+        m_pressedModifiers = event->modifiers();
+        if (selectionDebugEnabled()) {
+            selectionDebugLog(QString("[selection] mousePress pos=(%1,%2) index=(%3,%4) button=%5 modifiers=%6")
+                .arg(event->pos().x())
+                .arg(event->pos().y())
+                .arg(m_pressedIndex.row())
+                .arg(m_pressedIndex.column())
+                .arg(static_cast<int>(event->button()))
+                .arg(static_cast<int>(event->modifiers())));
+        }
+        QTableView::mousePressEvent(event);
+        logSelectionState("after base mousePress", this);
+        if (event->button() != Qt::LeftButton) {
+            return;
+        }
+
+        applyPersistentSelection(m_pressedIndex, m_pressedModifiers);
+        logSelectionState("after apply mousePress", this);
+    }
+
+    void mouseReleaseEvent(QMouseEvent *event) override
+    {
+        if (selectionDebugEnabled()) {
+            selectionDebugLog(QString("[selection] mouseRelease pos=(%1,%2) index=(%3,%4) button=%5")
+                .arg(event->pos().x())
+                .arg(event->pos().y())
+                .arg(indexAt(event->pos()).row())
+                .arg(indexAt(event->pos()).column())
+                .arg(static_cast<int>(event->button())));
+        }
+        QTableView::mouseReleaseEvent(event);
+        logSelectionState("after base mouseRelease", this);
+        if (event->button() != Qt::LeftButton) {
+            return;
+        }
+
+        const QPersistentModelIndex index = m_pressedIndex;
+        const Qt::KeyboardModifiers modifiers = m_pressedModifiers;
+        QTimer::singleShot(0, this, [this, index, modifiers]() {
+            applyPersistentSelection(index, modifiers);
+            logSelectionState("after deferred mouseRelease", this);
+        });
+    }
+
+private:
+    void applyPersistentSelection(const QPersistentModelIndex &persistentIndex, Qt::KeyboardModifiers modifiers)
+    {
+        if (!persistentIndex.isValid() || !selectionModel()) {
+            return;
+        }
+
+        const QModelIndex index = persistentIndex;
+        QItemSelectionModel::SelectionFlags flags = QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows;
+        if (modifiers.testFlag(Qt::ControlModifier)) {
+            flags = QItemSelectionModel::Toggle;
+        } else if (modifiers.testFlag(Qt::ShiftModifier)) {
+            flags = QItemSelectionModel::SelectCurrent;
+        }
+
+        setCurrentIndex(index);
+        selectionModel()->select(rowSelection(index), flags);
+        setProperty("currentSelectionRow", index.row());
+        viewport()->update();
+        logSelectionState("applyPersistentSelection", this);
+    }
+
+    QPersistentModelIndex m_pressedIndex;
+    Qt::KeyboardModifiers m_pressedModifiers;
 };
 
 int defaultColumnWidth(int column)
@@ -90,6 +264,48 @@ QString modeString(const QFileInfo &info)
     text.append(permissionTriplet(permissions, QFile::ReadGroup, QFile::WriteGroup, QFile::ExeGroup));
     text.append(permissionTriplet(permissions, QFile::ReadOther, QFile::WriteOther, QFile::ExeOther));
     return text;
+}
+
+QString porcelainStatusLabel(const QString &status)
+{
+    if (status.contains("??")) {
+        return "untracked";
+    }
+    if (status.contains("A")) {
+        return "added";
+    }
+    if (status.contains("D")) {
+        return "deleted";
+    }
+    if (status.contains("R")) {
+        return "renamed";
+    }
+    if (status.contains("C")) {
+        return "copied";
+    }
+    if (status.contains("U")) {
+        return "conflict";
+    }
+    if (status.contains("M")) {
+        return "modified";
+    }
+    if (status.contains("!")) {
+        return "ignored";
+    }
+    return status.trimmed();
+}
+
+QString porcelainPath(QString path)
+{
+    path = path.trimmed();
+    const int renameArrow = path.indexOf(" -> ");
+    if (renameArrow >= 0) {
+        path = path.mid(renameArrow + 4);
+    }
+    if (path.size() >= 2 && path.startsWith('"') && path.endsWith('"')) {
+        path = path.mid(1, path.size() - 2);
+    }
+    return path;
 }
 
 bool copyRecursively(const QString &sourcePath, const QString &destinationPath)
@@ -163,6 +379,19 @@ FileSystemProxyModel::FileSystemProxyModel(QObject *parent)
 {
 }
 
+void FileSystemProxyModel::setGitStatuses(const QHash<QString, QString> &statuses)
+{
+    m_gitStatuses = statuses;
+    invalidate();
+}
+
+void FileSystemProxyModel::setThemeColors(const QString &fileForeground, const QString &directoryForeground)
+{
+    m_fileForeground = fileForeground;
+    m_directoryForeground = directoryForeground;
+    invalidate();
+}
+
 int FileSystemProxyModel::columnCount(const QModelIndex &parent) const
 {
     Q_UNUSED(parent);
@@ -205,7 +434,7 @@ QVariant FileSystemProxyModel::data(const QModelIndex &index, int role) const
     const QFileInfo info = fsModel->fileInfo(sourceNameIndex);
 
     if (role == Qt::ForegroundRole) {
-        return QColor(info.isDir() ? "#6FFF80" : "#CFFFCF");
+        return QColor(info.isDir() ? m_directoryForeground : m_fileForeground);
     }
 
     if (role == Qt::DecorationRole && index.column() == ColumnName) {
@@ -231,7 +460,7 @@ QVariant FileSystemProxyModel::data(const QModelIndex &index, int role) const
         case ColumnMode:
             return modeString(info);
         case ColumnGit:
-            return QString();
+            return m_gitStatuses.value(info.absoluteFilePath());
         default:
             break;
         }
@@ -270,6 +499,8 @@ bool FileSystemProxyModel::lessThan(const QModelIndex &left, const QModelIndex &
         return leftInfo.lastModified() < rightInfo.lastModified();
     case ColumnMode:
         return modeString(leftInfo) < modeString(rightInfo);
+    case ColumnGit:
+        return m_gitStatuses.value(leftInfo.absoluteFilePath()) < m_gitStatuses.value(rightInfo.absoluteFilePath());
     default:
         return QSortFilterProxyModel::lessThan(left, right);
     }
@@ -280,16 +511,16 @@ FilePane::FilePane(const QString &label, const QString &initialPath, QWidget *pa
       m_model(new QFileSystemModel(this)),
       m_proxyModel(new FileSystemProxyModel(this)),
       m_tabBar(new QTabBar(this)),
-      m_view(new QTableView(this)),
+      m_view(new FileTableView(this)),
       m_badgeLabel(new QLabel(this)),
-      m_pathLabel(new QLabel(this)),
+      m_pathEdit(new QLineEdit(this)),
       m_statusLabel(new QLabel(this)),
       m_label(label)
 {
     setObjectName("filePane");
     setAttribute(Qt::WA_StyledBackground, true);
     setFocusPolicy(Qt::StrongFocus);
-    setMinimumWidth(320);
+    setMinimumWidth(220);
     m_model->setRootPath("/");
     m_model->setFilter(QDir::AllEntries | QDir::NoDot | QDir::AllDirs | QDir::Files);
     m_model->setReadOnly(false);
@@ -298,10 +529,13 @@ FilePane::FilePane(const QString &label, const QString &initialPath, QWidget *pa
     m_proxyModel->setDynamicSortFilter(true);
 
     m_badgeLabel->setObjectName("paneBadge");
-    m_pathLabel->setObjectName("panePath");
+    m_pathEdit->setObjectName("panePath");
     m_statusLabel->setObjectName("paneStatus");
     m_badgeLabel->setText(m_label.toUpper());
-    m_pathLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    m_pathEdit->setFrame(false);
+    m_pathEdit->setClearButtonEnabled(false);
+    m_pathEdit->setPlaceholderText("/");
+    m_pathEdit->installEventFilter(this);
     m_tabBar->setObjectName("paneTabs");
     m_tabBar->setMovable(true);
     m_tabBar->setTabsClosable(false);
@@ -314,12 +548,14 @@ FilePane::FilePane(const QString &label, const QString &initialPath, QWidget *pa
     m_view->setObjectName("fileTable");
     m_view->setSelectionMode(QAbstractItemView::ExtendedSelection);
     m_view->setSelectionBehavior(QAbstractItemView::SelectRows);
+    m_view->setFocusPolicy(Qt::StrongFocus);
     m_view->setSortingEnabled(true);
     m_view->sortByColumn(0, Qt::AscendingOrder);
     m_view->setShowGrid(false);
     m_view->setFrameShape(QFrame::NoFrame);
-    m_view->setEditTriggers(QAbstractItemView::EditKeyPressed | QAbstractItemView::SelectedClicked);
+    m_view->setEditTriggers(QAbstractItemView::EditKeyPressed);
     m_view->setIconSize(QSize(18, 18));
+    m_view->setItemDelegate(new FileItemDelegate(m_view));
     m_view->horizontalHeader()->setStretchLastSection(false);
     m_view->horizontalHeader()->setDefaultAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     m_view->horizontalHeader()->setHighlightSections(false);
@@ -339,7 +575,7 @@ FilePane::FilePane(const QString &label, const QString &initialPath, QWidget *pa
     headerLayout->setContentsMargins(8, 4, 8, 4);
     headerLayout->setSpacing(8);
     headerLayout->addWidget(m_badgeLabel);
-    headerLayout->addWidget(m_pathLabel, 1);
+    headerLayout->addWidget(m_pathEdit, 1);
 
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(2, 2, 2, 2);
@@ -349,6 +585,31 @@ FilePane::FilePane(const QString &label, const QString &initialPath, QWidget *pa
     layout->addWidget(m_view, 1);
     layout->addWidget(m_statusLabel);
 
+    connect(m_view, &QTableView::clicked, this, [this](const QModelIndex &index) {
+        if (!index.isValid()) {
+            return;
+        }
+        if (selectionDebugEnabled()) {
+            selectionDebugLog(QString("[selection] clicked index=(%1,%2)")
+                .arg(index.row())
+                .arg(index.column()));
+        }
+        QTimer::singleShot(0, this, [this, index]() {
+            if (!index.isValid()) {
+                return;
+            }
+            emit activated(this);
+            m_view->setFocus(Qt::MouseFocusReason);
+            m_view->setCurrentIndex(index);
+            m_view->selectionModel()->select(rowSelection(index), QItemSelectionModel::ClearAndSelect);
+            m_view->setProperty("currentSelectionRow", index.row());
+            m_view->viewport()->update();
+            updatePreviewFromSelection();
+            updateStatusLine();
+            logSelectionState("after deferred clicked", m_view);
+        });
+    });
+
     connect(m_view, &QTableView::doubleClicked, this, [this](const QModelIndex &index) {
         if (!index.isValid()) {
             return;
@@ -357,10 +618,31 @@ FilePane::FilePane(const QString &label, const QString &initialPath, QWidget *pa
         openSelected();
     });
 
+    connect(m_pathEdit, &QLineEdit::returnPressed, this, &FilePane::commitPathEditor);
+
     connect(m_view->selectionModel(), &QItemSelectionModel::selectionChanged,
             this, [this](const QItemSelection &, const QItemSelection &) {
+                logSelectionState("selectionChanged", m_view);
                 updatePreviewFromSelection();
                 updateStatusLine();
+            });
+    connect(m_view->selectionModel(), &QItemSelectionModel::currentChanged,
+            this, [this](const QModelIndex &current, const QModelIndex &previous) {
+                if (current.isValid()) {
+                    m_view->setProperty("currentSelectionRow", current.row());
+                    m_view->viewport()->update();
+                    updatePreviewFromSelection();
+                    updateStatusLine();
+                }
+                if (!selectionDebugEnabled()) {
+                    return;
+                }
+                selectionDebugLog(QString("[selection] currentChanged current=(%1,%2) previous=(%3,%4)")
+                    .arg(current.row())
+                    .arg(current.column())
+                    .arg(previous.row())
+                    .arg(previous.column()));
+                logSelectionState("currentChanged", m_view);
             });
 
     connect(m_view, &QWidget::customContextMenuRequested, this, [this](const QPoint &point) {
@@ -407,6 +689,15 @@ FilePane::FilePane(const QString &label, const QString &initialPath, QWidget *pa
 
     navigateTo(initialPath, false);
     setActive(false);
+}
+
+FilePane::~FilePane()
+{
+    if (m_gitStatusProcess) {
+        m_gitStatusProcess->kill();
+        m_gitStatusProcess->waitForFinished(100);
+        m_gitStatusProcess = nullptr;
+    }
 }
 
 QString FilePane::currentPath() const
@@ -461,7 +752,10 @@ QList<QUrl> FilePane::selectedUrls() const
 {
     QList<QUrl> urls;
     QSet<QString> seen;
-    const QModelIndexList rows = m_view->selectionModel()->selectedRows();
+    QModelIndexList rows = m_view->selectionModel()->selectedRows();
+    if (rows.isEmpty() && m_view->currentIndex().isValid()) {
+        rows << m_view->currentIndex().sibling(m_view->currentIndex().row(), ColumnName);
+    }
     for (const QModelIndex &index : rows) {
         const QString path = m_model->filePath(m_proxyModel->mapToSource(index));
         if (!seen.contains(path)) {
@@ -499,9 +793,14 @@ void FilePane::setActive(bool active)
     m_badgeLabel->setProperty("activePane", active);
     m_badgeLabel->style()->unpolish(m_badgeLabel);
     m_badgeLabel->style()->polish(m_badgeLabel);
-    m_pathLabel->setProperty("activePane", active);
-    m_pathLabel->style()->unpolish(m_pathLabel);
-    m_pathLabel->style()->polish(m_pathLabel);
+    m_pathEdit->setProperty("activePane", active);
+    m_pathEdit->style()->unpolish(m_pathEdit);
+    m_pathEdit->style()->polish(m_pathEdit);
+}
+
+void FilePane::setThemeColors(const QString &fileForeground, const QString &directoryForeground)
+{
+    m_proxyModel->setThemeColors(fileForeground, directoryForeground);
 }
 
 void FilePane::navigateTo(const QString &path, bool recordHistory)
@@ -519,21 +818,32 @@ void FilePane::navigateTo(const QString &path, bool recordHistory)
     }
 
     m_currentPath = nextPath;
-    m_pathLabel->setText(displayPath(m_currentPath));
+    m_pathEdit->setText(displayPath(m_currentPath));
     if (!m_isSwitchingTabs) {
         updateCurrentTabPath(m_currentPath);
     }
     m_view->setRootIndex(m_proxyModel->mapFromSource(m_model->setRootPath(m_currentPath)));
+    m_view->setProperty("currentSelectionRow", -1);
+    refreshGitStatuses();
     updateStatusLine();
     emit directoryChanged(m_currentPath);
     emit activated(this);
 }
 
+void FilePane::focusFileList()
+{
+    m_view->setFocus(Qt::OtherFocusReason);
+}
+
 void FilePane::goUp()
 {
+    const QString previousPath = m_currentPath;
     QDir dir(m_currentPath);
     if (dir.cdUp()) {
         navigateTo(dir.absolutePath());
+        QTimer::singleShot(0, this, [this, previousPath]() {
+            setCurrentIndexForPath(previousPath);
+        });
     }
 }
 
@@ -559,6 +869,8 @@ void FilePane::reload()
 {
     m_model->setRootPath(QString());
     m_view->setRootIndex(m_proxyModel->mapFromSource(m_model->setRootPath(m_currentPath)));
+    m_view->setProperty("currentSelectionRow", -1);
+    refreshGitStatuses();
     updateStatusLine();
 }
 
@@ -570,6 +882,9 @@ void FilePane::openSelected()
     }
     if (info.isDir()) {
         navigateTo(info.absoluteFilePath());
+        QTimer::singleShot(0, this, [this]() {
+            selectParentEntry();
+        });
     } else {
         QDesktopServices::openUrl(QUrl::fromLocalFile(info.absoluteFilePath()));
     }
@@ -731,12 +1046,37 @@ void FilePane::previousTab()
 
 bool FilePane::eventFilter(QObject *watched, QEvent *event)
 {
+    if (watched == m_pathEdit) {
+        if (event->type() == QEvent::FocusIn) {
+            m_pathEdit->setText(m_currentPath);
+            m_pathEdit->selectAll();
+            emit activated(this);
+        }
+        if (event->type() == QEvent::FocusOut) {
+            m_pathEdit->setText(displayPath(m_currentPath));
+        }
+        if (event->type() == QEvent::KeyPress) {
+            auto *keyEvent = static_cast<QKeyEvent *>(event);
+            if (keyEvent->key() == Qt::Key_Escape) {
+                m_pathEdit->setText(displayPath(m_currentPath));
+                m_view->setFocus();
+                return true;
+            }
+        }
+    }
     if (watched == m_view) {
         if (event->type() == QEvent::FocusIn || event->type() == QEvent::MouseButtonPress) {
             emit activated(this);
         }
         if (event->type() == QEvent::KeyPress) {
             auto *keyEvent = static_cast<QKeyEvent *>(event);
+            if (keyEvent->key() == Qt::Key_Down
+                && !m_view->currentIndex().isValid()
+                && m_view->selectionModel()->selectedIndexes().isEmpty()) {
+                if (selectParentEntry()) {
+                    return true;
+                }
+            }
             if (keyEvent->key() == Qt::Key_Return || keyEvent->key() == Qt::Key_Enter) {
                 openSelected();
                 return true;
@@ -1186,6 +1526,77 @@ void FilePane::saveColumnSettings()
     settings.endGroup();
 }
 
+void FilePane::refreshGitStatuses()
+{
+    if (m_gitStatusProcess) {
+        disconnect(m_gitStatusProcess, nullptr, this, nullptr);
+        m_gitStatusProcess->kill();
+        m_gitStatusProcess->waitForFinished(100);
+        m_gitStatusProcess->deleteLater();
+        m_gitStatusProcess = nullptr;
+    }
+
+    m_proxyModel->setGitStatuses({});
+
+    const QString gitProgram = QStandardPaths::findExecutable("git");
+    if (gitProgram.isEmpty() || m_currentPath.isEmpty()) {
+        return;
+    }
+
+    m_gitStatusProcess = new QProcess(this);
+    m_gitStatusProcess->setProgram(gitProgram);
+    m_gitStatusProcess->setArguments({
+        "-C",
+        m_currentPath,
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all",
+    });
+    connect(m_gitStatusProcess, &QProcess::finished, this, [this](int exitCode, QProcess::ExitStatus exitStatus) {
+        QProcess *process = m_gitStatusProcess;
+        m_gitStatusProcess = nullptr;
+        if (!process) {
+            return;
+        }
+        const QString output = QString::fromLocal8Bit(process->readAllStandardOutput());
+        process->deleteLater();
+        if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+            applyGitStatusOutput(output);
+        }
+    });
+    m_gitStatusProcess->start();
+}
+
+void FilePane::applyGitStatusOutput(const QString &output)
+{
+    QHash<QString, QString> statuses;
+    const QDir directory(m_currentPath);
+    const QStringList lines = output.split('\n', Qt::SkipEmptyParts);
+    for (const QString &line : lines) {
+        if (line.size() < 4) {
+            continue;
+        }
+        const QString status = line.left(2);
+        const QString relativePath = porcelainPath(line.mid(3));
+        if (relativePath.isEmpty()) {
+            continue;
+        }
+
+        const QString label = porcelainStatusLabel(status);
+        const QString absolutePath = QFileInfo(directory.filePath(relativePath)).absoluteFilePath();
+        statuses.insert(absolutePath, label);
+
+        const QString topLevelName = relativePath.section('/', 0, 0);
+        if (!topLevelName.isEmpty()) {
+            const QString topLevelPath = QFileInfo(directory.filePath(topLevelName)).absoluteFilePath();
+            if (!statuses.contains(topLevelPath)) {
+                statuses.insert(topLevelPath, label);
+            }
+        }
+    }
+    m_proxyModel->setGitStatuses(statuses);
+}
+
 void FilePane::updatePreviewFromSelection()
 {
     const QFileInfo info = currentFileInfo();
@@ -1200,7 +1611,10 @@ void FilePane::updateStatusLine()
 {
     const QModelIndex root = m_view->rootIndex();
     const int total = m_proxyModel->rowCount(root);
-    const int selected = m_view->selectionModel()->selectedRows().size();
+    int selected = m_view->selectionModel()->selectedRows().size();
+    if (selected == 0 && m_view->currentIndex().isValid()) {
+        selected = 1;
+    }
     QString selectedText = selected > 0
         ? UiText::t("%1 selected", "%1 件選択").arg(selected)
         : UiText::t("No selection", "選択なし");
@@ -1209,6 +1623,20 @@ void FilePane::updateStatusLine()
         .arg(total)
         .arg(selectedText)
         .arg(displayPath(m_currentPath)));
+}
+
+void FilePane::commitPathEditor()
+{
+    const QString path = m_pathEdit->text().trimmed();
+    if (path.isEmpty()) {
+        m_pathEdit->setText(displayPath(m_currentPath));
+        return;
+    }
+    const QString expandedPath = path == "~"
+        ? QDir::homePath()
+        : (path.startsWith("~/") ? QDir::home().filePath(path.mid(2)) : path);
+    navigateTo(expandedPath);
+    m_pathEdit->setText(displayPath(m_currentPath));
 }
 
 QString FilePane::displayPath(const QString &path) const
@@ -1255,6 +1683,41 @@ void FilePane::setCurrentIndexForPath(const QString &path)
 {
     const QModelIndex index = m_proxyModel->mapFromSource(m_model->index(path));
     if (index.isValid()) {
-        m_view->setCurrentIndex(index);
+        selectProxyIndex(index);
     }
+}
+
+void FilePane::selectProxyIndex(const QModelIndex &index)
+{
+    if (!index.isValid()) {
+        return;
+    }
+
+    const QModelIndex nameIndex = index.sibling(index.row(), ColumnName);
+    m_view->setCurrentIndex(nameIndex);
+    m_view->selectionModel()->select(rowSelection(nameIndex), QItemSelectionModel::ClearAndSelect);
+    m_view->setProperty("currentSelectionRow", nameIndex.row());
+    m_view->scrollTo(nameIndex, QAbstractItemView::PositionAtCenter);
+    m_view->viewport()->update();
+    updatePreviewFromSelection();
+    updateStatusLine();
+}
+
+bool FilePane::selectParentEntry()
+{
+    const QModelIndex root = m_view->rootIndex();
+    const int rows = m_proxyModel->rowCount(root);
+    for (int row = 0; row < rows; ++row) {
+        const QModelIndex index = m_proxyModel->index(row, ColumnName, root);
+        if (m_proxyModel->data(index, Qt::DisplayRole).toString() == "..") {
+            selectProxyIndex(index);
+            return true;
+        }
+    }
+
+    if (rows > 0) {
+        selectProxyIndex(m_proxyModel->index(0, ColumnName, root));
+        return true;
+    }
+    return false;
 }

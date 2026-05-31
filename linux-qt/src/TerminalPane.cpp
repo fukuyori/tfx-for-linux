@@ -2,7 +2,9 @@
 
 #include <QDir>
 #include <QHBoxLayout>
+#include <QLabel>
 #include <QPushButton>
+#include <QToolButton>
 #include <QVBoxLayout>
 
 TerminalPane::TerminalPane(QWidget *parent)
@@ -12,9 +14,28 @@ TerminalPane::TerminalPane(QWidget *parent)
       m_process(new QProcess(this)),
       m_workingDirectory(QDir::homePath())
 {
+    setObjectName("terminalPane");
+    setAttribute(Qt::WA_StyledBackground, true);
+    m_output->setObjectName("terminalOutput");
+    m_command->setObjectName("terminalCommand");
     m_output->setReadOnly(true);
     m_output->setMaximumBlockCount(3000);
     m_command->setPlaceholderText("command");
+
+    auto *title = new QLabel("TERMINAL", this);
+    title->setObjectName("terminalTitle");
+    auto *closeButton = new QToolButton(this);
+    closeButton->setObjectName("terminalCloseButton");
+    closeButton->setText("x");
+    closeButton->setToolTip("Close");
+    connect(closeButton, &QToolButton::clicked, this, &TerminalPane::closeRequested);
+
+    auto *headerLayout = new QHBoxLayout();
+    headerLayout->setContentsMargins(0, 0, 0, 0);
+    headerLayout->setSpacing(0);
+    headerLayout->addWidget(title);
+    headerLayout->addStretch(1);
+    headerLayout->addWidget(closeButton);
 
     auto *runButton = new QPushButton("Run", this);
     connect(runButton, &QPushButton::clicked, this, &TerminalPane::runCommand);
@@ -34,7 +55,9 @@ TerminalPane::TerminalPane(QWidget *parent)
     commandLayout->addWidget(runButton);
 
     auto *layout = new QVBoxLayout(this);
-    layout->setContentsMargins(4, 4, 4, 4);
+    layout->setContentsMargins(0, 0, 0, 4);
+    layout->setSpacing(0);
+    layout->addLayout(headerLayout);
     layout->addWidget(m_output, 1);
     layout->addLayout(commandLayout);
 }

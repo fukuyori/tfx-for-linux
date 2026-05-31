@@ -1,24 +1,25 @@
 # tfx for Linux Qt
 
-Version: **0.1.0**
+Version: **0.2.0**
 
 This directory contains the C++/Qt 6 Widgets implementation of `tfx-for-linux`.
 
 ## Build
 
 ```sh
-cmake -S linux-qt -B /tmp/tfx-qt-build
-cmake --build /tmp/tfx-qt-build
-/tmp/tfx-qt-build/tfx-qt
+./build.sh
+./build/tfx
 ```
 
 ## Scope
 
 - Folder tree and pinned folders
 - Single-pane and split-pane file browser
+- Startup path handling from command-line folder or current working directory
 - Preview pane with source/rendered view switching
 - Built-in command pane
 - Restored window size, pane visibility, splitter sizes, tabs, and file-list columns
+- Mouse and keyboard selection with persistent row highlight
 - Configurable file-list columns:
   - Name
   - Type

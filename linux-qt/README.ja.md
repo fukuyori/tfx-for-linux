@@ -1,24 +1,25 @@
 # tfx for Linux Qt
 
-Version: **0.1.0**
+Version: **0.2.0**
 
 このディレクトリは、`tfx-for-linux` の C++/Qt 6 Widgets 実装です。
 
 ## ビルド
 
 ```sh
-cmake -S linux-qt -B /tmp/tfx-qt-build
-cmake --build /tmp/tfx-qt-build
-/tmp/tfx-qt-build/tfx-qt
+./build.sh
+./build/tfx
 ```
 
 ## 実装範囲
 
 - フォルダツリーとピン留めフォルダ
 - 単独表示 / スプリット表示のファイル一覧
+- 起動引数またはカレントディレクトリに基づく左ペインの起動パス制御
 - ソース表示 / レンダリング表示を切り替えられるプレビューペイン
 - 内蔵コマンドペイン
 - ウインドウサイズ、表示状態、splitter 幅、タブ、ファイル一覧表示項目の復元
+- ファイル一覧でのマウス/キーボード選択と、選択行の保持表示
 - ファイル一覧の表示項目:
   - ファイル名
   - 種類

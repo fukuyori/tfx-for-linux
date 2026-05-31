@@ -21,6 +21,9 @@
 #include <QSizePolicy>
 #include <QStatusBar>
 #include <QStyle>
+#include <QStyledItemDelegate>
+#include <QStyleOptionViewItem>
+#include <QTimer>
 #include <QToolButton>
 #include <QUrl>
 #include <QVBoxLayout>
@@ -50,7 +53,7 @@ QIcon toolbarIcon(const QString &kind)
 
     QPainter painter(&pixmap);
     painter.setRenderHint(QPainter::Antialiasing);
-    QPen pen(QColor("#CFFFCF"), 1.7);
+    QPen pen(QColor("#D9E1E8"), 1.7);
     painter.setPen(pen);
     painter.setBrush(Qt::NoBrush);
 
@@ -61,7 +64,7 @@ QIcon toolbarIcon(const QString &kind)
     } else if (kind == "preview") {
         QRectF rect(7, 8, 18, 16);
         painter.drawRoundedRect(rect, 2, 2);
-        painter.fillRect(QRectF(18, 9, 6, 14), QColor("#CFFFCF"));
+        painter.fillRect(QRectF(18, 9, 6, 14), QColor("#D9E1E8"));
         painter.drawLine(QPointF(18, 8), QPointF(18, 24));
     } else if (kind == "search") {
         painter.drawEllipse(QRectF(9, 9, 10, 10));
@@ -70,6 +73,22 @@ QIcon toolbarIcon(const QString &kind)
 
     return QIcon(pixmap);
 }
+
+class FolderTreeDelegate : public QStyledItemDelegate {
+public:
+    explicit FolderTreeDelegate(QObject *parent = nullptr)
+        : QStyledItemDelegate(parent)
+    {
+    }
+
+    void initStyleOption(QStyleOptionViewItem *option, const QModelIndex &index) const override
+    {
+        QStyledItemDelegate::initStyleOption(option, index);
+        option->icon = QIcon();
+        option->decorationSize = QSize(0, 0);
+        option->features &= ~QStyleOptionViewItem::HasDecoration;
+    }
+};
 }
 
 MainWindow::MainWindow(const QString &initialPath, QWidget *parent)
@@ -90,9 +109,11 @@ MainWindow::MainWindow(const QString &initialPath, QWidget *parent)
       m_terminalPane(new TerminalPane(this)),
       m_fileSplitter(new QSplitter(Qt::Horizontal, this)),
       m_mainSplitter(new QSplitter(Qt::Horizontal, this)),
-      m_verticalSplitter(new QSplitter(Qt::Vertical, this))
+      m_verticalSplitter(new QSplitter(Qt::Vertical, this)),
+      m_config(AppConfig::loadOrCreate()),
+      m_initialPath(initialPath)
 {
-    setWindowTitle("tfx Qt");
+    setWindowTitle("tfx");
     resize(1280, 780);
     applyTerminalTheme();
     buildTopToolbar();
@@ -119,8 +140,8 @@ MainWindow::MainWindow(const QString &initialPath, QWidget *parent)
     auto *sidebarLayout = new QVBoxLayout(m_sidebar);
     sidebarLayout->setContentsMargins(10, 8, 8, 0);
     sidebarLayout->setSpacing(6);
-    auto *pinnedLabel = new QLabel(UiText::t("FOLDERS", "フォルダ"), m_sidebar);
-    auto *treeLabel = new QLabel(UiText::t("FOLDERS", "フォルダ"), m_sidebar);
+    auto *pinnedLabel = new QLabel(UiText::t("Pinned", "ピン留め"), m_sidebar);
+    auto *treeLabel = new QLabel(UiText::t("Folders", "フォルダー"), m_sidebar);
     pinnedLabel->setObjectName("sectionLabel");
     treeLabel->setObjectName("sectionLabel");
     sidebarLayout->addWidget(pinnedLabel);
@@ -191,11 +212,21 @@ MainWindow::MainWindow(const QString &initialPath, QWidget *parent)
             saveSettings();
         }
     });
+    connect(m_terminalPane, &TerminalPane::closeRequested, this, [this]() {
+        setTerminalVisible(false);
+    });
 
     buildActions();
+    auto *focusOtherPaneShortcut = new QShortcut(QKeySequence(Qt::Key_Tab), this);
+    connect(focusOtherPaneShortcut, &QShortcut::activated, this, &MainWindow::focusOtherPane);
+    auto *focusPreviousPaneShortcut = new QShortcut(QKeySequence(Qt::SHIFT | Qt::Key_Tab), this);
+    connect(focusPreviousPaneShortcut, &QShortcut::activated, this, &MainWindow::focusOtherPane);
     setActivePane(m_leftPane);
     m_previewPane->previewPath(initialPath);
     restoreSettings();
+    QTimer::singleShot(0, this, [this]() {
+        activePane()->focusFileList();
+    });
     statusBar()->showMessage(initialPath);
 }
 
@@ -208,40 +239,40 @@ void MainWindow::closeEvent(QCloseEvent *event)
 void MainWindow::buildActions()
 {
     auto *fileMenu = menuBar()->addMenu(UiText::t("File", "ファイル"));
-    addMenuAction(fileMenu, UiText::t("New File", "新規ファイル"), this, [this]() { activePane()->createFile(); }, QKeySequence("Ctrl+Shift+N"));
-    addMenuAction(fileMenu, UiText::t("New Folder", "新規フォルダ"), this, [this]() { activePane()->createFolder(); }, QKeySequence("Ctrl+N"));
-    addMenuAction(fileMenu, UiText::t("Rename", "名前を変更"), this, [this]() { activePane()->renameSelected(); }, QKeySequence("F2"));
-    addMenuAction(fileMenu, UiText::t("Move to Trash", "ゴミ箱へ移動"), this, [this]() { activePane()->moveSelectedToTrash(); }, QKeySequence("Del"));
+    addMenuAction(fileMenu, UiText::t("New File", "新規ファイル"), this, [this]() { activePane()->createFile(); }, QKeySequence(m_config.shortcut("newFile", "Ctrl+N")));
+    addMenuAction(fileMenu, UiText::t("New Folder", "新規フォルダ"), this, [this]() { activePane()->createFolder(); }, QKeySequence(m_config.shortcut("newFolder", "Ctrl+Shift+N")));
+    addMenuAction(fileMenu, UiText::t("Rename", "名前を変更"), this, [this]() { activePane()->renameSelected(); }, QKeySequence(m_config.shortcut("rename", "F2")));
+    addMenuAction(fileMenu, UiText::t("Move to Trash", "ゴミ箱へ移動"), this, [this]() { activePane()->moveSelectedToTrash(); }, QKeySequence(m_config.shortcut("moveToTrash", "Del")));
     fileMenu->addSeparator();
-    addMenuAction(fileMenu, UiText::t("Quit", "終了"), qApp, []() { QApplication::quit(); }, QKeySequence("Ctrl+Q"));
+    addMenuAction(fileMenu, UiText::t("Quit", "終了"), qApp, []() { QApplication::quit(); }, QKeySequence(m_config.shortcut("quit", "Ctrl+Q")));
 
     auto *editMenu = menuBar()->addMenu(UiText::t("Edit", "編集"));
-    addMenuAction(editMenu, UiText::t("Copy", "コピー"), this, [this]() { activePane()->copySelected(); }, QKeySequence::Copy);
-    addMenuAction(editMenu, UiText::t("Cut", "カット"), this, [this]() { activePane()->cutSelected(); }, QKeySequence::Cut);
-    addMenuAction(editMenu, UiText::t("Paste", "ペースト"), this, [this]() { activePane()->pasteIntoCurrentDirectory(); }, QKeySequence::Paste);
+    addMenuAction(editMenu, UiText::t("Copy", "コピー"), this, [this]() { activePane()->copySelected(); }, QKeySequence(m_config.shortcut("copyItems", "Ctrl+C")));
+    addMenuAction(editMenu, UiText::t("Cut", "カット"), this, [this]() { activePane()->cutSelected(); }, QKeySequence(m_config.shortcut("cutItems", "Ctrl+X")));
+    addMenuAction(editMenu, UiText::t("Paste", "ペースト"), this, [this]() { activePane()->pasteIntoCurrentDirectory(); }, QKeySequence(m_config.shortcut("pasteItems", "Ctrl+V")));
     addMenuAction(editMenu, UiText::t("Copy Path", "パスをコピー"), this, [this]() { activePane()->copySelectedPaths(); }, QKeySequence("Ctrl+Shift+C"));
 
     auto *viewMenu = menuBar()->addMenu(UiText::t("View", "表示"));
     m_splitAction = viewMenu->addAction(UiText::t("Split Pane", "スプリット表示"));
     m_splitAction->setCheckable(true);
     m_splitAction->setChecked(true);
-    m_splitAction->setShortcut(QKeySequence("Ctrl+\\"));
+    m_splitAction->setShortcut(QKeySequence(m_config.shortcut("toggleSplit", "Ctrl+\\")));
     connect(m_splitAction, &QAction::toggled, this, &MainWindow::setSplitVisible);
 
     m_previewAction = viewMenu->addAction(UiText::t("Preview", "プレビュー"));
     m_previewAction->setCheckable(true);
     m_previewAction->setChecked(true);
-    m_previewAction->setShortcut(QKeySequence("Ctrl+P"));
+    m_previewAction->setShortcut(QKeySequence(m_config.shortcut("togglePreview", "Ctrl+Shift+P")));
     connect(m_previewAction, &QAction::toggled, this, &MainWindow::setPreviewVisible);
 
     m_terminalAction = viewMenu->addAction(UiText::t("Terminal Pane", "ターミナルペイン"));
     m_terminalAction->setCheckable(true);
-    m_terminalAction->setShortcut(QKeySequence("Ctrl+Alt+T"));
+    m_terminalAction->setShortcut(QKeySequence(m_config.shortcut("toggleTerminal", "Ctrl+J")));
     connect(m_terminalAction, &QAction::toggled, this, &MainWindow::setTerminalVisible);
 
     m_hiddenAction = viewMenu->addAction(UiText::t("Show Hidden Files", "隠しファイルを表示"));
     m_hiddenAction->setCheckable(true);
-    m_hiddenAction->setShortcut(QKeySequence("Ctrl+H"));
+    m_hiddenAction->setShortcut(QKeySequence(m_config.shortcut("toggleHidden", "Ctrl+Shift+.")));
     connect(m_hiddenAction, &QAction::toggled, this, &MainWindow::setHiddenFilesVisible);
 
     addMenuAction(viewMenu, UiText::t("File List Settings...", "ファイル一覧設定..."), this, [this]() {
@@ -249,16 +280,16 @@ void MainWindow::buildActions()
     });
 
     auto *tabMenu = menuBar()->addMenu(UiText::t("Tabs", "タブ"));
-    addMenuAction(tabMenu, UiText::t("New Tab", "新規タブ"), this, [this]() { activePane()->newTab(); }, QKeySequence("Ctrl+Shift+T"));
-    addMenuAction(tabMenu, UiText::t("Close Tab", "タブを閉じる"), this, [this]() { activePane()->closeCurrentTab(); }, QKeySequence("Ctrl+W"));
-    addMenuAction(tabMenu, UiText::t("Previous Tab", "前のタブ"), this, [this]() { activePane()->previousTab(); }, QKeySequence("Ctrl+Shift+["));
-    addMenuAction(tabMenu, UiText::t("Next Tab", "次のタブ"), this, [this]() { activePane()->nextTab(); }, QKeySequence("Ctrl+Shift+]"));
+    addMenuAction(tabMenu, UiText::t("New Tab", "新規タブ"), this, [this]() { activePane()->newTab(); }, QKeySequence(m_config.shortcut("newTab", "Ctrl+T")));
+    addMenuAction(tabMenu, UiText::t("Close Tab", "タブを閉じる"), this, [this]() { activePane()->closeCurrentTab(); }, QKeySequence(m_config.shortcut("closeTab", "Ctrl+W")));
+    addMenuAction(tabMenu, UiText::t("Previous Tab", "前のタブ"), this, [this]() { activePane()->previousTab(); }, QKeySequence(m_config.shortcut("prevTab", "Ctrl+Shift+[")));
+    addMenuAction(tabMenu, UiText::t("Next Tab", "次のタブ"), this, [this]() { activePane()->nextTab(); }, QKeySequence(m_config.shortcut("nextTab", "Ctrl+Shift+]")));
 
     auto *navMenu = menuBar()->addMenu(UiText::t("Navigate", "移動"));
-    addMenuAction(navMenu, UiText::t("Parent", "親フォルダ"), this, [this]() { activePane()->goUp(); }, QKeySequence("Alt+Up"));
-    addMenuAction(navMenu, UiText::t("Back", "戻る"), this, [this]() { activePane()->goBack(); }, QKeySequence("Alt+Left"));
-    addMenuAction(navMenu, UiText::t("Forward", "進む"), this, [this]() { activePane()->goForward(); }, QKeySequence("Alt+Right"));
-    addMenuAction(navMenu, UiText::t("Reload", "再読み込み"), this, [this]() { activePane()->reload(); }, QKeySequence("Ctrl+R"));
+    addMenuAction(navMenu, UiText::t("Parent", "親フォルダ"), this, [this]() { activePane()->goUp(); }, QKeySequence(m_config.shortcut("goUp", "Alt+Up")));
+    addMenuAction(navMenu, UiText::t("Back", "戻る"), this, [this]() { activePane()->goBack(); }, QKeySequence(m_config.shortcut("goBack", "Alt+Left")));
+    addMenuAction(navMenu, UiText::t("Forward", "進む"), this, [this]() { activePane()->goForward(); }, QKeySequence(m_config.shortcut("goForward", "Alt+Right")));
+    addMenuAction(navMenu, UiText::t("Reload", "再読み込み"), this, [this]() { activePane()->reload(); }, QKeySequence(m_config.shortcut("reload", "F5")));
 }
 
 void MainWindow::buildTopToolbar()
@@ -275,6 +306,11 @@ void MainWindow::buildTopToolbar()
     m_searchEdit->setMaximumWidth(260);
     connect(m_searchEdit, &QLineEdit::textChanged, this, [this](const QString &text) {
         activePane()->setPathFilter(text);
+    });
+    auto *focusSearchShortcut = new QShortcut(QKeySequence(m_config.shortcut("focusSearch", "Ctrl+F")), this);
+    connect(focusSearchShortcut, &QShortcut::activated, m_searchEdit, [this]() {
+        m_searchEdit->setFocus();
+        m_searchEdit->selectAll();
     });
     m_topToolbar->addWidget(m_searchEdit);
 
@@ -313,9 +349,9 @@ void MainWindow::buildFolderSidebar(const QString &initialPath)
         m_treeView->hideColumn(column);
     }
     m_treeView->header()->hide();
+    m_treeView->setItemDelegate(new FolderTreeDelegate(m_treeView));
     m_treeView->setCurrentIndex(m_treeModel->index(initialPath));
-    m_treeView->setIndentation(18);
-    m_treeView->setIconSize(QSize(18, 18));
+    m_treeView->setIndentation(10);
     m_treeView->setContextMenuPolicy(Qt::CustomContextMenu);
 
     connect(m_treeView, &QTreeView::clicked, this, [this](const QModelIndex &index) {
@@ -398,143 +434,158 @@ void MainWindow::buildFolderSidebar(const QString &initialPath)
 
 void MainWindow::applyTerminalTheme()
 {
-    qApp->setStyleSheet(R"(
+    QString styleSheet = R"(
         QMainWindow, QWidget {
-            background: #000301;
-            color: #CFFFCF;
-            font-family: "JetBrains Mono", "Fira Code", "DejaVu Sans Mono", monospace;
-            font-size: 13px;
+            background: #151A1E;
+            color: #D9E1E8;
+            font-family: __MONO_FONT__;
+            font-size: 12px;
         }
         QMenuBar, QMenu {
-            background: #030905;
-            color: #CFFFCF;
-            border: 1px solid #102E1A;
+            background: #11161A;
+            color: #D9E1E8;
+            border: 1px solid #2A333A;
         }
         QMenu::item { padding: 5px 22px 5px 18px; }
-        QMenu::item:selected { background: #102E1A; color: #6FFF80; }
+        QMenu::item:selected { background: #243947; color: #FFFFFF; }
         QToolBar#topToolbar {
-            background: #030905;
+            background: #151A1E;
             border: 0;
-            border-bottom: 1px solid #0B2012;
-            padding: 7px 9px;
-            spacing: 8px;
+            border-bottom: 1px solid #293137;
+            padding: 4px 8px;
+            spacing: 5px;
         }
         QLineEdit#pathEdit {
-            background: #020704;
-            color: #CFFFCF;
-            border: 1px solid #0B2012;
-            border-radius: 6px;
-            padding: 8px 14px;
+            background: #0F1418;
+            color: #D9E1E8;
+            border: 1px solid #2A333A;
+            border-radius: 0;
+            padding: 5px 10px;
             font-weight: 700;
         }
         QLineEdit#searchEdit {
-            background: #061109;
-            color: #CFFFCF;
-            border: 1px solid #102E1A;
-            border-radius: 6px;
-            padding: 7px 11px;
-            selection-background-color: #102E1A;
+            background: #10161A;
+            color: #D9E1E8;
+            border: 1px solid #2A333A;
+            border-radius: 0;
+            padding: 5px 9px;
+            selection-background-color: #243947;
         }
         QWidget#sidebar {
-            background: #000301;
-            border-right: 1px solid #102E1A;
+            background: #171C20;
+            border-right: 1px solid #2A333A;
         }
         QLabel#sectionLabel {
-            color: #6FFF80;
-            font-weight: 700;
-            padding: 6px 0 4px 0;
+            color: #9EABB6;
+            font-weight: 500;
+            padding: 7px 0 3px 0;
         }
         QListWidget, QTreeView {
-            background: #000301;
-            color: #CFFFCF;
-            selection-background-color: #0B2012;
-            selection-color: #6FFF80;
-            border: 0;
-            outline: 0;
-        }
-        QTableView#fileTable {
-            background: #000301;
-            color: #CFFFCF;
-            selection-background-color: #102E1A;
+            background: #171C20;
+            color: #D9E1E8;
+            selection-background-color: #263D4C;
             selection-color: #FFFFFF;
             border: 0;
             outline: 0;
         }
-        QHeaderView::section {
-            background: #000301;
-            color: #6FFF80;
+        QTableView#fileTable {
+            background: #151A1E;
+            color: #D9E1E8;
+            selection-background-color: #263D4C;
+            selection-color: #FFFFFF;
             border: 0;
-            border-top: 1px solid #061109;
-            border-bottom: 1px solid #061109;
-            padding: 4px 10px;
-            font-weight: 700;
+            outline: 0;
+            gridline-color: #293137;
+        }
+        QTableView#fileTable::item:selected,
+        QTableView#fileTable::item:selected:active,
+        QTableView#fileTable::item:selected:!active {
+            background-color: #31576B;
+            color: #FFFFFF;
+        }
+        QTableView#fileTable::item:hover {
+            background: #1F2830;
+        }
+        QHeaderView::section {
+            background: #10161A;
+            color: #B9C4CC;
+            border: 0;
+            border-top: 1px solid #2A333A;
+            border-bottom: 1px solid #2A333A;
+            border-right: 1px solid #2A333A;
+            padding: 4px 9px;
+            font-weight: 500;
         }
         QTabBar#paneTabs {
-            background: #000301;
-            border-bottom: 1px solid #0B2012;
+            background: #151A1E;
+            border-bottom: 1px solid #2A333A;
             min-height: 21px;
         }
         QTabBar#paneTabs::tab {
             background: transparent;
-            color: #1A8F39;
+            color: #9EABB6;
             border: 1px solid transparent;
             border-radius: 2px;
             padding: 2px 10px;
             margin: 1px 2px 1px 0;
         }
         QTabBar#paneTabs::tab:selected {
-            color: #6FFF80;
-            border-color: #125625;
-            background: #061109;
+            color: #D9E1E8;
+            border-color: #364149;
+            background: #10161A;
         }
         QWidget#filePane {
-            background: #000301;
-            border: 1px solid #0B2012;
+            background: #151A1E;
+            border: 1px solid #2A333A;
         }
         QWidget#filePane[activePane="true"] {
-            border: 2px solid #6FFF80;
+            border: 2px solid #36E67A;
         }
         QLabel#paneBadge {
-            color: #6FFF80;
+            color: #AEBBC5;
             background: transparent;
-            border: 1px solid #125625;
+            border: 1px solid #38434B;
             border-radius: 2px;
-            padding: 2px 8px;
+            padding: 2px 9px;
             font-weight: 700;
         }
         QLabel#paneBadge[activePane="true"] {
-            color: #001909;
-            background: #6FFF80;
-            border-color: #6FFF80;
+            color: #04140A;
+            background: #63F28D;
+            border-color: #63F28D;
         }
-        QLabel#panePath {
-            color: #1A8F39;
+        QLineEdit#panePath {
+            color: #AEBBC5;
+            background: transparent;
+            border: 0;
+            padding: 0;
             font-weight: 600;
+            selection-background-color: #263D4C;
         }
-        QLabel#panePath[activePane="true"] {
-            color: #6FFF80;
+        QLineEdit#panePath[activePane="true"] {
+            color: #63F28D;
         }
         QLabel#paneStatus {
-            background: #030905;
-            color: #6FFF80;
-            border-top: 1px solid #0B2012;
-            padding: 7px 10px;
+            background: #10161A;
+            color: #B9C4CC;
+            border-top: 1px solid #2A333A;
+            padding: 5px 10px;
             font-weight: 600;
         }
         QToolButton, QPushButton {
-            background: #061109;
-            color: #CFFFCF;
-            border: 1px solid #102E1A;
-            border-radius: 6px;
-            padding: 5px 8px;
+            background: #151B20;
+            color: #D9E1E8;
+            border: 1px solid #303A42;
+            border-radius: 3px;
+            padding: 4px 7px;
         }
         QToolButton#toolbarIconButton {
-            min-width: 36px;
-            max-width: 36px;
-            min-height: 28px;
-            max-height: 28px;
+            min-width: 31px;
+            max-width: 31px;
+            min-height: 24px;
+            max-height: 24px;
             padding: 0;
-            background: #061109;
+            background: #151B20;
         }
         QToolButton#previewSourceToggle {
             min-width: 32px;
@@ -542,47 +593,115 @@ void MainWindow::applyTerminalTheme()
             min-height: 24px;
             max-height: 24px;
             padding: 0;
-            background: #061109;
+            background: #151B20;
         }
         QToolButton:hover, QPushButton:hover {
-            background: #0B2012;
-            border-color: #125625;
+            background: #1F2830;
+            border-color: #4A5963;
         }
         QToolButton#toolbarIconButton:checked,
         QToolButton#previewSourceToggle:checked {
-            background: #102E1A;
-            border-color: #6FFF80;
-            color: #CFFFCF;
+            background: #263D4C;
+            border-color: #5C7484;
+            color: #FFFFFF;
         }
         QSplitter::handle {
-            background: #0B2012;
+            background: #222A30;
         }
         QSplitter#fileSplitter::handle {
-            background: #061109;
-            border-left: 1px solid #125625;
-            border-right: 1px solid #125625;
+            background: #20272D;
+            border-left: 1px solid #2E3941;
+            border-right: 1px solid #2E3941;
         }
         QSplitter#mainSplitter::handle,
         QSplitter#verticalSplitter::handle {
-            background: #061109;
-            border: 1px solid #0B2012;
+            background: #20272D;
+            border: 1px solid #2E3941;
         }
         QStatusBar {
-            background: #030905;
-            color: #1A8F39;
-            border-top: 1px solid #0B2012;
+            background: #151A1E;
+            color: #9EABB6;
+            border-top: 1px solid #2A333A;
+        }
+        QWidget#previewPane {
+            background: #151A1E;
+            border: 1px solid #2A333A;
         }
         QPlainTextEdit#previewCode, QTextBrowser#previewRendered {
-            background: #000301;
-            color: #CFFFCF;
+            background: #151A1E;
+            color: #D9E1E8;
             border: 0;
-            selection-background-color: #102E1A;
+            selection-background-color: #263D4C;
         }
         QLabel#previewTitle {
-            color: #1A8F39;
+            color: #9EABB6;
             font-weight: 600;
         }
-    )");
+        QWidget#terminalPane {
+            background: #050607;
+            border-top: 1px solid #2A333A;
+        }
+        QLabel#terminalTitle {
+            color: #9EABB6;
+            padding: 4px 6px;
+            font-weight: 500;
+        }
+        QToolButton#terminalCloseButton {
+            background: transparent;
+            border: 0;
+            color: #D9E1E8;
+            padding: 0;
+            min-width: 20px;
+            max-width: 20px;
+            min-height: 20px;
+            max-height: 20px;
+        }
+        QToolButton#terminalCloseButton:hover {
+            background: #2A333A;
+        }
+        QPlainTextEdit#terminalOutput {
+            background: #050607;
+            color: #D9E1E8;
+            border: 0;
+            selection-background-color: #263D4C;
+        }
+        QLineEdit#terminalCommand {
+            background: #0D1114;
+            color: #D9E1E8;
+            border: 1px solid #2A333A;
+            border-radius: 0;
+            padding: 4px 8px;
+            selection-background-color: #263D4C;
+        }
+    )";
+    styleSheet.replace("#151A1E", m_config.colors.panelBackground);
+    styleSheet.replace("#151B20", m_config.colors.panelBackground);
+    styleSheet.replace("#11161A", m_config.colors.appBackground);
+    styleSheet.replace("#171C20", m_config.colors.sidebarBackground);
+    styleSheet.replace("#10161A", m_config.colors.inputBackground);
+    styleSheet.replace("#0F1418", m_config.colors.inputBackground);
+    styleSheet.replace("#0D1114", m_config.colors.inputBackground);
+    styleSheet.replace("#050607", m_config.colors.terminalBackground);
+    styleSheet.replace("#D9E1E8", m_config.colors.foreground);
+    styleSheet.replace("#9EABB6", m_config.colors.secondaryForeground);
+    styleSheet.replace("#AEBBC5", m_config.colors.secondaryForeground);
+    styleSheet.replace("#B9C4CC", m_config.colors.headerForeground);
+    styleSheet.replace("#263D4C", m_config.colors.selectedBackground);
+    styleSheet.replace("#31576B", m_config.colors.selectedBackground);
+    styleSheet.replace("#243947", m_config.colors.selectedBackground);
+    styleSheet.replace("#FFFFFF", m_config.colors.selectedForeground);
+    styleSheet.replace("#2A333A", m_config.colors.border);
+    styleSheet.replace("#293137", m_config.colors.border);
+    styleSheet.replace("#303A42", m_config.colors.border);
+    styleSheet.replace("#2E3941", m_config.colors.border);
+    styleSheet.replace("#36E67A", m_config.colors.activeBorder);
+    styleSheet.replace("#63F28D", m_config.colors.activeAccent);
+    styleSheet.replace("#1F2830", m_config.colors.hoverBackground);
+    styleSheet.replace("__MONO_FONT__", m_config.resolvedMonoFontFamily());
+    styleSheet.replace("font-size: 12px;", QString("font-size: %1px;").arg(m_config.font.size));
+    qApp->setStyleSheet(styleSheet);
+    m_leftPane->setThemeColors(m_config.colors.foreground, m_config.colors.directoryForeground);
+    m_rightPane->setThemeColors(m_config.colors.foreground, m_config.colors.directoryForeground);
 }
 
 void MainWindow::addPinnedFolder(const QString &path)
@@ -627,9 +746,19 @@ void MainWindow::restoreSettings()
 {
     m_isRestoringSettings = true;
     QSettings settings;
-    const bool splitVisible = settings.value("View/splitVisible", true).toBool();
-    const bool previewVisible = settings.value("View/previewVisible", true).toBool();
+    bool splitVisible = settings.value("View/splitVisible", true).toBool();
+    bool previewVisible = settings.value("View/previewVisible", true).toBool();
     const bool terminalVisible = settings.value("View/terminalVisible", false).toBool();
+    if (m_config.startup.layout == "single") {
+        splitVisible = false;
+    } else if (m_config.startup.layout == "split") {
+        splitVisible = true;
+    }
+    if (m_config.startup.preview == "show") {
+        previewVisible = true;
+    } else if (m_config.startup.preview == "hide") {
+        previewVisible = false;
+    }
 
     const QByteArray geometry = settings.value("MainWindow/geometry").toByteArray();
     if (!geometry.isEmpty()) {
@@ -664,7 +793,16 @@ void MainWindow::restoreSettings()
     }
     syncLayoutConstraints();
 
-    const QString rightDirectory = settings.value("Panes/rightDirectory", m_rightPane->currentPath()).toString();
+    QString rightDirectory = settings.value("Panes/rightDirectory", m_rightPane->currentPath()).toString();
+    if (!m_config.startup.rightFolder.isEmpty()) {
+        rightDirectory = m_config.startup.rightFolder;
+    }
+    for (const QString &path : m_config.startup.rightFolders) {
+        if (QFileInfo(path).isDir()) {
+            rightDirectory = path;
+            break;
+        }
+    }
     if (QFileInfo(rightDirectory).isDir()) {
         m_rightPane->navigateTo(rightDirectory, false);
     }
@@ -674,6 +812,9 @@ void MainWindow::restoreSettings()
     m_rightPane->restoreTabs(
         settings.value("Tabs/rightPaths").toStringList(),
         settings.value("Tabs/rightActiveIndex", 0).toInt());
+    if (QFileInfo(m_initialPath).isDir()) {
+        m_leftPane->navigateTo(m_initialPath, false);
+    }
 
     const QStringList pinnedPaths = settings.value("Sidebar/pinnedFolders").toStringList();
     if (!pinnedPaths.isEmpty()) {
@@ -708,6 +849,9 @@ void MainWindow::restoreSettings()
 
     const QString activePaneName = settings.value("Panes/activePane", "LEFT").toString();
     setActivePane(activePaneName == "RIGHT" ? m_rightPane : m_leftPane);
+    if (!m_config.warningText().isEmpty()) {
+        statusBar()->showMessage(m_config.warningText().section('\n', 0, 0), 6000);
+    }
     m_isRestoringSettings = false;
 }
 
@@ -815,39 +959,31 @@ QList<int> MainWindow::normalizedFileSplitterSizes(int leftWidth, int rightWidth
 void MainWindow::setSplitVisible(bool visible)
 {
     const bool wasVisible = m_rightPane->isVisible();
-    const int windowWidthBefore = width();
     const QList<int> fileSizes = m_fileSplitter->sizes();
     const QList<int> mainSizes = m_mainSplitter->sizes();
     const int sidebarWidth = std::max(m_sidebar->minimumWidth(), mainSizes.value(0, m_sidebar->width()));
-    const int fileAreaWidth = std::max(fileAreaMinimumWidth(wasVisible), mainSizes.value(1, visibleFileListWidth()));
+    const int fileAreaWidth = std::max(m_leftPane->minimumWidth(), mainSizes.value(1, visibleFileListWidth()));
     const int previewWidth = mainSizes.size() >= 3 ? std::max(0, mainSizes.value(2, 0)) : 0;
     const int leftWidth = visibleFileListWidth();
     const int rightWidth = std::max(0, fileSizes.value(1, 0));
 
     if (visible && !wasVisible) {
-        const int targetRightWidth = std::max(m_rightPane->minimumWidth(), leftWidth);
-        const int targetFileAreaWidth = leftWidth + m_fileSplitter->handleWidth() + targetRightWidth;
-        const int currentFileAreaWidth = std::max(fileAreaWidth, leftWidth);
-        const int addedWidth = std::max(0, targetFileAreaWidth - currentFileAreaWidth);
+        const int availableWidth = fileAreaWidth;
+        const int paneSpace = std::max(0, availableWidth - m_fileSplitter->handleWidth());
+        const int targetLeftWidth = std::max(m_leftPane->minimumWidth(), paneSpace / 2);
+        const int targetRightWidth = std::max(m_rightPane->minimumWidth(), paneSpace - targetLeftWidth);
         m_rightPane->setVisible(true);
         syncLayoutConstraints();
-        if (!m_isRestoringSettings && addedWidth > 0) {
-            resize(windowWidthBefore + addedWidth, height());
-        }
-        m_mainSplitter->setSizes(normalizedMainSplitterSizes(sidebarWidth, targetFileAreaWidth, previewWidth));
-        m_fileSplitter->setSizes(normalizedFileSplitterSizes(leftWidth, targetRightWidth));
+        m_mainSplitter->setSizes(normalizedMainSplitterSizes(sidebarWidth, availableWidth, previewWidth));
+        m_fileSplitter->setSizes(normalizedFileSplitterSizes(targetLeftWidth, targetRightWidth));
         m_lastSplitWidth = targetRightWidth;
     } else if (!visible && wasVisible) {
         if (rightWidth > 80) {
             m_lastSplitWidth = rightWidth;
         }
-        const int targetLeftWidth = std::max(m_leftPane->minimumWidth(), leftWidth);
-        const int removedWidth = std::max(0, fileAreaWidth - targetLeftWidth);
+        const int targetLeftWidth = std::max(m_leftPane->minimumWidth(), leftWidth + m_fileSplitter->handleWidth() + rightWidth);
         m_rightPane->setVisible(false);
         syncLayoutConstraints();
-        if (!m_isRestoringSettings && removedWidth > 0) {
-            resize(std::max(minimumWidth(), windowWidthBefore - removedWidth), height());
-        }
         m_mainSplitter->setSizes(normalizedMainSplitterSizes(sidebarWidth, targetLeftWidth, previewWidth));
         m_fileSplitter->setSizes(normalizedFileSplitterSizes(targetLeftWidth, 0));
     } else {
@@ -984,6 +1120,19 @@ void MainWindow::setActivePane(FilePane *pane)
     m_leftPane->setActive(pane == m_leftPane);
     m_rightPane->setActive(pane == m_rightPane);
     m_searchEdit->clear();
+}
+
+void MainWindow::focusOtherPane()
+{
+    if (!m_rightPane->isVisible()) {
+        setActivePane(m_leftPane);
+        m_leftPane->focusFileList();
+        return;
+    }
+
+    FilePane *nextPane = activePane() == m_leftPane ? m_rightPane : m_leftPane;
+    setActivePane(nextPane);
+    nextPane->focusFileList();
 }
 
 FilePane *MainWindow::activePane() const

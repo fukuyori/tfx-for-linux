@@ -24,6 +24,7 @@ private:
     QString csvToHtmlTable(const QString &content, QChar delimiter) const;
     QString escapeHtml(const QString &text) const;
     bool showImage(const QString &path);
+    bool showPdf(const QString &path);
     bool showText(const QString &path);
     void setRenderAvailable(bool available);
     void showPreferredTextView();

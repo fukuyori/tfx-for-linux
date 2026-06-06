@@ -42,6 +42,13 @@ struct AppStartupConfig
     QStringList rightFolders;
 };
 
+struct AppOpacityConfig
+{
+    double background = 1.0;
+    double inactivePane = 1.0;
+    double disabledItem = 1.0;
+};
+
 class AppConfig
 {
 public:
@@ -55,6 +62,7 @@ public:
     AppColors colors;
     AppFontConfig font;
     AppStartupConfig startup;
+    AppOpacityConfig opacity;
     QHash<QString, QString> shortcuts;
     QHash<QString, QString> openWith;
     QString terminalApp;

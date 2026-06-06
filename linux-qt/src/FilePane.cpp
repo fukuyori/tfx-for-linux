@@ -14,9 +14,12 @@
 #include <QDialogButtonBox>
 #include <QDebug>
 #include <QKeyEvent>
+#include <QHash>
 #include <QMenu>
 #include <QMessageBox>
 #include <QMimeData>
+#include <QMimeDatabase>
+#include <QMimeType>
 #include <QPainter>
 #include <QProcess>
 #include <QPushButton>
@@ -233,7 +236,7 @@ int defaultColumnWidth(int column)
     case ColumnMode:
         return 116;
     case ColumnGit:
-        return 92;
+        return 28;
     default:
         return 120;
     }
@@ -266,31 +269,98 @@ QString modeString(const QFileInfo &info)
     return text;
 }
 
+QString sizeString(qint64 bytes)
+{
+    if (bytes < 1024) {
+        return QString("%1 Byte").arg(bytes);
+    }
+    double value = bytes / 1024.0;
+    static const QStringList units = {"KiB", "MiB", "GiB", "TiB", "PiB"};
+    int unit = 0;
+    while (value >= 1024.0 && unit < units.size() - 1) {
+        value /= 1024.0;
+        ++unit;
+    }
+    return QString("%1 %2").arg(value, 0, 'f', 2).arg(units.at(unit));
+}
+
+QString englishTypeName(const QFileInfo &info)
+{
+    if (info.isDir()) {
+        return QStringLiteral("Folder");
+    }
+
+    static const QMimeDatabase mimeDb;
+    const QMimeType mime = mimeDb.mimeTypeForFile(info);
+    const QString name = mime.name();
+
+    static const QHash<QString, QString> kNames = {
+        {"text/plain", "Plain text"},
+        {"text/markdown", "Markdown"},
+        {"text/html", "HTML document"},
+        {"text/csv", "CSV document"},
+        {"text/css", "CSS"},
+        {"application/json", "JSON"},
+        {"application/xml", "XML"},
+        {"text/xml", "XML"},
+        {"application/javascript", "JavaScript"},
+        {"application/pdf", "PDF document"},
+        {"application/zip", "ZIP archive"},
+        {"application/gzip", "Gzip archive"},
+        {"application/x-tar", "Tar archive"},
+        {"application/x-shellscript", "Shell script"},
+        {"application/octet-stream", "Binary file"},
+    };
+    const auto it = kNames.constFind(name);
+    if (it != kNames.constEnd()) {
+        return it.value();
+    }
+
+    if (name.startsWith("image/")) {
+        return name.mid(6).toUpper() + " image";
+    }
+    if (name.startsWith("audio/")) {
+        return name.mid(6).toUpper() + " audio";
+    }
+    if (name.startsWith("video/")) {
+        return name.mid(6).toUpper() + " video";
+    }
+
+    const QString suffix = info.suffix();
+    if (!suffix.isEmpty()) {
+        return suffix.toUpper() + " file";
+    }
+    if (name.startsWith("text/")) {
+        return QStringLiteral("Plain text");
+    }
+    return mime.isValid() ? name : QStringLiteral("File");
+}
+
 QString porcelainStatusLabel(const QString &status)
 {
     if (status.contains("??")) {
-        return "untracked";
+        return "?";
     }
     if (status.contains("A")) {
-        return "added";
+        return "A";
     }
     if (status.contains("D")) {
-        return "deleted";
+        return "D";
     }
     if (status.contains("R")) {
-        return "renamed";
+        return "R";
     }
     if (status.contains("C")) {
-        return "copied";
+        return "C";
     }
     if (status.contains("U")) {
-        return "conflict";
+        return "U";
     }
     if (status.contains("M")) {
-        return "modified";
+        return "M";
     }
     if (status.contains("!")) {
-        return "ignored";
+        return "!";
     }
     return status.trimmed();
 }
@@ -398,6 +468,48 @@ int FileSystemProxyModel::columnCount(const QModelIndex &parent) const
     return kColumnCount;
 }
 
+int FileSystemProxyModel::sourceColumnCount() const
+{
+    return sourceModel() ? sourceModel()->columnCount() : 0;
+}
+
+QModelIndex FileSystemProxyModel::index(int row, int column, const QModelIndex &parent) const
+{
+    if (column >= sourceColumnCount() && column < kColumnCount) {
+        // Synthesise an index for an extra column by reusing the internal id of
+        // the source-backed column 0 index for the same row.
+        const QModelIndex base = QSortFilterProxyModel::index(row, 0, parent);
+        if (!base.isValid()) {
+            return QModelIndex();
+        }
+        return createIndex(row, column, base.internalId());
+    }
+    return QSortFilterProxyModel::index(row, column, parent);
+}
+
+QModelIndex FileSystemProxyModel::parent(const QModelIndex &child) const
+{
+    if (child.isValid() && child.column() >= sourceColumnCount()) {
+        const QModelIndex base = createIndex(child.row(), 0, child.internalId());
+        return QSortFilterProxyModel::parent(base);
+    }
+    return QSortFilterProxyModel::parent(child);
+}
+
+QModelIndex FileSystemProxyModel::sibling(int row, int column, const QModelIndex &idx) const
+{
+    return index(row, column, parent(idx));
+}
+
+QModelIndex FileSystemProxyModel::mapToSource(const QModelIndex &proxyIndex) const
+{
+    if (proxyIndex.isValid() && proxyIndex.column() >= sourceColumnCount()) {
+        // Extra columns have no backing source cell.
+        return QModelIndex();
+    }
+    return QSortFilterProxyModel::mapToSource(proxyIndex);
+}
+
 QVariant FileSystemProxyModel::headerData(int section, Qt::Orientation orientation, int role) const
 {
     if (orientation == Qt::Horizontal && role == Qt::DisplayRole) {
@@ -415,7 +527,7 @@ QVariant FileSystemProxyModel::headerData(int section, Qt::Orientation orientati
         case ColumnMode:
             return UiText::t("MODE", "MODE");
         case ColumnGit:
-            return UiText::t("GIT", "GIT");
+            return QString();
         default:
             break;
         }
@@ -432,6 +544,13 @@ QVariant FileSystemProxyModel::data(const QModelIndex &index, int role) const
 
     const QModelIndex sourceNameIndex = mapToSource(index.sibling(index.row(), ColumnName));
     const QFileInfo info = fsModel->fileInfo(sourceNameIndex);
+
+    if (role == Qt::TextAlignmentRole && index.column() == ColumnGit) {
+        return QVariant(Qt::AlignCenter);
+    }
+    if (role == Qt::TextAlignmentRole && index.column() == ColumnSize) {
+        return QVariant(Qt::AlignRight | Qt::AlignVCenter);
+    }
 
     if (role == Qt::ForegroundRole) {
         return QColor(info.isDir() ? m_directoryForeground : m_fileForeground);
@@ -450,9 +569,9 @@ QVariant FileSystemProxyModel::data(const QModelIndex &index, int role) const
         case ColumnName:
             return fsModel->data(sourceNameIndex, role);
         case ColumnType:
-            return fsModel->data(sourceNameIndex.sibling(sourceNameIndex.row(), 2), role);
+            return englishTypeName(info);
         case ColumnSize:
-            return fsModel->data(sourceNameIndex.sibling(sourceNameIndex.row(), 1), role);
+            return info.isDir() ? QString() : sizeString(info.size());
         case ColumnCreated:
             return info.birthTime().isValid() ? info.birthTime().toString("yyyy-MM-dd HH:mm:ss") : QString();
         case ColumnModified:
@@ -557,6 +676,7 @@ FilePane::FilePane(const QString &label, const QString &initialPath, QWidget *pa
     m_view->setIconSize(QSize(18, 18));
     m_view->setItemDelegate(new FileItemDelegate(m_view));
     m_view->horizontalHeader()->setStretchLastSection(false);
+    m_view->horizontalHeader()->setMinimumSectionSize(24);
     m_view->horizontalHeader()->setDefaultAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     m_view->horizontalHeader()->setHighlightSections(false);
     m_view->horizontalHeader()->setSectionsMovable(true);
@@ -569,7 +689,29 @@ FilePane::FilePane(const QString &label, const QString &initialPath, QWidget *pa
     m_view->setAlternatingRowColors(false);
     m_view->setContextMenuPolicy(Qt::CustomContextMenu);
     m_view->installEventFilter(this);
-    restoreColumnSettings();
+    applySharedColumnLayout();
+    // QHeaderView resets the width of the synthesised extra columns
+    // (modified/mode/git) to the default section size whenever the model is
+    // reloaded or re-sorted, so the shared layout must be re-applied after
+    // those events. The header's own reset slot runs before ours (it connects
+    // first), so a synchronous re-apply wins.
+    // While the model reorganises (sort/reload), QHeaderView resets the
+    // synthesised extra columns to the default size and — in a shown window —
+    // emits sectionResized for them. Those are not user actions, so saving is
+    // suppressed for the whole layout-change window and the saved layout is
+    // re-applied once it settles.
+    const auto beginLayoutChange = [this]() { m_suppressColumnSave = true; };
+    const auto endLayoutChange = [this]() {
+        applySharedColumnLayout();
+        QTimer::singleShot(0, this, [this]() { m_suppressColumnSave = false; });
+    };
+    connect(m_proxyModel, &QAbstractItemModel::layoutAboutToBeChanged, this, beginLayoutChange);
+    connect(m_proxyModel, &QAbstractItemModel::modelAboutToBeReset, this, beginLayoutChange);
+    connect(m_proxyModel, &QAbstractItemModel::layoutChanged, this, endLayoutChange);
+    connect(m_proxyModel, &QAbstractItemModel::modelReset, this, endLayoutChange);
+    connect(m_model, &QFileSystemModel::directoryLoaded, this, [this](const QString &) {
+        applySharedColumnLayout();
+    });
 
     auto *headerLayout = new QHBoxLayout();
     headerLayout->setContentsMargins(8, 4, 8, 4);
@@ -1460,69 +1602,83 @@ void FilePane::selectAllVisibleItems()
     updateStatusLine();
 }
 
-void FilePane::restoreColumnSettings()
+void FilePane::applyDefaultColumns()
 {
+    auto *header = m_view->horizontalHeader();
+    for (int column = 0; column < kColumnCount; ++column) {
+        m_view->setColumnHidden(column, false);
+        header->moveSection(header->visualIndex(column), column);
+        header->resizeSection(column, defaultColumnWidth(column));
+    }
+}
+
+void FilePane::applySharedColumnLayout()
+{
+    // Column layout (order/visibility/width) is shared between panes: only the
+    // left pane persists it and the right pane mirrors the left, so a single
+    // (non per-pane) settings group is used. "V2" retires older layouts.
     QSettings settings;
-    settings.beginGroup(QString("FilePane/%1/Columns").arg(m_label));
+    settings.beginGroup("FilePane/ColumnsV2");
+    const bool hasSaved = settings.contains("width0");
 
     auto *header = m_view->horizontalHeader();
     const QSignalBlocker headerBlocker(header);
 
-    const QStringList visualOrder = settings.value("visualOrder").toStringList();
-    if (visualOrder.size() == kColumnCount) {
-        for (int visual = 0; visual < visualOrder.size(); ++visual) {
+    if (!hasSaved) {
+        settings.endGroup();
+        applyDefaultColumns();
+        return;
+    }
+
+    const QStringList order = settings.value("order").toStringList();
+    if (order.size() == kColumnCount) {
+        for (int visual = 0; visual < kColumnCount; ++visual) {
             bool ok = false;
-            const int logical = visualOrder.at(visual).toInt(&ok);
-            if (!ok || logical < 0 || logical >= kColumnCount) {
-                continue;
+            const int logical = order.at(visual).toInt(&ok);
+            if (ok && logical >= 0 && logical < kColumnCount) {
+                const int current = header->visualIndex(logical);
+                if (current >= 0 && current != visual) {
+                    header->moveSection(current, visual);
+                }
             }
-            const int currentVisual = header->visualIndex(logical);
-            if (currentVisual >= 0 && currentVisual != visual) {
-                header->moveSection(currentVisual, visual);
-            }
-        }
-    } else {
-        const QByteArray headerState = settings.value("headerState").toByteArray();
-        if (!headerState.isEmpty()) {
-            header->restoreState(headerState);
         }
     }
 
-    const QList<QVariant> widths = settings.value("columnWidths").toList();
     for (int column = 0; column < kColumnCount; ++column) {
-        const bool visible = settings.value(QString("column%1Visible").arg(column), true).toBool();
-        m_view->setColumnHidden(column, column == 0 ? false : !visible);
-        const int width = column < widths.size()
-            ? widths.at(column).toInt()
-            : settings.value(QString("column%1Width").arg(column), defaultColumnWidth(column)).toInt();
-        header->resizeSection(column, std::max(48, width));
+        const bool visible = settings.value(QString("visible%1").arg(column), true).toBool();
+        m_view->setColumnHidden(column, column == ColumnName ? false : !visible);
+        const int width = settings.value(QString("width%1").arg(column), defaultColumnWidth(column)).toInt();
+        header->resizeSection(column, std::max(24, width));
     }
-
     settings.endGroup();
 }
 
 void FilePane::saveColumnSettings()
 {
+    // Ignore section changes triggered by the model reorganising itself rather
+    // than by the user (those would persist bogus reset widths).
+    if (m_suppressColumnSave) {
+        return;
+    }
+    // Only the left pane owns the shared column layout.
+    if (m_label != "LEFT") {
+        return;
+    }
+    auto *header = m_view->horizontalHeader();
     QSettings settings;
-    settings.beginGroup(QString("FilePane/%1/Columns").arg(m_label));
-    settings.setValue("headerState", m_view->horizontalHeader()->saveState());
+    settings.beginGroup("FilePane/ColumnsV2");
 
-    QStringList visualOrder;
-    visualOrder.reserve(kColumnCount);
+    QStringList order;
+    order.reserve(kColumnCount);
     for (int visual = 0; visual < kColumnCount; ++visual) {
-        visualOrder.append(QString::number(m_view->horizontalHeader()->logicalIndex(visual)));
+        order.append(QString::number(header->logicalIndex(visual)));
     }
-    settings.setValue("visualOrder", visualOrder);
+    settings.setValue("order", order);
 
-    QList<QVariant> widths;
-    widths.reserve(kColumnCount);
     for (int column = 0; column < kColumnCount; ++column) {
-        settings.setValue(QString("column%1Visible").arg(column), !m_view->isColumnHidden(column));
-        const int width = m_view->horizontalHeader()->sectionSize(column);
-        settings.setValue(QString("column%1Width").arg(column), width);
-        widths.append(width);
+        settings.setValue(QString("visible%1").arg(column), !m_view->isColumnHidden(column));
+        settings.setValue(QString("width%1").arg(column), header->sectionSize(column));
     }
-    settings.setValue("columnWidths", widths);
     settings.endGroup();
 }
 

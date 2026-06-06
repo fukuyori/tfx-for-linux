@@ -2,6 +2,27 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.2.1] - 2026-06-06
+
+File-list columns, preview, and window appearance refinements.
+
+### Added
+
+- Added a configurable `[opacity]` section (`background`, `inactivePane`, `disabledItem`) for window/pane transparency.
+- Added an "open in external viewer" button for image previews, placed beside the preview source toggle.
+
+### Changed
+
+- Moved the preview source/rendered toggle button above the file metadata, and hid the metadata while the rendered view is shown.
+- Showed English file-type names in the Type column (e.g. "Plain text") instead of the locale-dependent system description.
+- Displayed file sizes with an English "Byte" unit and right-aligned the Size column.
+- Slimmed the Git column (no header label, single-letter status such as "M", centered).
+
+### Fixed
+
+- Fixed the Modified, Mode, and Git columns showing no data by synthesising indices for columns beyond the underlying model.
+- Fixed column widths reverting on restart/reload by sharing the layout from the left pane, re-applying it after model reorganisation, and suppressing saves of header reset values.
+
 ## [0.2.0] - 2026-05-31
 
 UI and usability development release.

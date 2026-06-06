@@ -26,7 +26,17 @@ public:
     Qt::ItemFlags flags(const QModelIndex &index) const override;
     bool lessThan(const QModelIndex &left, const QModelIndex &right) const override;
 
+    // The proxy exposes more columns (mode/modified/git) than the underlying
+    // QFileSystemModel provides, so indices for those "extra" columns must be
+    // synthesised explicitly.
+    QModelIndex index(int row, int column, const QModelIndex &parent = QModelIndex()) const override;
+    QModelIndex parent(const QModelIndex &child) const override;
+    QModelIndex sibling(int row, int column, const QModelIndex &idx) const override;
+    QModelIndex mapToSource(const QModelIndex &proxyIndex) const override;
+
 private:
+    int sourceColumnCount() const;
+
     QHash<QString, QString> m_gitStatuses;
     QString m_fileForeground = "#D9E1E8";
     QString m_directoryForeground = "#E5EDF3";
@@ -51,6 +61,7 @@ public:
     void restoreTabs(const QStringList &paths, int activeIndex);
     void navigateTo(const QString &path, bool recordHistory = true);
     void focusFileList();
+    void applySharedColumnLayout();
 
 signals:
     void activated(FilePane *pane);
@@ -97,7 +108,7 @@ private:
     void compressSelectedItemsToZip();
     void extractSelectedZip();
     void selectAllVisibleItems();
-    void restoreColumnSettings();
+    void applyDefaultColumns();
     void saveColumnSettings();
     void refreshGitStatuses();
     void applyGitStatusOutput(const QString &output);
@@ -126,5 +137,6 @@ private:
     QStack<QString> m_forwardStack;
     bool m_showHiddenFiles = false;
     bool m_isActive = false;
+    bool m_suppressColumnSave = false;
     bool m_isSwitchingTabs = false;
 };

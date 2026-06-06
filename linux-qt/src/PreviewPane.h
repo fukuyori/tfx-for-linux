@@ -28,6 +28,7 @@ private:
     bool showText(const QString &path);
     void setRenderAvailable(bool available);
     void showPreferredTextView();
+    void openCurrentImageExternally();
 
     QStackedWidget *m_stack;
     QLabel *m_title;
@@ -35,6 +36,8 @@ private:
     QPlainTextEdit *m_text;
     QTextBrowser *m_rendered;
     QToolButton *m_sourceToggle;
+    QToolButton *m_openExternal;
+    QString m_currentImagePath;
     bool m_renderAvailable = false;
     bool m_prefersRendered = true;
 };

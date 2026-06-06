@@ -165,6 +165,11 @@ QString AppConfig::defaultConfigText()
         "# rightFolder = \"~/Downloads\"\n"
         "# rightFolders = [\"~/Downloads\", \"~/Documents\"]\n"
         "\n"
+        "# [opacity]\n"
+        "# background = 0.40     # ウィンドウ背景の不透明度 (0.0=透明, 1.0=不透明)\n"
+        "# inactivePane = 0.5    # 非アクティブペインの不透明度\n"
+        "# disabledItem = 0.45   # 無効な項目の不透明度\n"
+        "\n"
         "# [colors]\n"
         "# fileListBackground = \"#151A1E\"\n"
         "# fileForeground = \"#D9E1E8\"\n"
@@ -308,6 +313,20 @@ void AppConfig::applyValue(const QString &section, const QString &key, const QSt
         else if (key == "scrollbarThumb") colors.scrollbarThumb = color;
         else if (key == "scrollbarThumbHovered") colors.scrollbarThumbHovered = color;
         else if (key == "scrollbarThumbDragging") colors.scrollbarThumbDragging = color;
+        return;
+    }
+
+    if (section == "opacity") {
+        bool ok = false;
+        double level = value.toDouble(&ok);
+        if (!ok || level < 0.0 || level > 1.0) {
+            addWarning(lineNumber, QString("Invalid opacity value for %1 (expected 0.0-1.0)").arg(key));
+            return;
+        }
+        if (key == "background") opacity.background = level;
+        else if (key == "inactivePane") opacity.inactivePane = level;
+        else if (key == "disabledItem") opacity.disabledItem = level;
+        else addWarning(lineNumber, QString("Unknown opacity key: %1").arg(key));
         return;
     }
 

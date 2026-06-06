@@ -7,6 +7,7 @@
 #include <QCloseEvent>
 #include <QDesktopServices>
 #include <QDir>
+#include <QGraphicsOpacityEffect>
 #include <QFileInfo>
 #include <QHeaderView>
 #include <QLabel>
@@ -44,6 +45,17 @@ QAction *addMenuAction(QMenu *menu,
     }
     QObject::connect(action, &QAction::triggered, receiver, slot);
     return action;
+}
+
+QString withAlpha(const QString &color, double alpha)
+{
+    const QColor c(color);
+    if (!c.isValid()) {
+        return color;
+    }
+    return QString("rgba(%1,%2,%3,%4)")
+        .arg(c.red()).arg(c.green()).arg(c.blue())
+        .arg(alpha, 0, 'f', 3);
 }
 
 QIcon toolbarIcon(const QString &kind)
@@ -115,6 +127,10 @@ MainWindow::MainWindow(const QString &initialPath, QWidget *parent)
 {
     setWindowTitle("tfx");
     resize(1280, 780);
+    // Translucency must be set before the native surface is created.
+    if (m_config.opacity.background < 1.0) {
+        setAttribute(Qt::WA_TranslucentBackground);
+    }
     applyTerminalTheme();
     buildTopToolbar();
     buildFolderSidebar(initialPath);
@@ -587,7 +603,7 @@ void MainWindow::applyTerminalTheme()
             padding: 0;
             background: #151B20;
         }
-        QToolButton#previewSourceToggle {
+        QToolButton#previewSourceToggle, QToolButton#previewOpenExternal {
             min-width: 32px;
             max-width: 32px;
             min-height: 24px;
@@ -674,14 +690,18 @@ void MainWindow::applyTerminalTheme()
             selection-background-color: #263D4C;
         }
     )";
-    styleSheet.replace("#151A1E", m_config.colors.panelBackground);
-    styleSheet.replace("#151B20", m_config.colors.panelBackground);
-    styleSheet.replace("#11161A", m_config.colors.appBackground);
-    styleSheet.replace("#171C20", m_config.colors.sidebarBackground);
-    styleSheet.replace("#10161A", m_config.colors.inputBackground);
-    styleSheet.replace("#0F1418", m_config.colors.inputBackground);
-    styleSheet.replace("#0D1114", m_config.colors.inputBackground);
-    styleSheet.replace("#050607", m_config.colors.terminalBackground);
+    const double bgAlpha = m_config.opacity.background;
+    auto surface = [bgAlpha](const QString &color) {
+        return bgAlpha < 1.0 ? withAlpha(color, bgAlpha) : color;
+    };
+    styleSheet.replace("#151A1E", surface(m_config.colors.panelBackground));
+    styleSheet.replace("#151B20", surface(m_config.colors.panelBackground));
+    styleSheet.replace("#11161A", surface(m_config.colors.appBackground));
+    styleSheet.replace("#171C20", surface(m_config.colors.sidebarBackground));
+    styleSheet.replace("#10161A", surface(m_config.colors.inputBackground));
+    styleSheet.replace("#0F1418", surface(m_config.colors.inputBackground));
+    styleSheet.replace("#0D1114", surface(m_config.colors.inputBackground));
+    styleSheet.replace("#050607", surface(m_config.colors.terminalBackground));
     styleSheet.replace("#D9E1E8", m_config.colors.foreground);
     styleSheet.replace("#9EABB6", m_config.colors.secondaryForeground);
     styleSheet.replace("#AEBBC5", m_config.colors.secondaryForeground);
@@ -699,6 +719,13 @@ void MainWindow::applyTerminalTheme()
     styleSheet.replace("#1F2830", m_config.colors.hoverBackground);
     styleSheet.replace("__MONO_FONT__", m_config.resolvedMonoFontFamily());
     styleSheet.replace("font-size: 12px;", QString("font-size: %1px;").arg(m_config.font.size));
+    if (m_config.opacity.disabledItem < 1.0) {
+        styleSheet += QString(
+            "\nQWidget:disabled, QToolButton:disabled, QPushButton:disabled,"
+            " QMenu::item:disabled, QMenuBar::item:disabled {"
+            " color: %1; }\n")
+            .arg(withAlpha(m_config.colors.foreground, m_config.opacity.disabledItem));
+    }
     qApp->setStyleSheet(styleSheet);
     m_leftPane->setThemeColors(m_config.colors.foreground, m_config.colors.directoryForeground);
     m_rightPane->setThemeColors(m_config.colors.foreground, m_config.colors.directoryForeground);
@@ -972,6 +999,8 @@ void MainWindow::setSplitVisible(bool visible)
         const int paneSpace = std::max(0, availableWidth - m_fileSplitter->handleWidth());
         const int targetLeftWidth = std::max(m_leftPane->minimumWidth(), paneSpace / 2);
         const int targetRightWidth = std::max(m_rightPane->minimumWidth(), paneSpace - targetLeftWidth);
+        // The right pane mirrors the left pane's shared column layout when shown.
+        m_rightPane->applySharedColumnLayout();
         m_rightPane->setVisible(true);
         syncLayoutConstraints();
         m_mainSplitter->setSizes(normalizedMainSplitterSizes(sidebarWidth, availableWidth, previewWidth));
@@ -1119,6 +1148,23 @@ void MainWindow::setActivePane(FilePane *pane)
     m_activePane = pane;
     m_leftPane->setActive(pane == m_leftPane);
     m_rightPane->setActive(pane == m_rightPane);
+
+    const double inactiveAlpha = m_config.opacity.inactivePane;
+    auto applyPaneOpacity = [inactiveAlpha](FilePane *p, bool active) {
+        if (active || inactiveAlpha >= 1.0) {
+            p->setGraphicsEffect(nullptr);
+            return;
+        }
+        auto *effect = qobject_cast<QGraphicsOpacityEffect *>(p->graphicsEffect());
+        if (!effect) {
+            effect = new QGraphicsOpacityEffect(p);
+            p->setGraphicsEffect(effect);
+        }
+        effect->setOpacity(inactiveAlpha);
+    };
+    applyPaneOpacity(m_leftPane, pane == m_leftPane);
+    applyPaneOpacity(m_rightPane, pane == m_rightPane);
+
     m_searchEdit->clear();
 }
 

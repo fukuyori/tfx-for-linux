@@ -2,12 +2,14 @@
 #include "UiText.h"
 
 #include <QDateTime>
+#include <QDesktopServices>
 #include <QFile>
 #include <QFileInfo>
 #include <QImageReader>
 #include <QJsonDocument>
 #include <QMimeDatabase>
 #include <QPainter>
+#include <QPainterPath>
 #include <QPixmap>
 #include <QProcess>
 #include <QRegularExpression>
@@ -34,6 +36,35 @@ QIcon previewSourceIcon()
     return QIcon(pixmap);
 }
 
+QIcon previewExternalIcon()
+{
+    QPixmap pixmap(28, 28);
+    pixmap.fill(Qt::transparent);
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing);
+    QPen pen(QColor("#D9E1E8"), 2);
+    pen.setJoinStyle(Qt::RoundJoin);
+    pen.setCapStyle(Qt::RoundCap);
+    painter.setPen(pen);
+    painter.setBrush(Qt::NoBrush);
+    // Window frame with a corner left open for the out-going arrow.
+    QPainterPath frame;
+    frame.moveTo(15, 8);
+    frame.lineTo(8, 8);
+    frame.lineTo(8, 20);
+    frame.lineTo(20, 20);
+    frame.lineTo(20, 13);
+    painter.drawPath(frame);
+    // Arrow pointing out to the top-right.
+    painter.drawLine(QPointF(14, 14), QPointF(21, 7));
+    QPainterPath head;
+    head.moveTo(15, 7);
+    head.lineTo(21, 7);
+    head.lineTo(21, 13);
+    painter.drawPath(head);
+    return QIcon(pixmap);
+}
+
 bool hasTextPreviewSuffix(const QString &path)
 {
     const QString suffix = QFileInfo(path).suffix().toLower();
@@ -53,7 +84,8 @@ PreviewPane::PreviewPane(QWidget *parent)
       m_image(new QLabel(this)),
       m_text(new QPlainTextEdit(this)),
       m_rendered(new QTextBrowser(this)),
-      m_sourceToggle(new QToolButton(this))
+      m_sourceToggle(new QToolButton(this)),
+      m_openExternal(new QToolButton(this))
 {
     setObjectName("previewPane");
     setMinimumWidth(240);
@@ -79,26 +111,41 @@ PreviewPane::PreviewPane(QWidget *parent)
         showPreferredTextView();
     });
 
+    m_openExternal->setObjectName("previewOpenExternal");
+    m_openExternal->setIcon(previewExternalIcon());
+    m_openExternal->setIconSize(QSize(22, 22));
+    m_openExternal->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    m_openExternal->setToolTip(UiText::t("Open in external viewer", "外部ビューアで開く"));
+    m_openExternal->setVisible(false);
+    connect(m_openExternal, &QToolButton::clicked, this, [this]() {
+        openCurrentImageExternally();
+    });
+
     m_stack->addWidget(m_text);
     m_stack->addWidget(m_image);
     m_stack->addWidget(m_rendered);
 
     auto *modeLayout = new QHBoxLayout();
     modeLayout->setContentsMargins(0, 0, 0, 0);
-    modeLayout->addStretch(1);
+    modeLayout->setSpacing(6);
     modeLayout->addWidget(m_sourceToggle);
+    modeLayout->addWidget(m_openExternal);
+    modeLayout->addStretch(1);
 
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(10, 8, 10, 8);
     layout->setSpacing(6);
-    layout->addWidget(m_title);
     layout->addLayout(modeLayout);
+    layout->addWidget(m_title);
     layout->addWidget(m_stack, 1);
 }
 
 void PreviewPane::previewPath(const QString &path)
 {
     const QFileInfo info(path);
+    m_currentImagePath.clear();
+    m_openExternal->setVisible(false);
+    m_title->setVisible(true);
     if (!info.exists()) {
         m_title->setText(UiText::t("No selection", "選択なし"));
         m_text->clear();
@@ -202,6 +249,8 @@ bool PreviewPane::showImage(const QString &path)
     setRenderAvailable(false);
     m_image->setPixmap(pixmap.scaled(520, 520, Qt::KeepAspectRatio, Qt::SmoothTransformation));
     m_stack->setCurrentWidget(m_image);
+    m_currentImagePath = path;
+    m_openExternal->setVisible(true);
     return true;
 }
 
@@ -297,8 +346,17 @@ void PreviewPane::showPreferredTextView()
     } else {
         m_stack->setCurrentWidget(m_text);
     }
+    m_title->setVisible(m_stack->currentWidget() != m_rendered);
     m_sourceToggle->setChecked(m_stack->currentWidget() == m_rendered && m_renderAvailable);
     m_sourceToggle->setToolTip(m_stack->currentWidget() == m_text
         ? UiText::t("Show rendered preview", "レンダリング表示")
         : UiText::t("Show source", "ソースを表示"));
+}
+
+void PreviewPane::openCurrentImageExternally()
+{
+    if (m_currentImagePath.isEmpty()) {
+        return;
+    }
+    QDesktopServices::openUrl(QUrl::fromLocalFile(m_currentImagePath));
 }

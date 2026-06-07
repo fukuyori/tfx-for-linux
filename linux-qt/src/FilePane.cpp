@@ -6,7 +6,11 @@
 #include <QDesktopServices>
 #include <QDir>
 #include <QEvent>
+#include <QDBusConnection>
+#include <QDBusMessage>
+#include <QDBusUnixFileDescriptor>
 #include <QFile>
+#include <QFileSystemWatcher>
 #include <QHeaderView>
 #include <QInputDialog>
 #include <QDirIterator>
@@ -713,6 +717,26 @@ FilePane::FilePane(const QString &label, const QString &initialPath, QWidget *pa
         applySharedColumnLayout();
     });
 
+    // Auto-refresh: the file list itself is kept current by QFileSystemModel's
+    // own watcher; this keeps the Git badges fresh when the directory changes,
+    // plus a slow poll to catch git index changes (commits/staging).
+    m_refreshDebounce = new QTimer(this);
+    m_refreshDebounce->setSingleShot(true);
+    m_refreshDebounce->setInterval(200);
+    connect(m_refreshDebounce, &QTimer::timeout, this, [this]() { refreshGitStatuses(); });
+    m_dirWatcher = new QFileSystemWatcher(this);
+    connect(m_dirWatcher, &QFileSystemWatcher::directoryChanged, this, [this](const QString &) {
+        m_refreshDebounce->start();
+    });
+    auto *gitPoll = new QTimer(this);
+    gitPoll->setInterval(30000);
+    connect(gitPoll, &QTimer::timeout, this, [this]() {
+        if (isVisible() && !m_currentPath.isEmpty()) {
+            refreshGitStatuses();
+        }
+    });
+    gitPoll->start();
+
     auto *headerLayout = new QHBoxLayout();
     headerLayout->setContentsMargins(8, 4, 8, 4);
     headerLayout->setSpacing(8);
@@ -966,6 +990,14 @@ void FilePane::navigateTo(const QString &path, bool recordHistory)
     }
     m_view->setRootIndex(m_proxyModel->mapFromSource(m_model->setRootPath(m_currentPath)));
     m_view->setProperty("currentSelectionRow", -1);
+    if (m_dirWatcher) {
+        if (!m_dirWatcher->directories().isEmpty()) {
+            m_dirWatcher->removePaths(m_dirWatcher->directories());
+        }
+        if (!m_currentPath.isEmpty()) {
+            m_dirWatcher->addPath(m_currentPath);
+        }
+    }
     refreshGitStatuses();
     updateStatusLine();
     emit directoryChanged(m_currentPath);
@@ -1286,7 +1318,7 @@ void FilePane::showFileContextMenu(const QPoint &point)
     if (hasSelection && !isDirectory) {
         auto *openWith = menu.addMenu(UiText::t("Open With", "このアプリケーションで開く"));
         openWith->addAction(UiText::t("Default Application", "既定のアプリケーション"), this, &FilePane::openSelected);
-        openWith->addAction(UiText::t("Other...", "その他..."))->setEnabled(false);
+        openWith->addAction(UiText::t("Other...", "その他..."), this, &FilePane::openWithCustomApplication);
     }
 
     menu.addSeparator();
@@ -1305,6 +1337,7 @@ void FilePane::showFileContextMenu(const QPoint &point)
 
     menu.addSeparator();
     menu.addAction(UiText::t("Rename", "名前を変更"), this, &FilePane::renameSelected)->setEnabled(hasSelection);
+    menu.addAction(UiText::t("Create Link", "リンクを作成"), this, &FilePane::createLinkForSelection)->setEnabled(hasSelection);
     menu.addAction(UiText::t("Compress to Zip", "zip に圧縮"), this, &FilePane::compressSelectedItemsToZip)->setEnabled(hasSelection);
     if (isZip) {
         menu.addAction(UiText::t("Extract Zip", "zip を展開"), this, &FilePane::extractSelectedZip);
@@ -1511,6 +1544,62 @@ void FilePane::revealSelectionInFileManager()
     QDesktopServices::openUrl(QUrl::fromLocalFile(info.isDir() ? info.absoluteFilePath() : info.absolutePath()));
 }
 
+void FilePane::createLinkForSelection()
+{
+    const QFileInfo info = currentFileInfo();
+    if (!info.exists()) {
+        return;
+    }
+    const QString linkPath = uniqueChildPath(info.fileName() + UiText::t(" link", " のリンク"));
+    if (QFile::link(info.absoluteFilePath(), linkPath)) {
+        QTimer::singleShot(0, this, [this, linkPath]() {
+            setCurrentIndexForPath(linkPath);
+        });
+    } else {
+        emit statusMessageRequested(UiText::t("Could not create link.", "リンクを作成できませんでした。"));
+    }
+}
+
+void FilePane::openWithCustomApplication()
+{
+    const QFileInfo info = currentFileInfo();
+    if (!info.exists()) {
+        return;
+    }
+
+    // Prefer the desktop's native "Open With" application chooser via the
+    // xdg-desktop-portal OpenURI interface (ask = true shows the chooser).
+    QFile file(info.absoluteFilePath());
+    if (file.open(QIODevice::ReadOnly)) {
+        QDBusMessage message = QDBusMessage::createMethodCall(
+            "org.freedesktop.portal.Desktop",
+            "/org/freedesktop/portal/desktop",
+            "org.freedesktop.portal.OpenURI",
+            "OpenFile");
+        message << QString()
+                << QVariant::fromValue(QDBusUnixFileDescriptor(file.handle()))
+                << QVariantMap{{"ask", true}};
+        const QDBusMessage reply = QDBusConnection::sessionBus().call(message);
+        file.close();
+        if (reply.type() != QDBusMessage::ErrorMessage) {
+            return;
+        }
+    }
+
+    // Fallback: ask for a launch command when the portal is unavailable.
+    bool ok = false;
+    const QString command = QInputDialog::getText(this,
+        UiText::t("Open With", "このアプリケーションで開く"),
+        UiText::t("Application command:", "アプリケーションのコマンド:"),
+        QLineEdit::Normal, QString(), &ok).trimmed();
+    if (!ok || command.isEmpty()) {
+        return;
+    }
+    if (!QProcess::startDetached(command, {info.absoluteFilePath()})) {
+        emit statusMessageRequested(UiText::t("Could not launch: %1", "起動できませんでした: %1").arg(command));
+    }
+}
+
 void FilePane::openTerminalHere()
 {
     const QFileInfo info = currentFileInfo();
@@ -1682,8 +1771,43 @@ void FilePane::saveColumnSettings()
     settings.endGroup();
 }
 
+void FilePane::refreshGitBranch()
+{
+    const QString gitProgram = QStandardPaths::findExecutable("git");
+    if (gitProgram.isEmpty() || m_currentPath.isEmpty()) {
+        if (!m_gitBranch.isEmpty()) {
+            m_gitBranch.clear();
+            updateStatusLine();
+        }
+        return;
+    }
+    const QString pathAtStart = m_currentPath;
+    auto *proc = new QProcess(this);
+    proc->setProgram(gitProgram);
+    proc->setArguments({"-C", m_currentPath, "rev-parse", "--abbrev-ref", "HEAD"});
+    connect(proc, &QProcess::finished, this, [this, proc, pathAtStart](int code, QProcess::ExitStatus status) {
+        QString branch;
+        if (status == QProcess::NormalExit && code == 0) {
+            branch = QString::fromLocal8Bit(proc->readAllStandardOutput()).trimmed();
+            if (branch == "HEAD") {
+                branch = UiText::t("detached", "detached");
+            }
+        }
+        proc->deleteLater();
+        if (pathAtStart != m_currentPath) {
+            return; // navigated away; ignore stale result
+        }
+        if (branch != m_gitBranch) {
+            m_gitBranch = branch;
+            updateStatusLine();
+        }
+    });
+    proc->start();
+}
+
 void FilePane::refreshGitStatuses()
 {
+    refreshGitBranch();
     if (m_gitStatusProcess) {
         disconnect(m_gitStatusProcess, nullptr, this, nullptr);
         m_gitStatusProcess->kill();
@@ -1755,6 +1879,22 @@ void FilePane::applyGitStatusOutput(const QString &output)
 
 void FilePane::updatePreviewFromSelection()
 {
+    const QModelIndexList rows = m_view->selectionModel()->selectedRows();
+    if (rows.size() > 1) {
+        QStringList paths;
+        for (const QModelIndex &index : rows) {
+            const QModelIndex source = m_proxyModel->mapToSource(index.sibling(index.row(), 0));
+            const QString path = m_model->filePath(source);
+            if (!path.isEmpty()) {
+                paths << path;
+            }
+        }
+        if (paths.size() > 1) {
+            emit multiSelectionPreviewRequested(paths);
+            return;
+        }
+    }
+
     const QFileInfo info = currentFileInfo();
     if (info.exists()) {
         emit selectionPreviewRequested(info.absoluteFilePath());
@@ -1774,11 +1914,14 @@ void FilePane::updateStatusLine()
     QString selectedText = selected > 0
         ? UiText::t("%1 selected", "%1 件選択").arg(selected)
         : UiText::t("No selection", "選択なし");
-    m_statusLabel->setText(UiText::t(" %1 of %2 items  |  %3  |  %4 ", " %1 / %2 件  |  %3  |  %4 ")
+    QString text = UiText::t(" %1 of %2 items  |  %3 ", " %1 / %2 件  |  %3 ")
         .arg(qMin(total, qMax(0, m_view->currentIndex().row() + 1)))
         .arg(total)
-        .arg(selectedText)
-        .arg(displayPath(m_currentPath)));
+        .arg(selectedText);
+    if (!m_gitBranch.isEmpty()) {
+        text += QString("  |  ⎇ %1 ").arg(m_gitBranch);
+    }
+    m_statusLabel->setText(text);
 }
 
 void FilePane::commitPathEditor()

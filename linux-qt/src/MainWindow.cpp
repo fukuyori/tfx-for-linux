@@ -199,6 +199,7 @@ MainWindow::MainWindow(const QString &initialPath, QWidget *parent)
             }
         });
         connect(pane, &FilePane::selectionPreviewRequested, m_previewPane, &PreviewPane::previewPath);
+        connect(pane, &FilePane::multiSelectionPreviewRequested, m_previewPane, &PreviewPane::previewSelection);
         connect(pane, &FilePane::statusMessageRequested, this, [this](const QString &message) {
             statusBar()->showMessage(message, 3500);
         });
@@ -240,6 +241,11 @@ MainWindow::MainWindow(const QString &initialPath, QWidget *parent)
     setActivePane(m_leftPane);
     m_previewPane->previewPath(initialPath);
     restoreSettings();
+
+    auto *versionLabel = new QLabel(QString("v%1").arg(TFX_VERSION), this);
+    versionLabel->setObjectName("statusVersion");
+    statusBar()->addPermanentWidget(versionLabel);
+
     QTimer::singleShot(0, this, [this]() {
         activePane()->focusFileList();
     });

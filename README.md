@@ -1,7 +1,7 @@
 # tfx for Linux
 
 **Terminal-inspired interface File eXplorer for Linux**  
-Version: **0.2.1**
+Version: **0.3.0**
 
 English | [Japanese](README.ja.md)
 
@@ -48,12 +48,15 @@ When no folder is specified, the application opens the current working directory
 - Folder tree and pinned folders
 - Single-pane and split-pane file list
 - Startup path handling: the left pane opens the command-line folder, or the current working directory when no folder is specified
-- Preview pane with source/rendered switching
+- Preview pane with source/rendered switching, an external image viewer button, and a multi-selection summary
 - Built-in command pane
-- User-editable `config.toml` created under `~/.config/tfx/`
+- User-editable `config.toml` created under `~/.config/tfx/`, including window/pane transparency
 - Window, splitter, pane visibility, tab, and column setting restoration
-- File operations: open, rename, new file/folder, trash, copy/cut/paste, copy path
+- File operations: open, open with (native chooser), rename, link, new file/folder, trash, copy/cut/paste, copy path
 - Mouse and keyboard selection in file lists, including persistent row highlight
+- Per-pane status line showing item counts, selection, and the current Git branch
+- Auto-refresh of the file list and Git status when the directory changes
+- Application version shown in the status bar
 - Configurable file-list columns:
   - Name
   - Type
@@ -79,6 +82,7 @@ Currently supported sections are:
 - Top-level `version = 1`
 - `[font]`
 - `[colors]`
+- `[opacity]` (`background`, `inactivePane`, `disabledItem`)
 - `[startup]`
 - `[shortcuts]`
 - `[terminal]` and `[openWith]` are parsed for compatibility; detailed behavior is still being wired in.

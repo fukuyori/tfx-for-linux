@@ -172,6 +172,38 @@ void PreviewPane::previewPath(const QString &path)
     m_stack->setCurrentWidget(m_text);
 }
 
+void PreviewPane::previewSelection(const QStringList &paths)
+{
+    m_currentImagePath.clear();
+    m_openExternal->setVisible(false);
+    m_title->setVisible(true);
+    setRenderAvailable(false);
+
+    qint64 totalSize = 0;
+    for (const QString &path : paths) {
+        const QFileInfo info(path);
+        if (info.isFile()) {
+            totalSize += info.size();
+        }
+    }
+    m_title->setText(UiText::t("%1 items selected", "%1 件を選択").arg(paths.size()));
+
+    QString body = UiText::t("Total size: %1 bytes\n\n", "合計サイズ: %1 bytes\n\n").arg(totalSize);
+    const int limit = 50;
+    for (int i = 0; i < paths.size() && i < limit; ++i) {
+        const QFileInfo info(paths.at(i));
+        const QString detail = info.isDir()
+            ? UiText::t("Folder", "フォルダ")
+            : QString::number(info.size());
+        body += QString("%1\t%2\n").arg(info.fileName(), detail);
+    }
+    if (paths.size() > limit) {
+        body += UiText::t("... and %1 more", "...ほか %1 件").arg(paths.size() - limit);
+    }
+    m_text->setPlainText(body);
+    m_stack->setCurrentWidget(m_text);
+}
+
 QString PreviewPane::metadataText(const QFileInfo &info) const
 {
     return UiText::t("%1\n%2\nSize: %3 bytes\nModified: %4\nPath: %5",

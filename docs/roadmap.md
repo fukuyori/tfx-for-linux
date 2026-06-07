@@ -1,52 +1,47 @@
 # tfx for Linux Roadmap
 
-Version target: **0.2.x -> 0.3.0**
+Current version: **0.3.0**
 
-This roadmap tracks the next practical development steps for the Linux Qt port. It is intentionally focused on the file manager experience before packaging and broader platform polish.
+This roadmap tracks the practical development steps for the Linux Qt port as it
+moves toward feature parity with tfx for Windows (0.6.x). It is phased so each
+stage is buildable and verifiable on its own.
 
-## 0.2.x Stabilization
+## 0.3.0 — Phase 1: Usability (done)
 
-- Stabilize file-list selection across mouse, keyboard, directory changes, sorting, and filtering.
-- Verify split/preview pane resizing across repeated show/hide operations and restored sessions.
-- Finish preview reliability for images, Markdown, HTML, PDF, CSV, TSV, JSON, and plain text.
-- Review keyboard behavior for common navigation flows: Enter, Backspace, Tab, Shift+Tab, arrow keys, and rename.
-- Keep the folder tree compact and readable without folder icons.
-- Improve error messages for missing tools such as PDF render helpers.
+- Application version shown in the status bar.
+- Current Git branch shown per pane in the status line.
+- "Create Link" (symlink) in the file context menu.
+- "Open With → Other..." using the desktop's native application chooser.
+- Multi-selection preview summary (count, total size, item list).
+- Auto-refresh of the file list and Git status on directory changes.
 
-## 0.3.0 File Operations
+## 0.4.0 — Phase 2: Core file interactions
 
-- Harden copy, cut, paste, rename, trash, and folder/file creation behavior.
-- Add conflict handling for paste, extract, and archive creation.
-- Add progress feedback for longer-running file operations.
-- Add safer cancellation behavior for operations that can take time.
-- Expand context menus based on the current tfx behavior.
+- Drag-and-drop: between panes, to/from the folder tree and pinned list, and
+  to/from external file managers.
+- Recursive subfolder search with streaming results and progress feedback.
+- Conflict handling and progress/cancellation for longer file operations.
 
-## 0.4.0 Preview And Metadata
+## 0.5.0 / 0.6.0 — Phase 3: Larger subsystems
 
-- Improve preview-pane metadata for owner, group, permissions, symlink targets, MIME/type details, and Git status.
-- Add preview fallback states for unsupported, binary, very large, or unreadable files.
-- Improve rendered preview styling for Markdown, HTML, and tabular data.
-- Add explicit source/rendered preview mode persistence.
+- Interactive terminal pane backed by a real PTY (colors, cursor, `Ctrl+C`,
+  path drag-in), replacing the current command-output pane.
+- Browse ZIP archives as folders (navigate in, extract individual entries,
+  drag out).
+- Icon view mode in addition to the details view, with persistence.
 
-## 0.5.0 Configuration And Customization
+## 0.6.x — Phase 4: Polish and hardening
 
-- Complete `config.toml` support for terminal and open-with behavior.
-- Add validation feedback for unsupported config keys and values.
-- Add user-configurable pinned folders.
-- Add configurable preview limits and file association rules.
-- Document all supported settings in Japanese and English.
-
-## 0.6.0 Packaging
-
-- Add install and uninstall targets.
-- Prepare desktop entry and application icon assets.
-- Add packaging notes for common Linux distributions.
-- Add CI build checks for the Qt project.
+- Light/dark theme switching driven by `config.toml`.
+- PDF preview disk cache and multi-stage fallback rendering.
+- Security hardening for Markdown/HTML preview, ZIP extraction, Git, and the
+  terminal launcher.
+- Packaging: install/uninstall targets, desktop entry and icon, distribution
+  notes, and CI build checks.
 
 ## Later
 
-- Multi-tab workflow improvements.
+- Multi-tab workflow refinements.
 - Search and filter refinements.
-- Optional terminal integration improvements.
-- Test coverage for path handling, column configuration, and file operation helpers.
-
+- Test coverage for path handling, column configuration, and file-operation
+  helpers.

@@ -1,5 +1,8 @@
 #pragma once
 
+class QFileSystemWatcher;
+class QTimer;
+
 #include <QFileSystemModel>
 #include <QHash>
 #include <QItemSelection>
@@ -67,6 +70,7 @@ signals:
     void activated(FilePane *pane);
     void directoryChanged(const QString &path);
     void selectionPreviewRequested(const QString &path);
+    void multiSelectionPreviewRequested(const QStringList &paths);
     void statusMessageRequested(const QString &message);
     void pinFolderRequested(const QString &path);
     void openTerminalHereRequested(const QString &path);
@@ -111,7 +115,10 @@ private:
     void applyDefaultColumns();
     void saveColumnSettings();
     void refreshGitStatuses();
+    void refreshGitBranch();
     void applyGitStatusOutput(const QString &output);
+    void createLinkForSelection();
+    void openWithCustomApplication();
     void updatePreviewFromSelection();
     void updateStatusLine();
     void commitPathEditor();
@@ -131,6 +138,9 @@ private:
     QLineEdit *m_pathEdit;
     QLabel *m_statusLabel;
     QProcess *m_gitStatusProcess = nullptr;
+    QString m_gitBranch;
+    QFileSystemWatcher *m_dirWatcher = nullptr;
+    QTimer *m_refreshDebounce = nullptr;
     QString m_label;
     QString m_currentPath;
     QStack<QString> m_backStack;

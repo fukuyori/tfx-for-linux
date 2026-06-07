@@ -19,6 +19,7 @@ Session state such as window placement, last-opened paths, pinned folders, colum
 - Top-level `version = 1`
 - `[font]`
 - `[colors]`
+- `[opacity]`
 - `[startup]`
 - `[shortcuts]`
 - `[terminal]`
@@ -32,6 +33,7 @@ The loader intentionally accepts a small TOML subset:
 - Arrays of double-quoted strings for `rightFolders`
 - Numeric font sizes
 - Quoted `#RRGGBB` colors
+- Decimal opacity values between `0.0` and `1.0`
 - `#` comments outside quoted strings
 
 Unsupported sections and unsupported keys are ignored. Invalid values fall back to built-in defaults and surface a status warning instead of crashing the app.
@@ -78,6 +80,11 @@ quit = "ctrl+q"
 # rightFolder = "~/Downloads"
 # rightFolders = ["~/Downloads", "~/Documents"]
 
+# [opacity]
+# background = 0.40     # window background opacity (0.0 = transparent, 1.0 = opaque)
+# inactivePane = 0.5    # opacity of the inactive file pane
+# disabledItem = 0.45   # opacity of disabled items
+
 # [colors]
 # fileListBackground = "#151A1E"
 # fileForeground = "#D9E1E8"
@@ -99,6 +106,21 @@ quit = "ctrl+q"
 `[startup] preview` accepts `show`, `hide`, or `restore`.
 
 `rightFolder` and `rightFolders` accept absolute paths or `~`-expanded paths. When `rightFolders` is used, the first valid folder is used for the right pane.
+
+## Opacity
+
+`[opacity]` controls window and pane transparency. Each value is a decimal between `0.0` (fully transparent) and `1.0` (fully opaque). Omitted keys default to `1.0`.
+
+- `background` — overall window background opacity. Values below `1.0` enable a translucent window surface, so the desktop shows through behind the panes (requires a compositing window manager).
+- `inactivePane` — opacity applied to the file pane that is not currently active.
+- `disabledItem` — opacity applied to disabled controls and menu items.
+
+```toml
+[opacity]
+background = 0.40
+inactivePane = 0.5
+disabledItem = 0.45
+```
 
 ## Colors
 

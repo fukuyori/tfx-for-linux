@@ -17,6 +17,7 @@ public:
 
 public slots:
     void previewPath(const QString &path);
+    void previewSelection(const QStringList &paths);
 
 private:
     QString metadataText(const QFileInfo &info) const;

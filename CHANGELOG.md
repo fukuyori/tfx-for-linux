@@ -2,6 +2,19 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.3.0] - 2026-06-07
+
+Phase 1 usability features bringing the Linux port closer to tfx-for-windows.
+
+### Added
+
+- Added the application version at the right edge of the status bar.
+- Added the current Git branch (`⎇ name`) in the status bar, following the active pane.
+- Added "Create Link" (symlink) to the file context menu.
+- Enabled "Open With → Other..." to show the desktop's native application chooser via xdg-desktop-portal (falling back to a launch-command prompt when the portal is unavailable).
+- Added a multi-selection preview summary (item count, total size, and a per-item list) in the preview pane.
+- Added auto-refresh of Git status when the directory changes (via `QFileSystemWatcher`) plus a periodic poll to catch commits and staging.
+
 ## [0.2.1] - 2026-06-06
 
 File-list columns, preview, and window appearance refinements.

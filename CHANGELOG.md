@@ -2,6 +2,20 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.3.2] - 2026-06-07
+
+Drag-and-drop and search refinements.
+
+### Added
+
+- Added a drag image that follows the cursor while dragging file-list items (stacked rows with a `+N` badge for multiple items).
+- Search results now appear in the same table format as the file list, with file icons and the Name/Type/Size/Date Modified/File Mode columns.
+- Pinned folders can be reordered by dragging, with an insertion indicator showing the drop position; folders dragged from the file list are inserted at that position.
+
+### Changed
+
+- The folder tree no longer participates in drag-and-drop (its folders cannot be dragged out and nothing can be dropped onto it).
+
 ## [0.3.1] - 2026-06-07
 
 Phase 2 core file interactions.

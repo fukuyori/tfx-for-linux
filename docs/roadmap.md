@@ -1,6 +1,6 @@
 # tfx for Linux Roadmap
 
-Current version: **0.3.1**
+Current version: **0.3.2**
 
 This roadmap tracks the practical development steps for the Linux Qt port as it
 moves toward feature parity with tfx for Windows (0.6.x). It is phased so each

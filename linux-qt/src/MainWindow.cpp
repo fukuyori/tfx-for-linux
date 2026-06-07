@@ -7,7 +7,14 @@
 #include <QCloseEvent>
 #include <QDesktopServices>
 #include <QDir>
+#include <QDrag>
+#include <QDragEnterEvent>
+#include <QDragLeaveEvent>
+#include <QDragMoveEvent>
+#include <QDropEvent>
 #include <QGraphicsOpacityEffect>
+#include <QListWidget>
+#include <QMimeData>
 #include <QFileInfo>
 #include <QHeaderView>
 #include <QLabel>
@@ -101,13 +108,142 @@ public:
         option->features &= ~QStyleOptionViewItem::HasDecoration;
     }
 };
+
+// Pinned-folder list: supports reordering by drag, accepts folders dropped from
+// the file list, and draws an insertion indicator at the drop position.
+class PinnedListWidget : public QListWidget {
+public:
+    using QListWidget::QListWidget;
+
+    std::function<void(const QStringList &folders, int row)> onExternalFoldersDropped;
+    std::function<void()> onReordered;
+
+protected:
+    void startDrag(Qt::DropActions supportedActions) override
+    {
+        Q_UNUSED(supportedActions);
+        // Custom drag: the item is repositioned in dropEvent, so the base view's
+        // post-move row removal must be avoided (it would delete the item).
+        if (!currentItem()) {
+            return;
+        }
+        auto *drag = new QDrag(this);
+        drag->setMimeData(new QMimeData());
+        drag->exec(Qt::MoveAction);
+    }
+
+    void dragEnterEvent(QDragEnterEvent *event) override
+    {
+        if (event->source() == this || event->mimeData()->hasUrls()) {
+            m_dragActive = true;
+            m_dropRow = dropRowAt(event->position().toPoint());
+            event->acceptProposedAction();
+            viewport()->update();
+            return;
+        }
+        QListWidget::dragEnterEvent(event);
+    }
+
+    void dragMoveEvent(QDragMoveEvent *event) override
+    {
+        if (event->source() == this || event->mimeData()->hasUrls()) {
+            m_dragActive = true;
+            m_dropRow = dropRowAt(event->position().toPoint());
+            event->acceptProposedAction();
+            viewport()->update();
+            return;
+        }
+        QListWidget::dragMoveEvent(event);
+    }
+
+    void dragLeaveEvent(QDragLeaveEvent *event) override
+    {
+        m_dragActive = false;
+        viewport()->update();
+        QListWidget::dragLeaveEvent(event);
+    }
+
+    void dropEvent(QDropEvent *event) override
+    {
+        const int row = dropRowAt(event->position().toPoint());
+        m_dragActive = false;
+        viewport()->update();
+
+        if (event->source() == this) {
+            const int from = currentRow();
+            if (from >= 0) {
+                int to = row;
+                if (to > from) {
+                    to -= 1;
+                }
+                QListWidgetItem *moved = takeItem(from);
+                insertItem(qBound(0, to, count()), moved);
+                setCurrentItem(moved);
+                if (onReordered) {
+                    onReordered();
+                }
+            }
+            event->acceptProposedAction();
+            return;
+        }
+
+        if (event->mimeData()->hasUrls()) {
+            QStringList folders;
+            for (const QUrl &url : event->mimeData()->urls()) {
+                const QString path = url.toLocalFile();
+                if (!path.isEmpty()) {
+                    folders << path;
+                }
+            }
+            if (onExternalFoldersDropped) {
+                onExternalFoldersDropped(folders, row);
+            }
+            event->acceptProposedAction();
+            return;
+        }
+        QListWidget::dropEvent(event);
+    }
+
+    void paintEvent(QPaintEvent *event) override
+    {
+        QListWidget::paintEvent(event);
+        if (!m_dragActive) {
+            return;
+        }
+        int y = 0;
+        if (m_dropRow <= 0) {
+            y = count() > 0 ? visualItemRect(item(0)).top() : 0;
+        } else if (m_dropRow >= count()) {
+            y = count() > 0 ? visualItemRect(item(count() - 1)).bottom() : 0;
+        } else {
+            y = visualItemRect(item(m_dropRow)).top();
+        }
+        QPainter painter(viewport());
+        painter.setPen(QPen(QColor("#63F28D"), 2));
+        painter.drawLine(2, y, viewport()->width() - 2, y);
+    }
+
+private:
+    int dropRowAt(const QPoint &pos)
+    {
+        const QModelIndex index = indexAt(pos);
+        if (!index.isValid()) {
+            return count();
+        }
+        const QRect rect = visualItemRect(item(index.row()));
+        return pos.y() > rect.center().y() ? index.row() + 1 : index.row();
+    }
+
+    bool m_dragActive = false;
+    int m_dropRow = 0;
+};
 }
 
 MainWindow::MainWindow(const QString &initialPath, QWidget *parent)
     : QMainWindow(parent),
       m_treeModel(new QFileSystemModel(this)),
       m_treeView(new QTreeView(this)),
-      m_pinnedList(new QListWidget(this)),
+      m_pinnedList(new PinnedListWidget(this)),
       m_pinnedSpacer(new QWidget(this)),
       m_searchEdit(new QLineEdit(this)),
       m_topToolbar(new QToolBar(this)),
@@ -375,6 +511,11 @@ void MainWindow::buildFolderSidebar(const QString &initialPath)
     m_treeView->setCurrentIndex(m_treeModel->index(initialPath));
     m_treeView->setIndentation(10);
     m_treeView->setContextMenuPolicy(Qt::CustomContextMenu);
+    // The folder tree never participates in drag-and-drop: its folders cannot be
+    // dragged out, and items cannot be dropped onto it.
+    m_treeView->setDragDropMode(QAbstractItemView::NoDragDrop);
+    m_treeView->setDragEnabled(false);
+    m_treeView->setAcceptDrops(false);
 
     connect(m_treeView, &QTreeView::clicked, this, [this](const QModelIndex &index) {
         const QString path = m_treeModel->filePath(index);
@@ -421,6 +562,52 @@ void MainWindow::buildFolderSidebar(const QString &initialPath)
     m_pinnedList->setUniformItemSizes(true);
     m_pinnedList->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_pinnedList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    // Reorder pinned folders by dragging, and accept folders dropped from the
+    // file list; an insertion indicator shows where the item will land.
+    m_pinnedList->setSelectionMode(QAbstractItemView::SingleSelection);
+    m_pinnedList->setDragEnabled(true);
+    m_pinnedList->setAcceptDrops(true);
+    m_pinnedList->viewport()->setAcceptDrops(true);
+    m_pinnedList->setDropIndicatorShown(false);
+    m_pinnedList->setDragDropMode(QAbstractItemView::DragDrop);
+    m_pinnedList->setDefaultDropAction(Qt::MoveAction);
+    auto *pinned = static_cast<PinnedListWidget *>(m_pinnedList);
+    pinned->onReordered = [this]() {
+        updatePinnedFolderArea();
+        if (!m_isRestoringSettings) {
+            saveSettings();
+        }
+    };
+    pinned->onExternalFoldersDropped = [this](const QStringList &folders, int row) {
+        int insertAt = qBound(0, row, m_pinnedList->count());
+        for (const QString &path : folders) {
+            const QFileInfo info(path);
+            if (!info.isDir()) {
+                continue;
+            }
+            const QString clean = info.canonicalFilePath().isEmpty()
+                ? info.absoluteFilePath() : info.canonicalFilePath();
+            bool exists = false;
+            for (int r = 0; r < m_pinnedList->count(); ++r) {
+                if (m_pinnedList->item(r)->data(Qt::UserRole).toString() == clean) {
+                    exists = true;
+                    break;
+                }
+            }
+            if (exists) {
+                continue;
+            }
+            auto *item = new QListWidgetItem(info.fileName().isEmpty() ? clean : info.fileName());
+            item->setSizeHint(QSize(0, 18));
+            item->setData(Qt::UserRole, clean);
+            m_pinnedList->insertItem(insertAt, item);
+            ++insertAt;
+        }
+        updatePinnedFolderArea();
+        if (!m_isRestoringSettings) {
+            saveSettings();
+        }
+    };
     connect(m_pinnedList, &QListWidget::itemClicked, this, [this](QListWidgetItem *item) {
         activePane()->navigateTo(item->data(Qt::UserRole).toString());
     });

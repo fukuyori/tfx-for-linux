@@ -1,6 +1,6 @@
 # tfx for Linux Roadmap
 
-Current version: **0.3.0**
+Current version: **0.3.1**
 
 This roadmap tracks the practical development steps for the Linux Qt port as it
 moves toward feature parity with tfx for Windows (0.6.x). It is phased so each
@@ -15,12 +15,15 @@ stage is buildable and verifiable on its own.
 - Multi-selection preview summary (count, total size, item list).
 - Auto-refresh of the file list and Git status on directory changes.
 
-## 0.4.0 — Phase 2: Core file interactions
+## 0.3.1 — Phase 2: Core file interactions
 
-- Drag-and-drop: between panes, to/from the folder tree and pinned list, and
-  to/from external file managers.
-- Recursive subfolder search with streaming results and progress feedback.
-- Conflict handling and progress/cancellation for longer file operations.
+- Drag-and-drop between panes and to/from external file managers; drop onto a
+  folder to move, or hold Ctrl to copy. (done)
+- Recursive subfolder search started with Enter, streamed into a results view,
+  and cancelled on navigation. (done)
+- Remaining: drop onto the folder tree and pinned list.
+- Remaining: conflict handling and progress/cancellation for longer file
+  operations.
 
 ## 0.5.0 / 0.6.0 — Phase 3: Larger subsystems
 

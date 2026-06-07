@@ -2,7 +2,11 @@
 
 class QFileSystemWatcher;
 class QTimer;
+class QStackedWidget;
+class QDirIterator;
+class QStandardItemModel;
 
+#include <QFileIconProvider>
 #include <QFileSystemModel>
 #include <QHash>
 #include <QItemSelection>
@@ -57,6 +61,7 @@ public:
     QList<QUrl> selectedUrls() const;
     void setShowHiddenFiles(bool show);
     void setPathFilter(const QString &text);
+    void startSearch(const QString &term);
     void setActive(bool active);
     void setThemeColors(const QString &fileForeground, const QString &directoryForeground);
     QStringList tabPaths() const;
@@ -114,11 +119,14 @@ private:
     void selectAllVisibleItems();
     void applyDefaultColumns();
     void saveColumnSettings();
+    void searchStep();
+    void cancelSearch();
     void refreshGitStatuses();
     void refreshGitBranch();
     void applyGitStatusOutput(const QString &output);
     void createLinkForSelection();
     void openWithCustomApplication();
+    void performDrop(const QList<QUrl> &urls, Qt::DropAction action, const QString &targetDir);
     void updatePreviewFromSelection();
     void updateStatusLine();
     void commitPathEditor();
@@ -141,6 +149,16 @@ private:
     QString m_gitBranch;
     QFileSystemWatcher *m_dirWatcher = nullptr;
     QTimer *m_refreshDebounce = nullptr;
+    QStackedWidget *m_viewStack = nullptr;
+    QTableView *m_searchView = nullptr;
+    QStandardItemModel *m_searchModel = nullptr;
+    QFileIconProvider m_iconProvider;
+    QDirIterator *m_searchIterator = nullptr;
+    QTimer *m_searchTimer = nullptr;
+    QString m_searchTerm;
+    int m_searchMatches = 0;
+    QString m_fileForeground = "#D9E1E8";
+    QString m_directoryForeground = "#E5EDF3";
     QString m_label;
     QString m_currentPath;
     QStack<QString> m_backStack;

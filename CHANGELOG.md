@@ -2,6 +2,19 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.3.1] - 2026-06-07
+
+Phase 2 core file interactions.
+
+### Added
+
+- Added drag-and-drop for files and folders: drag out to other panes and external file managers, drop in from them, and drop onto a folder to move (or copy with Ctrl) into it.
+- Added recursive subfolder search: type a term and press Enter to search the current folder and all subfolders, with results streamed into a dedicated results view showing relative paths and a live match count.
+
+### Changed
+
+- Search no longer filters the current directory as you type; it now starts an explicit recursive search on Enter and is cancelled automatically when the pane navigates to another folder.
+
 ## [0.3.0] - 2026-06-07
 
 Phase 1 usability features bringing the Linux port closer to tfx-for-windows.

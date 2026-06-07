@@ -9,6 +9,10 @@
 #include <QDBusConnection>
 #include <QDBusMessage>
 #include <QDBusUnixFileDescriptor>
+#include <QDrag>
+#include <QDragEnterEvent>
+#include <QDragMoveEvent>
+#include <QDropEvent>
 #include <QFile>
 #include <QFileSystemWatcher>
 #include <QHeaderView>
@@ -24,7 +28,9 @@
 #include <QMimeData>
 #include <QMimeDatabase>
 #include <QMimeType>
+#include <QIcon>
 #include <QPainter>
+#include <QPixmap>
 #include <QProcess>
 #include <QPushButton>
 #include <QStyledItemDelegate>
@@ -39,9 +45,12 @@
 #include <QHBoxLayout>
 #include <QCheckBox>
 #include <QListWidget>
+#include <QStackedWidget>
+#include <QStandardItemModel>
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <functional>
 
 namespace {
 bool selectionDebugEnabled()
@@ -150,28 +159,89 @@ class FileTableView : public QTableView
 public:
     using QTableView::QTableView;
 
+    // Invoked on a drop of file URLs: (urls, action, target index under cursor).
+    std::function<void(const QList<QUrl> &, Qt::DropAction, const QModelIndex &)> dropHandler;
+
 protected:
+    void dragEnterEvent(QDragEnterEvent *event) override
+    {
+        if (event->mimeData()->hasUrls()) {
+            event->acceptProposedAction();
+        } else {
+            QTableView::dragEnterEvent(event);
+        }
+    }
+
+    void dragMoveEvent(QDragMoveEvent *event) override
+    {
+        if (event->mimeData()->hasUrls()) {
+            event->acceptProposedAction();
+        } else {
+            QTableView::dragMoveEvent(event);
+        }
+    }
+
+    void dropEvent(QDropEvent *event) override
+    {
+        if (!event->mimeData()->hasUrls() || !dropHandler) {
+            QTableView::dropEvent(event);
+            return;
+        }
+        const QModelIndex target = indexAt(event->position().toPoint());
+        const Qt::DropAction action = event->modifiers().testFlag(Qt::ControlModifier)
+            ? Qt::CopyAction
+            : Qt::MoveAction;
+        dropHandler(event->mimeData()->urls(), action, target);
+        event->acceptProposedAction();
+    }
+
     void mousePressEvent(QMouseEvent *event) override
     {
         m_pressedIndex = indexAt(event->pos());
         m_pressedModifiers = event->modifiers();
-        if (selectionDebugEnabled()) {
-            selectionDebugLog(QString("[selection] mousePress pos=(%1,%2) index=(%3,%4) button=%5 modifiers=%6")
-                .arg(event->pos().x())
-                .arg(event->pos().y())
-                .arg(m_pressedIndex.row())
-                .arg(m_pressedIndex.column())
-                .arg(static_cast<int>(event->button()))
-                .arg(static_cast<int>(event->modifiers())));
-        }
+        m_pressPos = event->pos();
         QTableView::mousePressEvent(event);
         logSelectionState("after base mousePress", this);
         if (event->button() != Qt::LeftButton) {
             return;
         }
 
+        // Keep an existing multi-selection on a plain press so it can be dragged;
+        // selection collapses on release if no drag happens.
+        const bool plain = !(event->modifiers() & (Qt::ControlModifier | Qt::ShiftModifier));
+        const bool alreadySelected = selectionModel() && m_pressedIndex.isValid()
+            && selectionModel()->isSelected(m_pressedIndex);
+        const bool multi = selectionModel() && selectionModel()->selectedRows().size() > 1;
+        if (plain && alreadySelected && multi) {
+            setProperty("currentSelectionRow", m_pressedIndex.row());
+            return;
+        }
+
         applyPersistentSelection(m_pressedIndex, m_pressedModifiers);
         logSelectionState("after apply mousePress", this);
+    }
+
+    void mouseMoveEvent(QMouseEvent *event) override
+    {
+        // Start a drag explicitly: the custom selection handling above otherwise
+        // leaves the view in rubber-band mode instead of initiating a drag.
+        if ((event->buttons() & Qt::LeftButton) && m_pressedIndex.isValid() && model() && selectionModel()
+            && (event->pos() - m_pressPos).manhattanLength() >= QApplication::startDragDistance()) {
+            QMimeData *mime = model()->mimeData(selectionModel()->selectedIndexes());
+            if (mime && mime->hasUrls()) {
+                auto *drag = new QDrag(this);
+                drag->setMimeData(mime);
+                const QPixmap pixmap = dragPixmap();
+                if (!pixmap.isNull()) {
+                    drag->setPixmap(pixmap);
+                    drag->setHotSpot(QPoint(14, 12));
+                }
+                drag->exec(Qt::CopyAction | Qt::MoveAction, Qt::MoveAction);
+                return;
+            }
+            delete mime;
+        }
+        QTableView::mouseMoveEvent(event);
     }
 
     void mouseReleaseEvent(QMouseEvent *event) override
@@ -199,6 +269,53 @@ protected:
     }
 
 private:
+    QPixmap dragPixmap() const
+    {
+        if (!selectionModel() || !model()) {
+            return {};
+        }
+        const QModelIndexList rows = selectionModel()->selectedRows(0);
+        if (rows.isEmpty()) {
+            return {};
+        }
+        const qreal dpr = devicePixelRatioF();
+        const int rowHeight = 24;
+        const int maxRows = 4;
+        const int shown = qMin(rows.size(), maxRows);
+        const bool overflow = rows.size() > maxRows;
+        const int width = 240;
+        const int height = rowHeight * shown + (overflow ? 18 : 0);
+
+        QPixmap pixmap(QSize(width, height) * dpr);
+        pixmap.setDevicePixelRatio(dpr);
+        pixmap.fill(Qt::transparent);
+        QPainter painter(&pixmap);
+        painter.setRenderHint(QPainter::Antialiasing);
+        for (int i = 0; i < shown; ++i) {
+            const QRectF rect(0, i * rowHeight, width, rowHeight);
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(QColor(38, 61, 76, 230));
+            painter.drawRoundedRect(rect.adjusted(0, 1, 0, -1), 4, 4);
+            const QModelIndex index = rows.at(i);
+            int x = 6;
+            const QIcon icon = qvariant_cast<QIcon>(index.data(Qt::DecorationRole));
+            if (!icon.isNull()) {
+                icon.paint(&painter, QRect(x, i * rowHeight + 3, 18, 18));
+                x += 24;
+            }
+            painter.setPen(QColor("#FFFFFF"));
+            const QString name = index.data(Qt::DisplayRole).toString();
+            const QString elided = painter.fontMetrics().elidedText(name, Qt::ElideRight, width - x - 8);
+            painter.drawText(QRect(x, i * rowHeight, width - x - 8, rowHeight), Qt::AlignVCenter, elided);
+        }
+        if (overflow) {
+            painter.setPen(QColor("#D9E1E8"));
+            painter.drawText(QRect(0, rowHeight * shown, width, 18), Qt::AlignCenter,
+                             QString("+%1").arg(rows.size() - maxRows));
+        }
+        return pixmap;
+    }
+
     void applyPersistentSelection(const QPersistentModelIndex &persistentIndex, Qt::KeyboardModifiers modifiers)
     {
         if (!persistentIndex.isValid() || !selectionModel()) {
@@ -222,6 +339,7 @@ private:
 
     QPersistentModelIndex m_pressedIndex;
     Qt::KeyboardModifiers m_pressedModifiers;
+    QPoint m_pressPos;
 };
 
 int defaultColumnWidth(int column)
@@ -672,6 +790,24 @@ FilePane::FilePane(const QString &label, const QString &initialPath, QWidget *pa
     m_view->setSelectionMode(QAbstractItemView::ExtendedSelection);
     m_view->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_view->setFocusPolicy(Qt::StrongFocus);
+    m_view->setDragEnabled(true);
+    m_view->setAcceptDrops(true);
+    m_view->viewport()->setAcceptDrops(true);
+    m_view->setDropIndicatorShown(true);
+    m_view->setDragDropMode(QAbstractItemView::DragDrop);
+    m_view->setDefaultDropAction(Qt::MoveAction);
+    static_cast<FileTableView *>(m_view)->dropHandler =
+        [this](const QList<QUrl> &urls, Qt::DropAction action, const QModelIndex &target) {
+            QString targetDir = m_currentPath;
+            if (target.isValid()) {
+                const QModelIndex source = m_proxyModel->mapToSource(target.sibling(target.row(), 0));
+                const QFileInfo info = m_model->fileInfo(source);
+                if (info.isDir()) {
+                    targetDir = info.absoluteFilePath();
+                }
+            }
+            performDrop(urls, action, targetDir);
+        };
     m_view->setSortingEnabled(true);
     m_view->sortByColumn(0, Qt::AscendingOrder);
     m_view->setShowGrid(false);
@@ -743,12 +879,60 @@ FilePane::FilePane(const QString &label, const QString &initialPath, QWidget *pa
     headerLayout->addWidget(m_badgeLabel);
     headerLayout->addWidget(m_pathEdit, 1);
 
+    m_searchModel = new QStandardItemModel(this);
+    m_searchModel->setHorizontalHeaderLabels({
+        columnTitle(ColumnName),
+        columnTitle(ColumnType),
+        columnTitle(ColumnSize),
+        columnTitle(ColumnModified),
+        columnTitle(ColumnMode),
+    });
+    m_searchView = new QTableView(this);
+    m_searchView->setObjectName("fileTable");
+    m_searchView->setModel(m_searchModel);
+    m_searchView->setSelectionBehavior(QAbstractItemView::SelectRows);
+    m_searchView->setSelectionMode(QAbstractItemView::ExtendedSelection);
+    m_searchView->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    m_searchView->setShowGrid(false);
+    m_searchView->setFrameShape(QFrame::NoFrame);
+    m_searchView->setIconSize(QSize(18, 18));
+    m_searchView->setItemDelegate(new FileItemDelegate(m_searchView));
+    m_searchView->verticalHeader()->hide();
+    m_searchView->verticalHeader()->setDefaultSectionSize(26);
+    m_searchView->horizontalHeader()->setStretchLastSection(true);
+    m_searchView->setColumnWidth(0, 320);
+    m_searchView->setColumnWidth(1, 120);
+    m_searchView->setColumnWidth(2, 96);
+    m_searchView->setColumnWidth(3, 160);
+
+    m_viewStack = new QStackedWidget(this);
+    m_viewStack->addWidget(m_view);
+    m_viewStack->addWidget(m_searchView);
+    m_viewStack->setCurrentWidget(m_view);
+
+    m_searchTimer = new QTimer(this);
+    m_searchTimer->setInterval(0);
+    connect(m_searchTimer, &QTimer::timeout, this, &FilePane::searchStep);
+    const auto openSearchResult = [this](const QModelIndex &index) {
+        if (!index.isValid()) {
+            return;
+        }
+        const QString path = m_searchModel->item(index.row(), 0)->data(Qt::UserRole).toString();
+        const QFileInfo info(path);
+        if (!info.exists()) {
+            return;
+        }
+        navigateTo(info.absolutePath());
+        QTimer::singleShot(0, this, [this, path]() { setCurrentIndexForPath(path); });
+    };
+    connect(m_searchView, &QTableView::activated, this, openSearchResult);
+
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(2, 2, 2, 2);
     layout->setSpacing(0);
     layout->addWidget(m_tabBar);
     layout->addLayout(headerLayout);
-    layout->addWidget(m_view, 1);
+    layout->addWidget(m_viewStack, 1);
     layout->addWidget(m_statusLabel);
 
     connect(m_view, &QTableView::clicked, this, [this](const QModelIndex &index) {
@@ -945,9 +1129,83 @@ void FilePane::setShowHiddenFiles(bool show)
 
 void FilePane::setPathFilter(const QString &text)
 {
-    m_model->setNameFilters(text.trimmed().isEmpty() ? QStringList() : QStringList(QString("*%1*").arg(text.trimmed())));
-    m_model->setNameFilterDisables(false);
-    updateStatusLine();
+    // Retained for compatibility; live filtering is no longer used. Searching is
+    // started explicitly via startSearch() (Enter in the search box).
+    Q_UNUSED(text);
+}
+
+void FilePane::startSearch(const QString &term)
+{
+    cancelSearch();
+    const QString trimmed = term.trimmed();
+    if (trimmed.isEmpty()) {
+        return;
+    }
+    m_searchTerm = trimmed;
+    m_searchMatches = 0;
+    m_searchModel->removeRows(0, m_searchModel->rowCount());
+
+    QDir::Filters filters = QDir::AllEntries | QDir::NoDotAndDotDot;
+    if (m_showHiddenFiles) {
+        filters |= QDir::Hidden | QDir::System;
+    }
+    m_searchIterator = new QDirIterator(m_currentPath, filters, QDirIterator::Subdirectories);
+    m_viewStack->setCurrentWidget(m_searchView);
+    emit statusMessageRequested(UiText::t("Searching: %1...", "検索中: %1...").arg(m_searchTerm));
+    m_searchTimer->start();
+}
+
+void FilePane::searchStep()
+{
+    if (!m_searchIterator) {
+        m_searchTimer->stop();
+        return;
+    }
+    const QDir base(m_currentPath);
+    int budget = 400;
+    while (budget-- > 0 && m_searchIterator->hasNext()) {
+        const QString path = m_searchIterator->next();
+        if (!m_searchIterator->fileName().contains(m_searchTerm, Qt::CaseInsensitive)) {
+            continue;
+        }
+        const QFileInfo info = m_searchIterator->fileInfo();
+
+        auto *nameItem = new QStandardItem(m_iconProvider.icon(info), base.relativeFilePath(path));
+        nameItem->setData(path, Qt::UserRole);
+        nameItem->setForeground(QColor(info.isDir() ? m_directoryForeground : m_fileForeground));
+        auto *typeItem = new QStandardItem(englishTypeName(info));
+        auto *sizeItem = new QStandardItem(info.isDir() ? QString() : sizeString(info.size()));
+        sizeItem->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        auto *modifiedItem = new QStandardItem(info.lastModified().toString("yyyy-MM-dd HH:mm:ss"));
+        auto *modeItem = new QStandardItem(modeString(info));
+        m_searchModel->appendRow({nameItem, typeItem, sizeItem, modifiedItem, modeItem});
+        ++m_searchMatches;
+    }
+    if (!m_searchIterator->hasNext()) {
+        m_searchTimer->stop();
+        delete m_searchIterator;
+        m_searchIterator = nullptr;
+        emit statusMessageRequested(UiText::t("Search complete: %1 matches", "検索完了: %1 件").arg(m_searchMatches));
+    } else {
+        emit statusMessageRequested(UiText::t("Searching: %1 matches", "検索中: %1 件").arg(m_searchMatches));
+    }
+}
+
+void FilePane::cancelSearch()
+{
+    if (m_searchTimer) {
+        m_searchTimer->stop();
+    }
+    if (m_searchIterator) {
+        delete m_searchIterator;
+        m_searchIterator = nullptr;
+    }
+    if (m_searchModel) {
+        m_searchModel->removeRows(0, m_searchModel->rowCount());
+    }
+    if (m_viewStack && m_view) {
+        m_viewStack->setCurrentWidget(m_view);
+    }
 }
 
 void FilePane::setActive(bool active)
@@ -966,6 +1224,8 @@ void FilePane::setActive(bool active)
 
 void FilePane::setThemeColors(const QString &fileForeground, const QString &directoryForeground)
 {
+    m_fileForeground = fileForeground;
+    m_directoryForeground = directoryForeground;
     m_proxyModel->setThemeColors(fileForeground, directoryForeground);
 }
 
@@ -976,6 +1236,8 @@ void FilePane::navigateTo(const QString &path, bool recordHistory)
         emit statusMessageRequested(UiText::t("Cannot open directory: %1", "フォルダを開けません: %1").arg(path));
         return;
     }
+
+    cancelSearch();
 
     const QString nextPath = info.canonicalFilePath().isEmpty() ? info.absoluteFilePath() : info.canonicalFilePath();
     if (recordHistory && !m_currentPath.isEmpty() && m_currentPath != nextPath) {
@@ -1143,6 +1405,64 @@ void FilePane::cutSelected()
     mime->setData("application/x-tfx-cut", "1");
     QApplication::clipboard()->setMimeData(mime);
     emit statusMessageRequested(UiText::t("Cut selected item(s).", "選択項目をカットしました。"));
+}
+
+void FilePane::performDrop(const QList<QUrl> &urls, Qt::DropAction action, const QString &targetDir)
+{
+    if (urls.isEmpty() || targetDir.isEmpty()) {
+        return;
+    }
+    const bool move = (action == Qt::MoveAction);
+    const QDir dir(targetDir);
+    const QString targetCanonical = QFileInfo(targetDir).absoluteFilePath();
+    bool changed = false;
+
+    for (const QUrl &url : urls) {
+        const QString source = url.toLocalFile();
+        if (source.isEmpty()) {
+            continue;
+        }
+        const QFileInfo sourceInfo(source);
+        if (!sourceInfo.exists()) {
+            continue;
+        }
+        // Dropping into the same directory is a no-op.
+        if (sourceInfo.absolutePath() == targetCanonical) {
+            continue;
+        }
+        // Never move/copy a folder into itself or one of its descendants.
+        if (sourceInfo.isDir()
+            && (targetCanonical + "/").startsWith(sourceInfo.absoluteFilePath() + "/")) {
+            emit statusMessageRequested(UiText::t("Cannot move a folder into itself.", "フォルダを自身の中へは移動できません。"));
+            continue;
+        }
+        const QString destination = dir.filePath(sourceInfo.fileName());
+        if (QFileInfo::exists(destination)) {
+            emit statusMessageRequested(UiText::t("Skipped existing item: %1", "既存項目をスキップしました: %1").arg(sourceInfo.fileName()));
+            continue;
+        }
+
+        bool ok = false;
+        if (move) {
+            ok = QFile::rename(source, destination);
+            if (!ok && copyRecursively(source, destination)) {
+                // Cross-device move: copy succeeded, remove the source.
+                ok = sourceInfo.isDir() ? QDir(source).removeRecursively() : QFile::remove(source);
+            }
+        } else {
+            ok = copyRecursively(source, destination);
+        }
+        if (ok) {
+            changed = true;
+        } else {
+            emit statusMessageRequested(UiText::t("Could not transfer item: %1", "項目を移動/コピーできませんでした: %1").arg(sourceInfo.fileName()));
+        }
+    }
+
+    if (changed) {
+        reload();
+    }
+    updateStatusLine();
 }
 
 void FilePane::pasteIntoCurrentDirectory()

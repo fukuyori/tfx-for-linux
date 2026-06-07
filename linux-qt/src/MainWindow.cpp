@@ -323,11 +323,11 @@ void MainWindow::buildTopToolbar()
     addToolBar(Qt::TopToolBarArea, m_topToolbar);
 
     m_searchEdit->setObjectName("searchEdit");
-    m_searchEdit->setPlaceholderText(UiText::t("Search", "検索"));
+    m_searchEdit->setPlaceholderText(UiText::t("Search (Enter to search subfolders)", "検索 (Enter でサブフォルダ検索)"));
     m_searchEdit->setClearButtonEnabled(true);
     m_searchEdit->setMaximumWidth(260);
-    connect(m_searchEdit, &QLineEdit::textChanged, this, [this](const QString &text) {
-        activePane()->setPathFilter(text);
+    connect(m_searchEdit, &QLineEdit::returnPressed, this, [this]() {
+        activePane()->startSearch(m_searchEdit->text());
     });
     auto *focusSearchShortcut = new QShortcut(QKeySequence(m_config.shortcut("focusSearch", "Ctrl+F")), this);
     connect(focusSearchShortcut, &QShortcut::activated, m_searchEdit, [this]() {

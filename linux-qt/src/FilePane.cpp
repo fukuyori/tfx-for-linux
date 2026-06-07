@@ -44,6 +44,7 @@
 #include <QMouseEvent>
 #include <QHBoxLayout>
 #include <QCheckBox>
+#include <QListView>
 #include <QListWidget>
 #include <QStackedWidget>
 #include <QStandardItemModel>
@@ -259,11 +260,16 @@ protected:
         if (event->button() != Qt::LeftButton) {
             return;
         }
+        // For Ctrl/Shift the press already set the selection; re-applying on
+        // release would toggle it back or rebuild the range. Only plain clicks
+        // finalize here (collapse to the clicked row when no drag occurred).
+        if (event->modifiers() & (Qt::ControlModifier | Qt::ShiftModifier)) {
+            return;
+        }
 
         const QPersistentModelIndex index = m_pressedIndex;
-        const Qt::KeyboardModifiers modifiers = m_pressedModifiers;
-        QTimer::singleShot(0, this, [this, index, modifiers]() {
-            applyPersistentSelection(index, modifiers);
+        QTimer::singleShot(0, this, [this, index]() {
+            applyPersistentSelection(index, Qt::NoModifier);
             logSelectionState("after deferred mouseRelease", this);
         });
     }
@@ -323,15 +329,27 @@ private:
         }
 
         const QModelIndex index = persistentIndex;
-        QItemSelectionModel::SelectionFlags flags = QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows;
-        if (modifiers.testFlag(Qt::ControlModifier)) {
-            flags = QItemSelectionModel::Toggle;
-        } else if (modifiers.testFlag(Qt::ShiftModifier)) {
-            flags = QItemSelectionModel::SelectCurrent;
+        if (modifiers.testFlag(Qt::ShiftModifier) && m_anchorRow >= 0 && model()) {
+            // Range select from the anchor to the clicked row.
+            const QModelIndex parent = index.parent();
+            const int from = qMin(m_anchorRow, index.row());
+            const int to = qMax(m_anchorRow, index.row());
+            const QItemSelection range(model()->index(from, 0, parent),
+                                       model()->index(to, kColumnCount - 1, parent));
+            selectionModel()->select(range, QItemSelectionModel::ClearAndSelect);
+            selectionModel()->setCurrentIndex(index, QItemSelectionModel::NoUpdate);
+        } else if (modifiers.testFlag(Qt::ControlModifier)) {
+            // Toggle the clicked row, keeping the rest of the selection.
+            selectionModel()->select(rowSelection(index),
+                                     QItemSelectionModel::Toggle | QItemSelectionModel::Rows);
+            setCurrentIndex(index);
+            m_anchorRow = index.row();
+        } else {
+            setCurrentIndex(index);
+            selectionModel()->select(rowSelection(index),
+                                     QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
+            m_anchorRow = index.row();
         }
-
-        setCurrentIndex(index);
-        selectionModel()->select(rowSelection(index), flags);
         setProperty("currentSelectionRow", index.row());
         viewport()->update();
         logSelectionState("applyPersistentSelection", this);
@@ -340,6 +358,82 @@ private:
     QPersistentModelIndex m_pressedIndex;
     Qt::KeyboardModifiers m_pressedModifiers;
     QPoint m_pressPos;
+    int m_anchorRow = -1;
+};
+
+// Icon-mode counterpart of FileTableView. Drag-out uses the base view's default
+// handling; drops of file URLs are routed through dropHandler.
+class FileIconView : public QListView
+{
+public:
+    using QListView::QListView;
+
+    std::function<void(const QList<QUrl> &, Qt::DropAction, const QModelIndex &)> dropHandler;
+
+protected:
+    void mousePressEvent(QMouseEvent *event) override
+    {
+        m_pressPos = event->pos();
+        m_pressValid = indexAt(event->pos()).isValid();
+        QListView::mousePressEvent(event);
+    }
+
+    void mouseMoveEvent(QMouseEvent *event) override
+    {
+        if ((event->buttons() & Qt::LeftButton) && m_pressValid && model() && selectionModel()
+            && (event->pos() - m_pressPos).manhattanLength() >= QApplication::startDragDistance()) {
+            QMimeData *mime = model()->mimeData(selectionModel()->selectedIndexes());
+            if (mime && mime->hasUrls()) {
+                auto *drag = new QDrag(this);
+                drag->setMimeData(mime);
+                const QIcon icon = qvariant_cast<QIcon>(currentIndex().data(Qt::DecorationRole));
+                if (!icon.isNull()) {
+                    drag->setPixmap(icon.pixmap(48, 48));
+                    drag->setHotSpot(QPoint(24, 24));
+                }
+                drag->exec(Qt::CopyAction | Qt::MoveAction, Qt::MoveAction);
+                return;
+            }
+            delete mime;
+        }
+        QListView::mouseMoveEvent(event);
+    }
+
+    void dragEnterEvent(QDragEnterEvent *event) override
+    {
+        if (event->mimeData()->hasUrls()) {
+            event->acceptProposedAction();
+        } else {
+            QListView::dragEnterEvent(event);
+        }
+    }
+
+    void dragMoveEvent(QDragMoveEvent *event) override
+    {
+        if (event->mimeData()->hasUrls()) {
+            event->acceptProposedAction();
+        } else {
+            QListView::dragMoveEvent(event);
+        }
+    }
+
+    void dropEvent(QDropEvent *event) override
+    {
+        if (!event->mimeData()->hasUrls() || !dropHandler) {
+            QListView::dropEvent(event);
+            return;
+        }
+        const QModelIndex target = indexAt(event->position().toPoint());
+        const Qt::DropAction action = event->modifiers().testFlag(Qt::ControlModifier)
+            ? Qt::CopyAction
+            : Qt::MoveAction;
+        dropHandler(event->mimeData()->urls(), action, target);
+        event->acceptProposedAction();
+    }
+
+private:
+    QPoint m_pressPos;
+    bool m_pressValid = false;
 };
 
 int defaultColumnWidth(int column)
@@ -905,8 +999,50 @@ FilePane::FilePane(const QString &label, const QString &initialPath, QWidget *pa
     m_searchView->setColumnWidth(2, 96);
     m_searchView->setColumnWidth(3, 160);
 
+    m_iconView = new FileIconView(this);
+    m_iconView->setObjectName("fileIcons");
+    m_iconView->setModel(m_proxyModel);
+    m_iconView->setSelectionModel(m_view->selectionModel());
+    m_iconView->setViewMode(QListView::IconMode);
+    m_iconView->setResizeMode(QListView::Adjust);
+    m_iconView->setMovement(QListView::Static);
+    m_iconView->setWrapping(true);
+    m_iconView->setUniformItemSizes(true);
+    m_iconView->setIconSize(QSize(48, 48));
+    m_iconView->setGridSize(QSize(104, 80));
+    m_iconView->setWordWrap(true);
+    m_iconView->setSelectionMode(QAbstractItemView::ExtendedSelection);
+    m_iconView->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    m_iconView->setFrameShape(QFrame::NoFrame);
+    m_iconView->setDragEnabled(true);
+    m_iconView->setAcceptDrops(true);
+    m_iconView->viewport()->setAcceptDrops(true);
+    m_iconView->setDropIndicatorShown(true);
+    m_iconView->setDragDropMode(QAbstractItemView::DragDrop);
+    m_iconView->setDefaultDropAction(Qt::MoveAction);
+    m_iconView->installEventFilter(this);
+    static_cast<FileIconView *>(m_iconView)->dropHandler =
+        [this](const QList<QUrl> &urls, Qt::DropAction action, const QModelIndex &target) {
+            QString targetDir = m_currentPath;
+            if (target.isValid()) {
+                const QModelIndex source = m_proxyModel->mapToSource(target.sibling(target.row(), 0));
+                const QFileInfo info = m_model->fileInfo(source);
+                if (info.isDir()) {
+                    targetDir = info.absoluteFilePath();
+                }
+            }
+            performDrop(urls, action, targetDir);
+        };
+    connect(m_iconView, &QListView::doubleClicked, this, [this](const QModelIndex &index) {
+        if (index.isValid()) {
+            m_iconView->setCurrentIndex(index);
+            openSelected();
+        }
+    });
+
     m_viewStack = new QStackedWidget(this);
     m_viewStack->addWidget(m_view);
+    m_viewStack->addWidget(m_iconView);
     m_viewStack->addWidget(m_searchView);
     m_viewStack->setCurrentWidget(m_view);
 
@@ -950,10 +1086,13 @@ FilePane::FilePane(const QString &label, const QString &initialPath, QWidget *pa
             }
             emit activated(this);
             m_view->setFocus(Qt::MouseFocusReason);
-            m_view->setCurrentIndex(index);
-            m_view->selectionModel()->select(rowSelection(index), QItemSelectionModel::ClearAndSelect);
-            m_view->setProperty("currentSelectionRow", index.row());
-            m_view->viewport()->update();
+            // Don't collapse a Ctrl/Shift multi-selection back to a single row.
+            if (!(QApplication::keyboardModifiers() & (Qt::ControlModifier | Qt::ShiftModifier))) {
+                m_view->setCurrentIndex(index);
+                m_view->selectionModel()->select(rowSelection(index), QItemSelectionModel::ClearAndSelect);
+                m_view->setProperty("currentSelectionRow", index.row());
+                m_view->viewport()->update();
+            }
             updatePreviewFromSelection();
             updateStatusLine();
             logSelectionState("after deferred clicked", m_view);
@@ -1134,6 +1273,15 @@ void FilePane::setPathFilter(const QString &text)
     Q_UNUSED(text);
 }
 
+void FilePane::setViewMode(bool iconMode)
+{
+    m_iconMode = iconMode;
+    if (m_viewStack->currentWidget() != m_searchView) {
+        m_viewStack->setCurrentWidget(iconMode ? static_cast<QWidget *>(m_iconView)
+                                               : static_cast<QWidget *>(m_view));
+    }
+}
+
 void FilePane::startSearch(const QString &term)
 {
     cancelSearch();
@@ -1204,7 +1352,8 @@ void FilePane::cancelSearch()
         m_searchModel->removeRows(0, m_searchModel->rowCount());
     }
     if (m_viewStack && m_view) {
-        m_viewStack->setCurrentWidget(m_view);
+        m_viewStack->setCurrentWidget(m_iconMode ? static_cast<QWidget *>(m_iconView)
+                                                 : static_cast<QWidget *>(m_view));
     }
 }
 
@@ -1250,7 +1399,9 @@ void FilePane::navigateTo(const QString &path, bool recordHistory)
     if (!m_isSwitchingTabs) {
         updateCurrentTabPath(m_currentPath);
     }
-    m_view->setRootIndex(m_proxyModel->mapFromSource(m_model->setRootPath(m_currentPath)));
+    const QModelIndex navRoot = m_proxyModel->mapFromSource(m_model->setRootPath(m_currentPath));
+    m_view->setRootIndex(navRoot);
+    m_iconView->setRootIndex(navRoot);
     m_view->setProperty("currentSelectionRow", -1);
     if (m_dirWatcher) {
         if (!m_dirWatcher->directories().isEmpty()) {
@@ -1268,7 +1419,11 @@ void FilePane::navigateTo(const QString &path, bool recordHistory)
 
 void FilePane::focusFileList()
 {
-    m_view->setFocus(Qt::OtherFocusReason);
+    QWidget *target = m_view;
+    if (m_viewStack && m_viewStack->currentWidget() == m_iconView) {
+        target = m_iconView;
+    }
+    target->setFocus(Qt::OtherFocusReason);
 }
 
 void FilePane::goUp()
@@ -1304,7 +1459,9 @@ void FilePane::goForward()
 void FilePane::reload()
 {
     m_model->setRootPath(QString());
-    m_view->setRootIndex(m_proxyModel->mapFromSource(m_model->setRootPath(m_currentPath)));
+    const QModelIndex reloadRoot = m_proxyModel->mapFromSource(m_model->setRootPath(m_currentPath));
+    m_view->setRootIndex(reloadRoot);
+    m_iconView->setRootIndex(reloadRoot);
     m_view->setProperty("currentSelectionRow", -1);
     refreshGitStatuses();
     updateStatusLine();
@@ -1558,7 +1715,7 @@ bool FilePane::eventFilter(QObject *watched, QEvent *event)
             }
         }
     }
-    if (watched == m_view) {
+    if (watched == m_view || watched == m_iconView) {
         if (event->type() == QEvent::FocusIn || event->type() == QEvent::MouseButtonPress) {
             emit activated(this);
         }

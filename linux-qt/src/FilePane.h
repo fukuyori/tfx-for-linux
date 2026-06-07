@@ -5,6 +5,7 @@ class QTimer;
 class QStackedWidget;
 class QDirIterator;
 class QStandardItemModel;
+class QListView;
 
 #include <QFileIconProvider>
 #include <QFileSystemModel>
@@ -62,6 +63,8 @@ public:
     void setShowHiddenFiles(bool show);
     void setPathFilter(const QString &text);
     void startSearch(const QString &term);
+    void setViewMode(bool iconMode);
+    bool isIconMode() const { return m_iconMode; }
     void setActive(bool active);
     void setThemeColors(const QString &fileForeground, const QString &directoryForeground);
     QStringList tabPaths() const;
@@ -150,6 +153,8 @@ private:
     QFileSystemWatcher *m_dirWatcher = nullptr;
     QTimer *m_refreshDebounce = nullptr;
     QStackedWidget *m_viewStack = nullptr;
+    QListView *m_iconView = nullptr;
+    bool m_iconMode = false;
     QTableView *m_searchView = nullptr;
     QStandardItemModel *m_searchModel = nullptr;
     QFileIconProvider m_iconProvider;

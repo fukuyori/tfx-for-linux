@@ -88,6 +88,12 @@ QIcon toolbarIcon(const QString &kind)
     } else if (kind == "search") {
         painter.drawEllipse(QRectF(9, 9, 10, 10));
         painter.drawLine(QPointF(17, 17), QPointF(23, 23));
+    } else if (kind == "icons") {
+        for (int row = 0; row < 2; ++row) {
+            for (int col = 0; col < 2; ++col) {
+                painter.drawRoundedRect(QRectF(8 + col * 9, 8 + row * 9, 7, 7), 1.5, 1.5);
+            }
+        }
     }
 
     return QIcon(pixmap);
@@ -433,6 +439,10 @@ void MainWindow::buildActions()
     m_hiddenAction->setShortcut(QKeySequence(m_config.shortcut("toggleHidden", "Ctrl+Shift+.")));
     connect(m_hiddenAction, &QAction::toggled, this, &MainWindow::setHiddenFilesVisible);
 
+    m_iconViewAction = viewMenu->addAction(UiText::t("Icon View", "アイコン表示"));
+    m_iconViewAction->setCheckable(true);
+    connect(m_iconViewAction, &QAction::toggled, this, &MainWindow::setIconViewEnabled);
+
     addMenuAction(viewMenu, UiText::t("File List Settings...", "ファイル一覧設定..."), this, [this]() {
         activePane()->showColumnSettingsDialog();
     });
@@ -495,6 +505,16 @@ void MainWindow::buildTopToolbar()
     m_previewButton->setToolTip(UiText::t("Show / hide preview", "プレビューを表示 / 非表示"));
     connect(m_previewButton, &QToolButton::toggled, this, &MainWindow::setPreviewVisible);
     m_topToolbar->addWidget(m_previewButton);
+
+    m_iconViewButton = new QToolButton(this);
+    m_iconViewButton->setObjectName("toolbarIconButton");
+    m_iconViewButton->setIcon(toolbarIcon("icons"));
+    m_iconViewButton->setIconSize(QSize(24, 24));
+    m_iconViewButton->setCheckable(true);
+    m_iconViewButton->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    m_iconViewButton->setToolTip(UiText::t("Details / icon view", "詳細表示 / アイコン表示"));
+    connect(m_iconViewButton, &QToolButton::toggled, this, &MainWindow::setIconViewEnabled);
+    m_topToolbar->addWidget(m_iconViewButton);
 }
 
 void MainWindow::buildFolderSidebar(const QString &initialPath)
@@ -969,6 +989,8 @@ void MainWindow::restoreSettings()
     bool splitVisible = settings.value("View/splitVisible", true).toBool();
     bool previewVisible = settings.value("View/previewVisible", true).toBool();
     const bool terminalVisible = settings.value("View/terminalVisible", false).toBool();
+    m_leftPane->setViewMode(settings.value("View/leftIconMode", false).toBool());
+    m_rightPane->setViewMode(settings.value("View/rightIconMode", false).toBool());
     if (m_config.startup.layout == "single") {
         splitVisible = false;
     } else if (m_config.startup.layout == "split") {
@@ -1093,6 +1115,8 @@ void MainWindow::saveSettings()
     settings.setValue("View/previewWidth", m_lastPreviewWidth);
     settings.setValue("View/terminalVisible", m_terminalPane->isVisible());
     settings.setValue("View/showHiddenFiles", m_showHiddenFiles);
+    settings.setValue("View/leftIconMode", m_leftPane->isIconMode());
+    settings.setValue("View/rightIconMode", m_rightPane->isIconMode());
     settings.setValue("Panes/activePane", activePane() == m_rightPane ? "RIGHT" : "LEFT");
     settings.setValue("Panes/leftDirectory", m_leftPane->currentPath());
     settings.setValue("Panes/rightDirectory", m_rightPane->currentPath());
@@ -1113,6 +1137,29 @@ void MainWindow::rememberSidebarWidth()
     const QList<int> sizes = m_mainSplitter->sizes();
     if (sizes.size() >= 3 && sizes.at(0) > 80) {
         m_lastSidebarWidth = sizes.at(0);
+    }
+}
+
+void MainWindow::setIconViewEnabled(bool enabled)
+{
+    // View mode is per-pane: only the active file list changes.
+    activePane()->setViewMode(enabled);
+    syncIconViewToggle();
+    if (!m_isRestoringSettings) {
+        saveSettings();
+    }
+}
+
+void MainWindow::syncIconViewToggle()
+{
+    const bool on = activePane()->isIconMode();
+    if (m_iconViewButton && m_iconViewButton->isChecked() != on) {
+        const QSignalBlocker blocker(m_iconViewButton);
+        m_iconViewButton->setChecked(on);
+    }
+    if (m_iconViewAction && m_iconViewAction->isChecked() != on) {
+        const QSignalBlocker blocker(m_iconViewAction);
+        m_iconViewAction->setChecked(on);
     }
 }
 
@@ -1341,6 +1388,7 @@ void MainWindow::setActivePane(FilePane *pane)
     m_activePane = pane;
     m_leftPane->setActive(pane == m_leftPane);
     m_rightPane->setActive(pane == m_rightPane);
+    syncIconViewToggle();
 
     const double inactiveAlpha = m_config.opacity.inactivePane;
     auto applyPaneOpacity = [inactiveAlpha](FilePane *p, bool active) {

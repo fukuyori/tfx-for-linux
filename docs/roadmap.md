@@ -1,6 +1,6 @@
 # tfx for Linux Roadmap
 
-Current version: **0.3.2**
+Current version: **0.3.3**
 
 This roadmap tracks the practical development steps for the Linux Qt port as it
 moves toward feature parity with tfx for Windows (0.6.x). It is phased so each
@@ -15,25 +15,25 @@ stage is buildable and verifiable on its own.
 - Multi-selection preview summary (count, total size, item list).
 - Auto-refresh of the file list and Git status on directory changes.
 
-## 0.3.1 — Phase 2: Core file interactions
+## 0.3.1 — Phase 2: Core file interactions (done)
 
 - Drag-and-drop between panes and to/from external file managers; drop onto a
   folder to move, or hold Ctrl to copy. (done)
 - Recursive subfolder search started with Enter, streamed into a results view,
   and cancelled on navigation. (done)
-- Remaining: drop onto the folder tree and pinned list.
-- Remaining: conflict handling and progress/cancellation for longer file
-  operations.
+- Pinned list: reorder by dragging and drop folders to pin them. (done) The
+  folder tree is intentionally excluded from drag-and-drop.
 
-## 0.5.0 / 0.6.0 — Phase 3: Larger subsystems
+## Phase 3: Larger subsystems (in progress)
 
-- Interactive terminal pane backed by a real PTY (colors, cursor, `Ctrl+C`,
-  path drag-in), replacing the current command-output pane.
+- Icon view mode in addition to the details view, per pane, with persistence. (done, 0.3.3)
 - Browse ZIP archives as folders (navigate in, extract individual entries,
-  drag out).
-- Icon view mode in addition to the details view, with persistence.
+  drag out). (remaining)
+- Interactive terminal pane backed by a real PTY (colors, cursor, `Ctrl+C`,
+  path drag-in), replacing the current command-output pane; needs a dependency
+  decision (QTermWidget vs. a custom PTY). (remaining)
 
-## 0.6.x — Phase 4: Polish and hardening
+## Phase 4: Polish and hardening
 
 - Light/dark theme switching driven by `config.toml`.
 - PDF preview disk cache and multi-stage fallback rendering.
@@ -44,6 +44,7 @@ stage is buildable and verifiable on its own.
 
 ## Later
 
+- Conflict handling and progress/cancellation for longer file operations.
 - Multi-tab workflow refinements.
 - Search and filter refinements.
 - Test coverage for path handling, column configuration, and file-operation

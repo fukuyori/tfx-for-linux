@@ -1,7 +1,7 @@
 # tfx for Linux
 
 **Terminal-inspired interface File eXplorer for Linux**  
-Version: **0.3.2**
+Version: **0.3.3**
 
 English | [Japanese](README.ja.md)
 
@@ -45,8 +45,9 @@ When no folder is specified, the application opens the current working directory
 
 ## Current Scope
 
-- Folder tree and pinned folders
-- Single-pane and split-pane file list
+- Folder tree and pinned folders (reorder pins by dragging; drop folders to pin)
+- Single-pane and split-pane file list, with per-pane details and icon view modes
+- Range selection (click then Shift+click) and toggle selection (Ctrl+click)
 - Startup path handling: the left pane opens the command-line folder, or the current working directory when no folder is specified
 - Preview pane with source/rendered switching, an external image viewer button, and a multi-selection summary
 - Built-in command pane

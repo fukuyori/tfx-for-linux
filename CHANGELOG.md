@@ -2,6 +2,19 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.3.3] - 2026-06-07
+
+Icon view and multi-selection (start of Phase 3).
+
+### Added
+
+- Added an icon view mode for the file list, toggled per pane from the toolbar or the View menu and remembered separately for the left and right panes. Icon view shares the model and selection with the details view and supports the same drag-and-drop.
+- Added range selection (click then Shift+click) and toggle selection (Ctrl+click) in the details view.
+
+### Changed
+
+- The icon-view toggle reflects and applies to the active pane only, so split view can show one pane as details and the other as icons.
+
 ## [0.3.2] - 2026-06-07
 
 Drag-and-drop and search refinements.

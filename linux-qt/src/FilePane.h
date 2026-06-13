@@ -6,6 +6,7 @@ class QStackedWidget;
 class QDirIterator;
 class QStandardItemModel;
 class QListView;
+class GitStatusController;
 
 #include "models/FileSystemProxyModel.h"
 
@@ -96,8 +97,6 @@ private:
     void searchStep();
     void cancelSearch();
     void refreshGitStatuses();
-    void refreshGitBranch();
-    void applyGitStatusOutput(const QString &output);
     void createLinkForSelection();
     void openWithCustomApplication();
     void performDrop(const QList<QUrl> &urls, Qt::DropAction action, const QString &targetDir);
@@ -119,7 +118,7 @@ private:
     QLabel *m_badgeLabel;
     QLineEdit *m_pathEdit;
     QLabel *m_statusLabel;
-    QProcess *m_gitStatusProcess = nullptr;
+    GitStatusController *m_gitController = nullptr;
     QString m_gitBranch;
     QFileSystemWatcher *m_dirWatcher = nullptr;
     QTimer *m_refreshDebounce = nullptr;

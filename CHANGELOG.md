@@ -2,6 +2,16 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.4.2] - 2026-06-13
+
+Internal refactor (no behavior change); concludes the layered restructuring.
+
+### Changed
+
+- Extracted the asynchronous Git work (branch + status) out of `FilePane` into a
+  reusable `GitStatusController` (under `controllers/`) that reports results via
+  signals and drops stale results after navigation.
+
 ## [0.4.1] - 2026-06-13
 
 Internal refactor (no behavior change).

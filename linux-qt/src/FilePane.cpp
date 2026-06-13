@@ -3,6 +3,7 @@
 #include "core/FileOperations.h"
 #include "core/FileTypeInfo.h"
 #include "core/GitService.h"
+#include "controllers/GitStatusController.h"
 #include "platform/Platform.h"
 #include "views/FileViews.h"
 
@@ -207,6 +208,18 @@ FilePane::FilePane(const QString &label, const QString &initialPath, QWidget *pa
     connect(m_proxyModel, &QAbstractItemModel::modelReset, this, endLayoutChange);
     connect(m_model, &QFileSystemModel::directoryLoaded, this, [this](const QString &) {
         applySharedColumnLayout();
+    });
+
+    m_gitController = new GitStatusController(this);
+    connect(m_gitController, &GitStatusController::statusesReady,
+            this, [this](const QHash<QString, QString> &statuses) {
+        m_proxyModel->setGitStatuses(statuses);
+    });
+    connect(m_gitController, &GitStatusController::branchChanged, this, [this](const QString &branch) {
+        if (branch != m_gitBranch) {
+            m_gitBranch = branch;
+            updateStatusLine();
+        }
     });
 
     // Auto-refresh: the file list itself is kept current by QFileSystemModel's
@@ -442,14 +455,7 @@ FilePane::FilePane(const QString &label, const QString &initialPath, QWidget *pa
     setActive(false);
 }
 
-FilePane::~FilePane()
-{
-    if (m_gitStatusProcess) {
-        m_gitStatusProcess->kill();
-        m_gitStatusProcess->waitForFinished(100);
-        m_gitStatusProcess = nullptr;
-    }
-}
+FilePane::~FilePane() = default;
 
 QString FilePane::currentPath() const
 {
@@ -1498,110 +1504,9 @@ void FilePane::saveColumnSettings()
     settings.endGroup();
 }
 
-void FilePane::refreshGitBranch()
-{
-    const QString gitProgram = QStandardPaths::findExecutable("git");
-    if (gitProgram.isEmpty() || m_currentPath.isEmpty()) {
-        if (!m_gitBranch.isEmpty()) {
-            m_gitBranch.clear();
-            updateStatusLine();
-        }
-        return;
-    }
-    const QString pathAtStart = m_currentPath;
-    auto *proc = new QProcess(this);
-    proc->setProgram(gitProgram);
-    proc->setArguments({"-C", m_currentPath, "rev-parse", "--abbrev-ref", "HEAD"});
-    connect(proc, &QProcess::finished, this, [this, proc, pathAtStart](int code, QProcess::ExitStatus status) {
-        QString branch;
-        if (status == QProcess::NormalExit && code == 0) {
-            branch = QString::fromLocal8Bit(proc->readAllStandardOutput()).trimmed();
-            if (branch == "HEAD") {
-                branch = UiText::t("detached", "detached");
-            }
-        }
-        proc->deleteLater();
-        if (pathAtStart != m_currentPath) {
-            return; // navigated away; ignore stale result
-        }
-        if (branch != m_gitBranch) {
-            m_gitBranch = branch;
-            updateStatusLine();
-        }
-    });
-    proc->start();
-}
-
 void FilePane::refreshGitStatuses()
 {
-    refreshGitBranch();
-    if (m_gitStatusProcess) {
-        disconnect(m_gitStatusProcess, nullptr, this, nullptr);
-        m_gitStatusProcess->kill();
-        m_gitStatusProcess->waitForFinished(100);
-        m_gitStatusProcess->deleteLater();
-        m_gitStatusProcess = nullptr;
-    }
-
-    m_proxyModel->setGitStatuses({});
-
-    const QString gitProgram = QStandardPaths::findExecutable("git");
-    if (gitProgram.isEmpty() || m_currentPath.isEmpty()) {
-        return;
-    }
-
-    m_gitStatusProcess = new QProcess(this);
-    m_gitStatusProcess->setProgram(gitProgram);
-    m_gitStatusProcess->setArguments({
-        "-C",
-        m_currentPath,
-        "status",
-        "--porcelain=v1",
-        "--untracked-files=all",
-    });
-    connect(m_gitStatusProcess, &QProcess::finished, this, [this](int exitCode, QProcess::ExitStatus exitStatus) {
-        QProcess *process = m_gitStatusProcess;
-        m_gitStatusProcess = nullptr;
-        if (!process) {
-            return;
-        }
-        const QString output = QString::fromLocal8Bit(process->readAllStandardOutput());
-        process->deleteLater();
-        if (exitStatus == QProcess::NormalExit && exitCode == 0) {
-            applyGitStatusOutput(output);
-        }
-    });
-    m_gitStatusProcess->start();
-}
-
-void FilePane::applyGitStatusOutput(const QString &output)
-{
-    QHash<QString, QString> statuses;
-    const QDir directory(m_currentPath);
-    const QStringList lines = output.split('\n', Qt::SkipEmptyParts);
-    for (const QString &line : lines) {
-        if (line.size() < 4) {
-            continue;
-        }
-        const QString status = line.left(2);
-        const QString relativePath = porcelainPath(line.mid(3));
-        if (relativePath.isEmpty()) {
-            continue;
-        }
-
-        const QString label = porcelainStatusLabel(status);
-        const QString absolutePath = QFileInfo(directory.filePath(relativePath)).absoluteFilePath();
-        statuses.insert(absolutePath, label);
-
-        const QString topLevelName = relativePath.section('/', 0, 0);
-        if (!topLevelName.isEmpty()) {
-            const QString topLevelPath = QFileInfo(directory.filePath(topLevelName)).absoluteFilePath();
-            if (!statuses.contains(topLevelPath)) {
-                statuses.insert(topLevelPath, label);
-            }
-        }
-    }
-    m_proxyModel->setGitStatuses(statuses);
+    m_gitController->refresh(m_currentPath);
 }
 
 void FilePane::updatePreviewFromSelection()

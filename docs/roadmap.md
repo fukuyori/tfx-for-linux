@@ -1,6 +1,6 @@
 # tfx for Linux Roadmap
 
-Current version: **0.4.2**
+Current version: **0.5.0**
 
 This roadmap tracks the practical development steps for the Linux Qt port as it
 moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
@@ -24,18 +24,16 @@ moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
 - Pinned list: reorder by dragging and drop folders to pin them. (done) The
   folder tree is intentionally excluded from drag-and-drop.
 
-## Phase 3: Larger subsystems (in progress)
+## Phase 3: Larger subsystems (done)
 
-- Icon view mode in addition to the details view, per pane, with persistence. (done, 0.3.3)
-- Browse ZIP archives as folders (navigate in, extract individual entries,
-  drag out). (remaining)
-- Interactive terminal pane backed by a real PTY (colors, cursor, `Ctrl+C`,
-  path drag-in), replacing the current command-output pane; needs a dependency
-  decision (QTermWidget vs. a custom PTY). (remaining)
-  Follow-on terminal work (matching tfx macOS 0.7.6 / 0.8.2): 24-bit colour
-  (`COLORTERM=truecolor`), a folder-sync button that follows the foreground
-  process working directory, the session surviving pane show/hide toggles, and
-  configuration of shell/font/palette via `config.toml`.
+- Icon view mode in addition to the details view, per pane, with persistence. (done)
+- Browse ZIP archives as folders (navigate in, open/extract entries). (done)
+- Interactive terminal pane backed by QTermWidget (true colour, colour scheme,
+  cursor, `Ctrl+C`, TUI apps), with the working directory following the active
+  pane and font/colour scheme from `config.toml`. Falls back to the simple
+  command pane when QTermWidget is unavailable. (done)
+- Remaining terminal follow-ups: a folder-sync button reading the foreground
+  process working directory, and session persistence across show/hide toggles.
 
 ## Phase 4: User-defined commands (from tfx macOS 0.7.0)
 

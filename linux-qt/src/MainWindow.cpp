@@ -21,7 +21,9 @@
 #include <QLineEdit>
 #include <QMenu>
 #include <QMenuBar>
+#include <QFont>
 #include <QPainter>
+#include <QPolygonF>
 #include <QPixmap>
 #include <QShortcut>
 #include <QSettings>
@@ -94,6 +96,14 @@ QIcon toolbarIcon(const QString &kind)
                 painter.drawRoundedRect(QRectF(8 + col * 9, 8 + row * 9, 7, 7), 1.5, 1.5);
             }
         }
+    } else if (kind == "terminal") {
+        painter.drawRoundedRect(QRectF(6, 8, 20, 16), 2, 2);
+        QPen prompt(QColor("#63F28D"), 2);
+        prompt.setCapStyle(Qt::RoundCap);
+        prompt.setJoinStyle(Qt::RoundJoin);
+        painter.setPen(prompt);
+        painter.drawPolyline(QPolygonF({QPointF(10, 13), QPointF(14, 16), QPointF(10, 19)}));
+        painter.drawLine(QPointF(16, 19), QPointF(22, 19));
     }
 
     return QIcon(pixmap);
@@ -487,12 +497,24 @@ void MainWindow::buildTopToolbar()
     m_iconViewButton->setToolTip(UiText::t("Details / icon view", "詳細表示 / アイコン表示"));
     connect(m_iconViewButton, &QToolButton::toggled, this, &MainWindow::setIconViewEnabled);
     m_topToolbar->addWidget(m_iconViewButton);
+
+    m_terminalButton = new QToolButton(this);
+    m_terminalButton->setObjectName("toolbarIconButton");
+    m_terminalButton->setIcon(toolbarIcon("terminal"));
+    m_terminalButton->setIconSize(QSize(24, 24));
+    m_terminalButton->setCheckable(true);
+    m_terminalButton->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    m_terminalButton->setToolTip(UiText::t("Show / hide terminal", "ターミナルを表示 / 非表示"));
+    connect(m_terminalButton, &QToolButton::toggled, this, &MainWindow::setTerminalVisible);
+    m_topToolbar->addWidget(m_terminalButton);
 }
 
 void MainWindow::buildFolderSidebar(const QString &initialPath)
 {
     m_treeModel->setRootPath("/");
     m_treeModel->setFilter(QDir::AllDirs | QDir::NoDotAndDotDot);
+    m_treeView->setObjectName("folderTree");
+    m_pinnedList->setObjectName("pinnedList");
     m_treeView->setModel(m_treeModel);
     m_treeView->setRootIndex(m_treeModel->index("/"));
     for (int column = 1; column < m_treeModel->columnCount(); ++column) {
@@ -911,7 +933,38 @@ void MainWindow::applyTerminalTheme()
             " color: %1; }\n")
             .arg(withAlpha(m_config.colors.foreground, m_config.opacity.disabledItem));
     }
+
+    // Per-pane font overrides (empty family / 0 size inherits the global mono).
+    const auto paneFontRule = [this](const QString &selector, const QString &family, int size) {
+        const QString resolvedFamily = family.isEmpty() ? m_config.resolvedMonoFontFamily() : family;
+        const int resolvedSize = size > 0 ? size : m_config.font.size;
+        return QString("\n%1 { font-family: %2; font-size: %3px; }\n")
+            .arg(selector, resolvedFamily).arg(resolvedSize);
+    };
+    styleSheet += paneFontRule("QTableView#fileTable, QListView#fileIcons",
+                               m_config.font.fileListFamily, m_config.font.fileListSize);
+    styleSheet += paneFontRule("QPlainTextEdit#previewCode, QTextBrowser#previewRendered",
+                               m_config.font.previewFamily, m_config.font.previewSize);
+    styleSheet += paneFontRule("QTreeView#folderTree, QListWidget#pinnedList",
+                               m_config.font.folderTreeFamily, m_config.font.folderTreeSize);
+
     qApp->setStyleSheet(styleSheet);
+
+    // The terminal renders its own text, so its font is set directly.
+    {
+        QFont terminalFont;
+        if (!m_config.font.terminalFamily.isEmpty()) {
+            terminalFont.setFamilies({m_config.font.terminalFamily});
+        } else {
+            terminalFont.setFamily(QStringLiteral("Monospace"));
+            terminalFont.setStyleHint(QFont::Monospace);
+        }
+        terminalFont.setFixedPitch(true);
+        terminalFont.setPointSize(m_config.font.terminalSize > 0 ? m_config.font.terminalSize
+                                                                 : m_config.font.size);
+        m_terminalPane->setContentFont(terminalFont);
+    }
+    m_terminalPane->setColorScheme(m_config.terminalColorScheme);
     m_leftPane->setThemeColors(m_config.colors.foreground, m_config.colors.directoryForeground);
     m_rightPane->setThemeColors(m_config.colors.foreground, m_config.colors.directoryForeground);
 }
@@ -1044,6 +1097,10 @@ void MainWindow::restoreSettings()
         const QSignalBlocker terminalActionBlocker(m_terminalAction);
         m_terminalAction->setChecked(terminalVisible);
     }
+    if (m_terminalButton) {
+        const QSignalBlocker terminalButtonBlocker(m_terminalButton);
+        m_terminalButton->setChecked(terminalVisible);
+    }
 
     const QString activePaneName = settings.value("Panes/activePane", "LEFT").toString();
     setActivePane(activePaneName == "RIGHT" ? m_rightPane : m_leftPane);
@@ -1151,6 +1208,10 @@ void MainWindow::setPreviewVisible(bool visible)
 void MainWindow::setTerminalVisible(bool visible)
 {
     m_dockTerminal->setVisible(visible);
+    if (m_terminalButton && m_terminalButton->isChecked() != visible) {
+        const QSignalBlocker blocker(m_terminalButton);
+        m_terminalButton->setChecked(visible);
+    }
     if (m_terminalAction && m_terminalAction->isChecked() != visible) {
         const QSignalBlocker blocker(m_terminalAction);
         m_terminalAction->setChecked(visible);

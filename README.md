@@ -1,7 +1,7 @@
 # tfx for Linux
 
 **Terminal-inspired interface File eXplorer for Linux**  
-Version: **0.4.2**
+Version: **0.5.0**
 
 English | [Japanese](README.ja.md)
 
@@ -51,8 +51,9 @@ When no folder is specified, the application opens the current working directory
 - Range selection (click then Shift+click) and toggle selection (Ctrl+click)
 - Startup path handling: the left pane opens the command-line folder, or the current working directory when no folder is specified
 - Preview pane with source/rendered switching, an external image viewer button, and a multi-selection summary
-- Built-in command pane
-- User-editable `config.toml` created under `~/.config/tfx/`, including window/pane transparency
+- Browse ZIP archives as folders (navigate in, open/extract entries)
+- Interactive terminal pane (QTermWidget) whose working directory follows the active pane; falls back to a simple command pane when unavailable
+- User-editable `config.toml` created under `~/.config/tfx/`, including window/pane transparency, per-pane fonts, and the terminal colour scheme
 - Window, dock layout, pane visibility, tab, and column setting restoration
 - File operations: open, open with (native chooser), rename, link, new file/folder, trash, copy/cut/paste, copy path
 - Drag-and-drop of files and folders between panes and to/from external file managers (drop onto a folder to move, or hold Ctrl to copy)

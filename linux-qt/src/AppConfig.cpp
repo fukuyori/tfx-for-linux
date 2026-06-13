@@ -134,6 +134,15 @@ QString AppConfig::defaultConfigText()
         "ui = \"system\"\n"
         "mono = \"monospace\"\n"
         "size = 12\n"
+        "# Optional per-pane overrides (family and/or size):\n"
+        "# fileList = \"monospace\"\n"
+        "# fileListSize = 12\n"
+        "# preview = \"monospace\"\n"
+        "# previewSize = 12\n"
+        "# terminal = \"monospace\"\n"
+        "# terminalSize = 12\n"
+        "# folderTree = \"monospace\"\n"
+        "# folderTreeSize = 12\n"
         "\n"
         "[shortcuts]\n"
         "reload = \"f5\"\n"
@@ -177,6 +186,7 @@ QString AppConfig::defaultConfigText()
         "# paneBorderKeyboardTarget = \"#36E67A\"\n"
         "\n"
         "# [terminal]\n"
+        "# colorScheme = \"DarkPastels\"   # built-in QTermWidget scheme (sets background/foreground)\n"
         "# app = \"x-terminal-emulator\"\n"
         "# arguments = \"--working-directory={path}\"\n"
         "\n"
@@ -266,21 +276,36 @@ void AppConfig::applyValue(const QString &section, const QString &key, const QSt
     }
 
     if (section == "font") {
-        if (key == "size") {
+        // Size keys: global "size" and per-pane "<area>Size".
+        int *sizeTarget = nullptr;
+        if (key == "size") sizeTarget = &font.size;
+        else if (key == "fileListSize") sizeTarget = &font.fileListSize;
+        else if (key == "previewSize") sizeTarget = &font.previewSize;
+        else if (key == "terminalSize") sizeTarget = &font.terminalSize;
+        else if (key == "folderTreeSize") sizeTarget = &font.folderTreeSize;
+        if (sizeTarget) {
             bool ok = false;
             const int size = value.toInt(&ok);
             if (ok && size >= 8 && size <= 40) {
-                font.size = size;
+                *sizeTarget = size;
             } else {
                 addWarning(lineNumber, "Invalid font size");
             }
             return;
         }
-        if (key == "ui" || key == "mono") {
+        // Family keys: global "ui"/"mono" and per-pane "<area>".
+        QString *familyTarget = nullptr;
+        if (key == "ui") familyTarget = &font.ui;
+        else if (key == "mono") familyTarget = &font.mono;
+        else if (key == "fileList") familyTarget = &font.fileListFamily;
+        else if (key == "preview") familyTarget = &font.previewFamily;
+        else if (key == "terminal") familyTarget = &font.terminalFamily;
+        else if (key == "folderTree") familyTarget = &font.folderTreeFamily;
+        if (familyTarget) {
             bool ok = false;
             const QString text = unquote(value, &ok);
             if (ok) {
-                key == "ui" ? font.ui = text : font.mono = text;
+                *familyTarget = text;
             } else {
                 addWarning(lineNumber, "Invalid font value");
             }
@@ -372,6 +397,7 @@ void AppConfig::applyValue(const QString &section, const QString &key, const QSt
         if (key == "app") terminalApp = text;
         else if (key == "arguments") terminalArguments = text;
         else if (key == "shell") terminalShell = text;
+        else if (key == "colorScheme") terminalColorScheme = text;
         return;
     }
 

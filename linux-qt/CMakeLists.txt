@@ -1,12 +1,13 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(tfx-for-linux VERSION 0.4.2 LANGUAGES CXX)
+project(tfx-for-linux VERSION 0.5.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets DBus)
+find_package(qtermwidget6 QUIET)
 
 if(APPLE)
     set(TFX_PLATFORM_SOURCES src/platform/macos/PlatformMacOS.cpp)
@@ -49,6 +50,15 @@ qt_add_executable(tfx
 
 target_include_directories(tfx PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(tfx PRIVATE Qt6::Widgets Qt6::DBus)
+
+# Optional: use QTermWidget for an interactive terminal pane when available.
+if(qtermwidget6_FOUND)
+    target_link_libraries(tfx PRIVATE qtermwidget6)
+    target_compile_definitions(tfx PRIVATE TFX_HAVE_QTERMWIDGET)
+    message(STATUS "tfx: QTermWidget found — interactive terminal enabled")
+else()
+    message(STATUS "tfx: QTermWidget not found — using the simple command pane")
+endif()
 target_compile_definitions(tfx PRIVATE TFX_VERSION="${PROJECT_VERSION}")
 
 install(TARGETS tfx RUNTIME DESTINATION bin)

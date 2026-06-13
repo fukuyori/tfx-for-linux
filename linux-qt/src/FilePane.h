@@ -12,6 +12,7 @@ class GitStatusController;
 
 #include <QFileIconProvider>
 #include <QFileSystemModel>
+#include <QFont>
 #include <QHash>
 #include <QItemSelection>
 #include <QLabel>
@@ -96,6 +97,9 @@ private:
     void saveColumnSettings();
     void searchStep();
     void cancelSearch();
+    void openZip(const QString &path);
+    void populateZipView();
+    void exitZipMode();
     void refreshGitStatuses();
     void createLinkForSelection();
     void openWithCustomApplication();
@@ -132,6 +136,11 @@ private:
     QTimer *m_searchTimer = nullptr;
     QString m_searchTerm;
     int m_searchMatches = 0;
+    QTableView *m_zipView = nullptr;
+    QStandardItemModel *m_zipModel = nullptr;
+    QString m_zipPath;
+    QString m_zipDir;
+    QStringList m_zipEntries;
     QString m_fileForeground = "#D9E1E8";
     QString m_directoryForeground = "#E5EDF3";
     QString m_label;

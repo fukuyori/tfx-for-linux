@@ -49,6 +49,15 @@ version = 1
 ui = "system"
 mono = "monospace"
 size = 12
+# Optional per-pane overrides (family and/or size):
+# fileList = "monospace"
+# fileListSize = 12
+# preview = "monospace"
+# previewSize = 12
+# terminal = "monospace"
+# terminalSize = 12
+# folderTree = "monospace"
+# folderTreeSize = 12
 
 [shortcuts]
 reload = "f5"
@@ -97,6 +106,28 @@ quit = "ctrl+q"
 
 # [openWith]
 # md = "code"
+```
+
+## Fonts
+
+`[font]` sets the global UI font (`ui`), the monospace family used across the
+file areas (`mono`), and the base point `size`.
+
+Each pane can override the global monospace font and/or size. An empty family or
+a size of `0` (i.e. the key omitted) inherits the global values.
+
+- `fileList` / `fileListSize` — the file list (details and icon views, search
+  and archive views).
+- `preview` / `previewSize` — the preview pane (source and rendered text).
+- `terminal` / `terminalSize` — the terminal pane.
+- `folderTree` / `folderTreeSize` — the folder tree and pinned list.
+
+```toml
+[font]
+mono = "monospace"
+size = 12
+terminal = "JetBrains Mono"
+terminalSize = 13
 ```
 
 ## Startup
@@ -148,6 +179,22 @@ The Linux port accepts the same semantic color names used by tfx for Windows whe
 
 Values must be quoted `#RRGGBB` strings.
 
+## Terminal
+
+`[terminal] colorScheme` sets the built-in QTermWidget colour scheme for the
+terminal pane (this determines the background and foreground colours). Available
+schemes include: `DarkPastels`, `Falcon`, `GreenOnBlack`, `Linux`, `Solarized`,
+`SolarizedLight`, `Tango`, `Ubuntu`, `BreezeModified`, `WhiteOnBlack`,
+`BlackOnWhite`, `BlackOnLightYellow`. An unknown or empty name keeps the default.
+
+```toml
+[terminal]
+colorScheme = "DarkPastels"
+```
+
+The terminal font is set with `[font] terminal` / `terminalSize` (see Fonts).
+
 ## Notes
 
-`[terminal]` and `[openWith]` are parsed for compatibility with the Windows configuration shape. Their detailed Linux behavior is still being wired into the file operations and terminal launcher.
+`[openWith]` is parsed for compatibility with the Windows configuration shape.
+Its detailed Linux behavior is still being wired into the file operations.

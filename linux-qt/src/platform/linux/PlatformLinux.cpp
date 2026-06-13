@@ -66,6 +66,34 @@ QStringList terminalRunArguments(const QString &command)
     return {QStringLiteral("-lc"), command};
 }
 
+QStringList listZipEntries(const QString &zipPath)
+{
+    const QString unzip = QStandardPaths::findExecutable("unzip");
+    if (unzip.isEmpty()) {
+        return {};
+    }
+    QProcess process;
+    process.start(unzip, {"-Z1", zipPath});
+    if (!process.waitForStarted(1000) || !process.waitForFinished(8000)
+        || process.exitStatus() != QProcess::NormalExit) {
+        return {};
+    }
+    const QString output = QString::fromLocal8Bit(process.readAllStandardOutput());
+    return output.split('\n', Qt::SkipEmptyParts);
+}
+
+bool extractZipEntry(const QString &zipPath, const QString &entry, const QString &destDir)
+{
+    const QString unzip = QStandardPaths::findExecutable("unzip");
+    if (unzip.isEmpty()) {
+        return false;
+    }
+    QProcess process;
+    process.start(unzip, {"-o", zipPath, entry, "-d", destDir});
+    return process.waitForStarted(1000) && process.waitForFinished(15000)
+        && process.exitStatus() == QProcess::NormalExit && process.exitCode() <= 1;
+}
+
 bool pdfPreviewAvailable()
 {
     return !QStandardPaths::findExecutable("pdftoppm").isEmpty();

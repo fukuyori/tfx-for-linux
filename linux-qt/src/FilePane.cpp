@@ -35,8 +35,10 @@
 #include <QPixmap>
 #include <QProcess>
 #include <QPushButton>
+#include <QSet>
 #include <QStyledItemDelegate>
 #include <QSettings>
+#include <QTemporaryDir>
 #include <QSignalBlocker>
 #include <QTimer>
 #include <QStandardPaths>
@@ -315,10 +317,56 @@ FilePane::FilePane(const QString &label, const QString &initialPath, QWidget *pa
         }
     });
 
+    m_zipModel = new QStandardItemModel(this);
+    m_zipModel->setHorizontalHeaderLabels({columnTitle(ColumnName), columnTitle(ColumnType)});
+    m_zipView = new QTableView(this);
+    m_zipView->setObjectName("fileTable");
+    m_zipView->setModel(m_zipModel);
+    m_zipView->setSelectionBehavior(QAbstractItemView::SelectRows);
+    m_zipView->setSelectionMode(QAbstractItemView::SingleSelection);
+    m_zipView->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    m_zipView->setShowGrid(false);
+    m_zipView->setFrameShape(QFrame::NoFrame);
+    m_zipView->setIconSize(QSize(18, 18));
+    m_zipView->setItemDelegate(new FileItemDelegate(m_zipView));
+    m_zipView->verticalHeader()->hide();
+    m_zipView->verticalHeader()->setDefaultSectionSize(26);
+    m_zipView->horizontalHeader()->setStretchLastSection(true);
+    m_zipView->setColumnWidth(0, 360);
+    connect(m_zipView, &QTableView::activated, this, [this](const QModelIndex &index) {
+        if (!index.isValid()) {
+            return;
+        }
+        const QString entry = m_zipModel->item(index.row(), 0)->data(Qt::UserRole).toString();
+        const bool isDir = m_zipModel->item(index.row(), 0)->data(Qt::UserRole + 1).toBool();
+        if (entry == "..") {
+            if (m_zipDir.isEmpty()) {
+                exitZipMode();
+            } else {
+                const int slash = m_zipDir.lastIndexOf('/', m_zipDir.size() - 2);
+                m_zipDir = slash >= 0 ? m_zipDir.left(slash + 1) : QString();
+                populateZipView();
+            }
+        } else if (isDir) {
+            m_zipDir = entry;
+            populateZipView();
+        } else {
+            QTemporaryDir tempDir;
+            tempDir.setAutoRemove(false);
+            if (tempDir.isValid()
+                && tfx::platform::extractZipEntry(m_zipPath, entry, tempDir.path())) {
+                tfx::platform::openPath(QDir(tempDir.path()).filePath(entry));
+            } else {
+                emit statusMessageRequested(UiText::t("Could not extract entry.", "エントリを展開できませんでした。"));
+            }
+        }
+    });
+
     m_viewStack = new QStackedWidget(this);
     m_viewStack->addWidget(m_view);
     m_viewStack->addWidget(m_iconView);
     m_viewStack->addWidget(m_searchView);
+    m_viewStack->addWidget(m_zipView);
     m_viewStack->setCurrentWidget(m_view);
 
     m_searchTimer = new QTimer(this);
@@ -625,6 +673,73 @@ void FilePane::cancelSearch()
     }
 }
 
+void FilePane::openZip(const QString &path)
+{
+    m_zipPath = path;
+    m_zipDir.clear();
+    m_zipEntries = tfx::platform::listZipEntries(path);
+    if (m_zipEntries.isEmpty()) {
+        emit statusMessageRequested(UiText::t("Could not read archive.", "アーカイブを読み込めませんでした。"));
+        return;
+    }
+    populateZipView();
+    m_viewStack->setCurrentWidget(m_zipView);
+}
+
+void FilePane::populateZipView()
+{
+    m_zipModel->removeRows(0, m_zipModel->rowCount());
+
+    auto *up = new QStandardItem(m_iconProvider.icon(QFileIconProvider::Folder), "..");
+    up->setData("..", Qt::UserRole);
+    up->setData(true, Qt::UserRole + 1);
+    m_zipModel->appendRow({up, new QStandardItem(QString())});
+
+    QSet<QString> dirsSeen;
+    const int prefixLen = m_zipDir.size();
+    for (const QString &entry : m_zipEntries) {
+        if (!entry.startsWith(m_zipDir)) {
+            continue;
+        }
+        const QString rest = entry.mid(prefixLen);
+        if (rest.isEmpty()) {
+            continue;
+        }
+        const int slash = rest.indexOf('/');
+        if (slash >= 0) {
+            const QString dirName = rest.left(slash);
+            const QString fullDir = m_zipDir + dirName + "/";
+            if (!dirsSeen.contains(fullDir)) {
+                dirsSeen.insert(fullDir);
+                auto *item = new QStandardItem(m_iconProvider.icon(QFileIconProvider::Folder), dirName);
+                item->setData(fullDir, Qt::UserRole);
+                item->setData(true, Qt::UserRole + 1);
+                m_zipModel->appendRow({item, new QStandardItem(UiText::t("Folder", "フォルダ"))});
+            }
+        } else {
+            auto *item = new QStandardItem(m_iconProvider.icon(QFileIconProvider::File), rest);
+            item->setData(entry, Qt::UserRole);
+            item->setData(false, Qt::UserRole + 1);
+            const QString suffix = QFileInfo(rest).suffix();
+            m_zipModel->appendRow({item, new QStandardItem(suffix.isEmpty() ? UiText::t("File", "ファイル")
+                                                                            : suffix.toUpper() + " file")});
+        }
+    }
+
+    const QString internal = m_zipDir.isEmpty() ? QString() : "/" + m_zipDir.chopped(1);
+    m_pathEdit->setText(displayPath(m_zipPath) + internal);
+}
+
+void FilePane::exitZipMode()
+{
+    const QString zip = m_zipPath;
+    if (zip.isEmpty()) {
+        return;
+    }
+    navigateTo(QFileInfo(zip).absolutePath());
+    QTimer::singleShot(0, this, [this, zip]() { setCurrentIndexForPath(zip); });
+}
+
 void FilePane::setActive(bool active)
 {
     m_isActive = active;
@@ -655,6 +770,9 @@ void FilePane::navigateTo(const QString &path, bool recordHistory)
     }
 
     cancelSearch();
+    m_zipPath.clear();
+    m_zipDir.clear();
+    m_zipEntries.clear();
 
     const QString nextPath = info.canonicalFilePath().isEmpty() ? info.absoluteFilePath() : info.canonicalFilePath();
     if (recordHistory && !m_currentPath.isEmpty() && m_currentPath != nextPath) {
@@ -746,6 +864,8 @@ void FilePane::openSelected()
         QTimer::singleShot(0, this, [this]() {
             selectParentEntry();
         });
+    } else if (info.suffix().compare("zip", Qt::CaseInsensitive) == 0) {
+        openZip(info.absoluteFilePath());
     } else {
         openPath(info.absoluteFilePath());
     }

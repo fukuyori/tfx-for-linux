@@ -24,6 +24,13 @@ bool moveToTrash(const QStringList &paths);
 QString terminalShellProgram();
 QStringList terminalRunArguments(const QString &command);
 
+// List the entries inside a ZIP archive. Directory entries end with '/'.
+QStringList listZipEntries(const QString &zipPath);
+
+// Extract a single entry from a ZIP into destDir (preserving the entry's
+// relative path under destDir). Returns true on success.
+bool extractZipEntry(const QString &zipPath, const QString &entry, const QString &destDir);
+
 // Whether a PDF preview renderer is available on this system.
 bool pdfPreviewAvailable();
 

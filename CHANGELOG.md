@@ -2,6 +2,24 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.5.0] - 2026-06-13
+
+Phase 3 features: ZIP browsing, interactive terminal, and font control.
+
+### Added
+
+- Browse ZIP archives as folders: opening a `.zip` lists its contents with
+  in-archive navigation; opening an entry extracts and opens it, and `..` at the
+  root returns to the containing folder.
+- Interactive terminal pane backed by QTermWidget (true colour, colour scheme,
+  cursor, `Ctrl+C`, TUI apps); the working directory follows the active pane.
+  Falls back to the simple command pane when QTermWidget is unavailable.
+- Toolbar toggle button (with icon) for showing/hiding the terminal pane.
+- Per-pane font overrides in `[font]`: `fileList`, `preview`, `terminal`,
+  `folderTree` (each with an optional `*Size`), overriding the global mono font.
+- `[terminal] colorScheme` to choose the terminal's QTermWidget colour scheme
+  (background/foreground).
+
 ## [0.4.2] - 2026-06-13
 
 Internal refactor (no behavior change); concludes the layered restructuring.

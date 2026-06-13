@@ -32,6 +32,17 @@ struct AppFontConfig
     QString ui = "system";
     QString mono = "monospace";
     int size = 12;
+
+    // Optional per-pane overrides. Empty family / size 0 means inherit the
+    // global mono family / size above.
+    QString fileListFamily;
+    int fileListSize = 0;
+    QString previewFamily;
+    int previewSize = 0;
+    QString terminalFamily;
+    int terminalSize = 0;
+    QString folderTreeFamily;
+    int folderTreeSize = 0;
 };
 
 struct AppStartupConfig
@@ -68,6 +79,7 @@ public:
     QString terminalApp;
     QString terminalArguments;
     QString terminalShell;
+    QString terminalColorScheme;
 
 private:
     static QString configDirectory();

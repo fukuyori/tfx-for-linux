@@ -1,4 +1,5 @@
 #include "TerminalPane.h"
+#include "platform/Platform.h"
 
 #include <QDir>
 #include <QHBoxLayout>
@@ -81,5 +82,5 @@ void TerminalPane::runCommand()
     m_output->appendPlainText(QString("%1 $ %2").arg(m_workingDirectory, command));
     m_command->clear();
     m_process->setWorkingDirectory(m_workingDirectory);
-    m_process->start("/bin/sh", QStringList() << "-lc" << command);
+    m_process->start(tfx::platform::terminalShellProgram(), tfx::platform::terminalRunArguments(command));
 }

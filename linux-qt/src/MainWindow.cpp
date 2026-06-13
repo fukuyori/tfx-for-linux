@@ -1,11 +1,11 @@
 #include "MainWindow.h"
 #include "UiText.h"
+#include "platform/Platform.h"
 
 #include <QAction>
 #include <QApplication>
 #include <QClipboard>
 #include <QCloseEvent>
-#include <QDesktopServices>
 #include <QDir>
 #include <QDrag>
 #include <QDragEnterEvent>
@@ -261,9 +261,6 @@ MainWindow::MainWindow(const QString &initialPath, QWidget *parent)
       m_activePane(m_leftPane),
       m_previewPane(new PreviewPane(this)),
       m_terminalPane(new TerminalPane(this)),
-      m_fileSplitter(new QSplitter(Qt::Horizontal, this)),
-      m_mainSplitter(new QSplitter(Qt::Horizontal, this)),
-      m_verticalSplitter(new QSplitter(Qt::Vertical, this)),
       m_config(AppConfig::loadOrCreate()),
       m_initialPath(initialPath)
 {
@@ -277,22 +274,9 @@ MainWindow::MainWindow(const QString &initialPath, QWidget *parent)
     buildTopToolbar();
     buildFolderSidebar(initialPath);
 
-    m_fileSplitter->setObjectName("fileSplitter");
-    m_mainSplitter->setObjectName("mainSplitter");
-    m_verticalSplitter->setObjectName("verticalSplitter");
-    m_fileSplitter->setHandleWidth(6);
-    m_mainSplitter->setHandleWidth(5);
-    m_verticalSplitter->setHandleWidth(5);
     m_sidebar->setMinimumWidth(160);
     m_treeView->setMinimumWidth(140);
     m_pinnedList->setMinimumWidth(140);
-
-    m_fileSplitter->addWidget(m_leftPane);
-    m_fileSplitter->addWidget(m_rightPane);
-    m_fileSplitter->setStretchFactor(0, 1);
-    m_fileSplitter->setStretchFactor(1, 1);
-    m_fileSplitter->setCollapsible(0, false);
-    m_fileSplitter->setCollapsible(1, false);
 
     m_sidebar->setObjectName("sidebar");
     auto *sidebarLayout = new QVBoxLayout(m_sidebar);
@@ -308,23 +292,29 @@ MainWindow::MainWindow(const QString &initialPath, QWidget *parent)
     sidebarLayout->addWidget(treeLabel);
     sidebarLayout->addWidget(m_treeView, 1);
 
-    m_mainSplitter->addWidget(m_sidebar);
-    m_mainSplitter->addWidget(m_fileSplitter);
-    m_mainSplitter->addWidget(m_previewPane);
-    m_mainSplitter->setStretchFactor(0, 0);
-    m_mainSplitter->setStretchFactor(1, 1);
-    m_mainSplitter->setStretchFactor(2, 0);
-    m_mainSplitter->setCollapsible(0, false);
-    m_mainSplitter->setCollapsible(1, false);
-    m_mainSplitter->setCollapsible(2, false);
-    syncLayoutConstraints();
+    // Each pane lives in a dock widget so it can be rearranged, floated, or
+    // hidden. Toggling visibility redistributes space within the window instead
+    // of resizing the window. A zero-size central widget lets docks fill it.
+    setDockOptions(QMainWindow::AnimatedDocks | QMainWindow::AllowNestedDocks
+                   | QMainWindow::AllowTabbedDocks);
+    auto *centerFiller = new QWidget(this);
+    centerFiller->setFixedSize(0, 0);
+    setCentralWidget(centerFiller);
 
-    m_verticalSplitter->addWidget(m_mainSplitter);
-    m_verticalSplitter->addWidget(m_terminalPane);
-    m_verticalSplitter->setStretchFactor(0, 1);
-    m_verticalSplitter->setStretchFactor(1, 0);
-    m_terminalPane->hide();
-    setCentralWidget(m_verticalSplitter);
+    m_dockSidebar = makeDock("dockSidebar", UiText::t("Folders", "フォルダー"), m_sidebar);
+    m_dockLeftPane = makeDock("dockLeftPane", UiText::t("Left", "左"), m_leftPane);
+    m_dockRightPane = makeDock("dockRightPane", UiText::t("Right", "右"), m_rightPane);
+    m_dockPreview = makeDock("dockPreview", UiText::t("Preview", "プレビュー"), m_previewPane);
+    m_dockTerminal = makeDock("dockTerminal", UiText::t("Terminal", "ターミナル"), m_terminalPane);
+
+    addDockWidget(Qt::LeftDockWidgetArea, m_dockSidebar);
+    splitDockWidget(m_dockSidebar, m_dockLeftPane, Qt::Horizontal);
+    splitDockWidget(m_dockLeftPane, m_dockRightPane, Qt::Horizontal);
+    splitDockWidget(m_dockRightPane, m_dockPreview, Qt::Horizontal);
+    addDockWidget(Qt::BottomDockWidgetArea, m_dockTerminal);
+    resizeDocks({m_dockSidebar, m_dockLeftPane, m_dockRightPane, m_dockPreview},
+                {200, 460, 460, 360}, Qt::Horizontal);
+    m_dockTerminal->hide();
 
     const auto wirePane = [this](FilePane *pane) {
         connect(pane, &FilePane::activated, this, [this](FilePane *activatedPane) {
@@ -353,24 +343,6 @@ MainWindow::MainWindow(const QString &initialPath, QWidget *parent)
     };
     wirePane(m_leftPane);
     wirePane(m_rightPane);
-    connect(m_mainSplitter, &QSplitter::splitterMoved, this, [this]() {
-        rememberSidebarWidth();
-        rememberPreviewWidth();
-        if (!m_isRestoringSettings) {
-            saveSettings();
-        }
-    });
-    connect(m_fileSplitter, &QSplitter::splitterMoved, this, [this]() {
-        rememberSplitWidth();
-        if (!m_isRestoringSettings) {
-            saveSettings();
-        }
-    });
-    connect(m_verticalSplitter, &QSplitter::splitterMoved, this, [this]() {
-        if (!m_isRestoringSettings) {
-            saveSettings();
-        }
-    });
     connect(m_terminalPane, &TerminalPane::closeRequested, this, [this]() {
         setTerminalVisible(false);
     });
@@ -553,7 +525,7 @@ void MainWindow::buildFolderSidebar(const QString &initialPath)
         });
         menu.addSeparator();
         menu.addAction(UiText::t("Reveal in File Manager", "ファイルマネージャで表示"), this, [path]() {
-            QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+            tfx::platform::revealInFileManager(path);
         });
         menu.addAction(UiText::t("Copy Path", "パスをコピー"), this, [path]() {
             QApplication::clipboard()->setText(path);
@@ -644,7 +616,7 @@ void MainWindow::buildFolderSidebar(const QString &initialPath)
         });
         menu.addSeparator();
         menu.addAction(UiText::t("Reveal in File Manager", "ファイルマネージャで表示"), this, [path]() {
-            QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+            tfx::platform::revealInFileManager(path);
         });
         menu.addAction(UiText::t("Copy Path", "パスをコピー"), this, [path]() {
             QApplication::clipboard()->setText(path);
@@ -1007,33 +979,17 @@ void MainWindow::restoreSettings()
         restoreGeometry(geometry);
     }
 
+    // Restore the saved dock layout, then apply per-pane visibility on top.
     const QByteArray state = settings.value("MainWindow/state").toByteArray();
     if (!state.isEmpty()) {
         restoreState(state);
     }
 
-    m_rightPane->setVisible(splitVisible);
-    m_previewPane->setVisible(previewVisible);
-    m_mainSplitter->setCollapsible(2, !previewVisible);
-    m_terminalPane->setVisible(terminalVisible);
-    syncLayoutConstraints();
-
-    const QByteArray mainSplitterState = settings.value("MainWindow/mainSplitter").toByteArray();
-    if (!mainSplitterState.isEmpty()) {
-        m_mainSplitter->restoreState(mainSplitterState);
-    }
-    m_lastSidebarWidth = settings.value("Sidebar/width", m_lastSidebarWidth).toInt();
-    m_lastPreviewWidth = settings.value("View/previewWidth", m_lastPreviewWidth).toInt();
-    const QByteArray fileSplitterState = settings.value("MainWindow/fileSplitter").toByteArray();
-    if (!fileSplitterState.isEmpty()) {
-        m_fileSplitter->restoreState(fileSplitterState);
-    }
-    m_lastSplitWidth = settings.value("View/splitWidth", m_lastSplitWidth).toInt();
-    const QByteArray verticalSplitterState = settings.value("MainWindow/verticalSplitter").toByteArray();
-    if (!verticalSplitterState.isEmpty()) {
-        m_verticalSplitter->restoreState(verticalSplitterState);
-    }
-    syncLayoutConstraints();
+    m_dockSidebar->setVisible(true);
+    m_dockLeftPane->setVisible(true);
+    m_dockRightPane->setVisible(splitVisible);
+    m_dockPreview->setVisible(previewVisible);
+    m_dockTerminal->setVisible(terminalVisible);
 
     QString rightDirectory = settings.value("Panes/rightDirectory", m_rightPane->currentPath()).toString();
     if (!m_config.startup.rightFolder.isEmpty()) {
@@ -1101,19 +1057,12 @@ void MainWindow::saveSettings()
 {
     QSettings settings;
     settings.setValue("MainWindow/geometry", saveGeometry());
+    // saveState() captures the full dock layout (positions, sizes, floating)
+    // and the toolbar, replacing the old per-splitter persistence.
     settings.setValue("MainWindow/state", saveState());
-    settings.setValue("MainWindow/mainSplitter", m_mainSplitter->saveState());
-    settings.setValue("MainWindow/fileSplitter", m_fileSplitter->saveState());
-    settings.setValue("MainWindow/verticalSplitter", m_verticalSplitter->saveState());
-    rememberSidebarWidth();
-    settings.setValue("Sidebar/width", m_lastSidebarWidth);
-    settings.setValue("View/splitVisible", m_rightPane->isVisible());
-    rememberSplitWidth();
-    settings.setValue("View/splitWidth", m_lastSplitWidth);
-    settings.setValue("View/previewVisible", m_previewPane->isVisible());
-    rememberPreviewWidth();
-    settings.setValue("View/previewWidth", m_lastPreviewWidth);
-    settings.setValue("View/terminalVisible", m_terminalPane->isVisible());
+    settings.setValue("View/splitVisible", m_dockRightPane->isVisible());
+    settings.setValue("View/previewVisible", m_dockPreview->isVisible());
+    settings.setValue("View/terminalVisible", m_dockTerminal->isVisible());
     settings.setValue("View/showHiddenFiles", m_showHiddenFiles);
     settings.setValue("View/leftIconMode", m_leftPane->isIconMode());
     settings.setValue("View/rightIconMode", m_rightPane->isIconMode());
@@ -1130,14 +1079,6 @@ void MainWindow::saveSettings()
         pinnedPaths.append(m_pinnedList->item(row)->data(Qt::UserRole).toString());
     }
     settings.setValue("Sidebar/pinnedFolders", pinnedPaths);
-}
-
-void MainWindow::rememberSidebarWidth()
-{
-    const QList<int> sizes = m_mainSplitter->sizes();
-    if (sizes.size() >= 3 && sizes.at(0) > 80) {
-        m_lastSidebarWidth = sizes.at(0);
-    }
 }
 
 void MainWindow::setIconViewEnabled(bool enabled)
@@ -1163,108 +1104,27 @@ void MainWindow::syncIconViewToggle()
     }
 }
 
-int MainWindow::fileAreaMinimumWidth(bool splitVisible) const
+QDockWidget *MainWindow::makeDock(const QString &objectName, const QString &title, QWidget *content)
 {
-    return splitVisible
-        ? m_leftPane->minimumWidth() + m_fileSplitter->handleWidth() + m_rightPane->minimumWidth()
-        : m_leftPane->minimumWidth();
-}
-
-int MainWindow::contentMinimumWidth(bool splitVisible, bool previewVisible) const
-{
-    int width = m_sidebar->minimumWidth() + m_mainSplitter->handleWidth() + fileAreaMinimumWidth(splitVisible);
-    if (previewVisible) {
-        width += m_mainSplitter->handleWidth() + m_previewPane->minimumWidth();
-    }
-    return width;
-}
-
-int MainWindow::visibleFileListWidth() const
-{
-    const QList<int> sizes = m_fileSplitter->sizes();
-    if (!sizes.isEmpty() && sizes.at(0) > 0) {
-        return std::max(m_leftPane->minimumWidth(), sizes.at(0));
-    }
-    return std::max(m_leftPane->minimumWidth(), m_fileSplitter->width());
-}
-
-void MainWindow::syncLayoutConstraints()
-{
-    const bool splitVisible = m_rightPane->isVisible();
-    const bool previewVisible = m_previewPane->isVisible();
-
-    m_fileSplitter->setMinimumWidth(fileAreaMinimumWidth(splitVisible));
-    m_fileSplitter->setCollapsible(0, false);
-    m_fileSplitter->setCollapsible(1, !splitVisible);
-
-    m_mainSplitter->setCollapsible(0, false);
-    m_mainSplitter->setCollapsible(1, false);
-    m_mainSplitter->setCollapsible(2, !previewVisible);
-
-    setMinimumWidth(contentMinimumWidth(splitVisible, previewVisible));
-}
-
-QList<int> MainWindow::normalizedMainSplitterSizes(int sidebarWidth, int fileWidth, int previewWidth) const
-{
-    const bool previewVisible = m_previewPane->isVisible();
-    return {
-        std::max(m_sidebar->minimumWidth(), sidebarWidth),
-        std::max(fileAreaMinimumWidth(m_rightPane->isVisible()), fileWidth),
-        previewVisible ? std::max(m_previewPane->minimumWidth(), previewWidth) : 0,
-    };
-}
-
-QList<int> MainWindow::normalizedFileSplitterSizes(int leftWidth, int rightWidth) const
-{
-    const bool splitVisible = m_rightPane->isVisible();
-    return {
-        std::max(m_leftPane->minimumWidth(), leftWidth),
-        splitVisible ? std::max(m_rightPane->minimumWidth(), rightWidth) : 0,
-    };
+    auto *dock = new QDockWidget(title, this);
+    dock->setObjectName(objectName);
+    dock->setWidget(content);
+    dock->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
+    return dock;
 }
 
 void MainWindow::setSplitVisible(bool visible)
 {
-    const bool wasVisible = m_rightPane->isVisible();
-    const QList<int> fileSizes = m_fileSplitter->sizes();
-    const QList<int> mainSizes = m_mainSplitter->sizes();
-    const int sidebarWidth = std::max(m_sidebar->minimumWidth(), mainSizes.value(0, m_sidebar->width()));
-    const int fileAreaWidth = std::max(m_leftPane->minimumWidth(), mainSizes.value(1, visibleFileListWidth()));
-    const int previewWidth = mainSizes.size() >= 3 ? std::max(0, mainSizes.value(2, 0)) : 0;
-    const int leftWidth = visibleFileListWidth();
-    const int rightWidth = std::max(0, fileSizes.value(1, 0));
-
-    if (visible && !wasVisible) {
-        const int availableWidth = fileAreaWidth;
-        const int paneSpace = std::max(0, availableWidth - m_fileSplitter->handleWidth());
-        const int targetLeftWidth = std::max(m_leftPane->minimumWidth(), paneSpace / 2);
-        const int targetRightWidth = std::max(m_rightPane->minimumWidth(), paneSpace - targetLeftWidth);
-        // The right pane mirrors the left pane's shared column layout when shown.
+    if (visible && !m_dockRightPane->isVisible()) {
         m_rightPane->applySharedColumnLayout();
-        m_rightPane->setVisible(true);
-        syncLayoutConstraints();
-        m_mainSplitter->setSizes(normalizedMainSplitterSizes(sidebarWidth, availableWidth, previewWidth));
-        m_fileSplitter->setSizes(normalizedFileSplitterSizes(targetLeftWidth, targetRightWidth));
-        m_lastSplitWidth = targetRightWidth;
-    } else if (!visible && wasVisible) {
-        if (rightWidth > 80) {
-            m_lastSplitWidth = rightWidth;
-        }
-        const int targetLeftWidth = std::max(m_leftPane->minimumWidth(), leftWidth + m_fileSplitter->handleWidth() + rightWidth);
-        m_rightPane->setVisible(false);
-        syncLayoutConstraints();
-        m_mainSplitter->setSizes(normalizedMainSplitterSizes(sidebarWidth, targetLeftWidth, previewWidth));
-        m_fileSplitter->setSizes(normalizedFileSplitterSizes(targetLeftWidth, 0));
-    } else {
-        syncLayoutConstraints();
     }
-
-    const QSignalBlocker splitButtonBlocker(m_splitButton);
-    if (m_splitButton->isChecked() != visible) {
+    m_dockRightPane->setVisible(visible);
+    {
+        const QSignalBlocker blocker(m_splitButton);
         m_splitButton->setChecked(visible);
     }
-    if (m_splitAction && m_splitAction->isChecked() != visible) {
-        const QSignalBlocker splitActionBlocker(m_splitAction);
+    if (m_splitAction) {
+        const QSignalBlocker blocker(m_splitAction);
         m_splitAction->setChecked(visible);
     }
     if (!m_isRestoringSettings) {
@@ -1272,56 +1132,15 @@ void MainWindow::setSplitVisible(bool visible)
     }
 }
 
-void MainWindow::rememberSplitWidth()
-{
-    if (!m_rightPane->isVisible()) {
-        return;
-    }
-
-    const QList<int> sizes = m_fileSplitter->sizes();
-    if (sizes.size() >= 2 && sizes.at(1) > 80) {
-        m_lastSplitWidth = sizes.at(1);
-    }
-}
-
 void MainWindow::setPreviewVisible(bool visible)
 {
-    const bool wasVisible = m_previewPane->isVisible();
-    const int windowWidthBefore = width();
-    const QList<int> mainSizes = m_mainSplitter->sizes();
-    const int sidebarWidth = std::max(m_sidebar->minimumWidth(), mainSizes.value(0, m_sidebar->width()));
-    const int fileWidth = std::max(fileAreaMinimumWidth(m_rightPane->isVisible()), mainSizes.value(1, m_fileSplitter->width()));
-    const int previewWidth = std::max(0, mainSizes.value(2, 0));
-
-    if (visible && !wasVisible) {
-        const int targetPreviewWidth = std::max(m_previewPane->minimumWidth(), m_lastPreviewWidth);
-        m_previewPane->setVisible(true);
-        syncLayoutConstraints();
-        if (!m_isRestoringSettings) {
-            resize(windowWidthBefore + targetPreviewWidth, height());
-        }
-        m_mainSplitter->setSizes(normalizedMainSplitterSizes(sidebarWidth, fileWidth, targetPreviewWidth));
-    } else if (!visible && wasVisible) {
-        if (previewWidth > 80) {
-            m_lastPreviewWidth = previewWidth;
-        }
-        m_previewPane->setVisible(false);
-        syncLayoutConstraints();
-        m_mainSplitter->setSizes(normalizedMainSplitterSizes(sidebarWidth, fileWidth, 0));
-        if (!m_isRestoringSettings && previewWidth > 0) {
-            resize(std::max(minimumWidth(), windowWidthBefore - previewWidth), height());
-            m_mainSplitter->setSizes(normalizedMainSplitterSizes(sidebarWidth, fileWidth, 0));
-        }
-    } else {
-        syncLayoutConstraints();
-    }
-
-    const QSignalBlocker previewButtonBlocker(m_previewButton);
-    if (m_previewButton->isChecked() != visible) {
+    m_dockPreview->setVisible(visible);
+    {
+        const QSignalBlocker blocker(m_previewButton);
         m_previewButton->setChecked(visible);
     }
-    if (m_previewAction && m_previewAction->isChecked() != visible) {
-        const QSignalBlocker previewActionBlocker(m_previewAction);
+    if (m_previewAction) {
+        const QSignalBlocker blocker(m_previewAction);
         m_previewAction->setChecked(visible);
     }
     if (!m_isRestoringSettings) {
@@ -1329,22 +1148,11 @@ void MainWindow::setPreviewVisible(bool visible)
     }
 }
 
-void MainWindow::rememberPreviewWidth()
-{
-    if (!m_previewPane->isVisible()) {
-        return;
-    }
-
-    const QList<int> sizes = m_mainSplitter->sizes();
-    if (sizes.size() >= 3 && sizes.at(2) > 80) {
-        m_lastPreviewWidth = sizes.at(2);
-    }
-}
-
 void MainWindow::setTerminalVisible(bool visible)
 {
-    m_terminalPane->setVisible(visible);
+    m_dockTerminal->setVisible(visible);
     if (m_terminalAction && m_terminalAction->isChecked() != visible) {
+        const QSignalBlocker blocker(m_terminalAction);
         m_terminalAction->setChecked(visible);
     }
     if (!m_isRestoringSettings) {

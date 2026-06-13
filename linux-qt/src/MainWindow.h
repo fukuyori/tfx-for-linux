@@ -9,7 +9,7 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMainWindow>
-#include <QSplitter>
+#include <QDockWidget>
 #include <QString>
 #include <QToolBar>
 #include <QToolButton>
@@ -42,15 +42,7 @@ private:
     void syncIconViewToggle();
     void setActivePane(FilePane *pane);
     void focusOtherPane();
-    void rememberSidebarWidth();
-    int fileAreaMinimumWidth(bool splitVisible) const;
-    int contentMinimumWidth(bool splitVisible, bool previewVisible) const;
-    int visibleFileListWidth() const;
-    void syncLayoutConstraints();
-    QList<int> normalizedMainSplitterSizes(int sidebarWidth, int fileWidth, int previewWidth) const;
-    QList<int> normalizedFileSplitterSizes(int leftWidth, int rightWidth) const;
-    void rememberSplitWidth();
-    void rememberPreviewWidth();
+    QDockWidget *makeDock(const QString &objectName, const QString &title, QWidget *content);
     FilePane *activePane() const;
 
     QFileSystemModel *m_treeModel;
@@ -73,14 +65,13 @@ private:
     FilePane *m_activePane;
     PreviewPane *m_previewPane;
     TerminalPane *m_terminalPane;
-    QSplitter *m_fileSplitter;
-    QSplitter *m_mainSplitter;
-    QSplitter *m_verticalSplitter;
+    QDockWidget *m_dockSidebar = nullptr;
+    QDockWidget *m_dockLeftPane = nullptr;
+    QDockWidget *m_dockRightPane = nullptr;
+    QDockWidget *m_dockPreview = nullptr;
+    QDockWidget *m_dockTerminal = nullptr;
     AppConfig m_config;
     QString m_initialPath;
     bool m_showHiddenFiles = false;
     bool m_isRestoringSettings = true;
-    int m_lastSidebarWidth = 240;
-    int m_lastSplitWidth = 420;
-    int m_lastPreviewWidth = 360;
 };

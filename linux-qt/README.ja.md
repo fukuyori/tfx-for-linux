@@ -1,6 +1,6 @@
 # tfx for Linux Qt
 
-Version: **0.3.3**
+Version: **0.4.0**
 
 このディレクトリは、`tfx-for-linux` の C++/Qt 6 Widgets 実装です。
 

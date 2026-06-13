@@ -1,7 +1,7 @@
 # tfx for Linux
 
 **Terminal-inspired interface File eXplorer for Linux**  
-Version: **0.3.3**
+Version: **0.4.0**
 
 English | [Japanese](README.ja.md)
 
@@ -47,12 +47,13 @@ When no folder is specified, the application opens the current working directory
 
 - Folder tree and pinned folders (reorder pins by dragging; drop folders to pin)
 - Single-pane and split-pane file list, with per-pane details and icon view modes
+- Dockable panes: the sidebar, both file panes, the preview, and the terminal can be rearranged, floated, or tabbed; toggling visibility splits the current window instead of resizing it
 - Range selection (click then Shift+click) and toggle selection (Ctrl+click)
 - Startup path handling: the left pane opens the command-line folder, or the current working directory when no folder is specified
 - Preview pane with source/rendered switching, an external image viewer button, and a multi-selection summary
 - Built-in command pane
 - User-editable `config.toml` created under `~/.config/tfx/`, including window/pane transparency
-- Window, splitter, pane visibility, tab, and column setting restoration
+- Window, dock layout, pane visibility, tab, and column setting restoration
 - File operations: open, open with (native chooser), rename, link, new file/folder, trash, copy/cut/paste, copy path
 - Drag-and-drop of files and folders between panes and to/from external file managers (drop onto a folder to move, or hold Ctrl to copy)
 - Recursive subfolder search: type a term and press Enter; results stream into a dedicated view and the search is cancelled when the pane changes folder
@@ -76,7 +77,7 @@ Column visibility and order can be changed from the file-list header menu. Colum
 The Linux port follows the same split as tfx for Windows:
 
 - `~/.config/tfx/config.toml` is the user-editable configuration file.
-- Qt session settings remain app-owned state for window placement, last paths, pane visibility, splitters, pinned folders, tabs, and column layout.
+- Qt session settings remain app-owned state for window placement, last paths, pane visibility, dock layout, pinned folders, tabs, and column layout.
 
 On startup, tfx creates `config.toml` when it does not already exist. Existing files are not overwritten.
 

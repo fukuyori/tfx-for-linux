@@ -2,6 +2,27 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.4.0] - 2026-06-13
+
+Architecture restructuring and dockable panes.
+
+### Added
+
+- Panes are now dock widgets: the sidebar, both file panes, the preview, and the
+  terminal can be rearranged, floated, or tabbed by dragging their title bars.
+
+### Changed
+
+- Toggling a pane's visibility now redistributes space within the current window
+  instead of resizing the window — friendlier for multi-platform use.
+- Window layout is persisted via `QMainWindow` state (dock positions, sizes, and
+  floating), replacing the previous per-splitter persistence.
+- Restructured the codebase into layers: `core/` (platform-agnostic logic:
+  file-type/size/mode formatting, file operations, git parsing) and `platform/`
+  (an OS abstraction with a Linux implementation for open/reveal/trash, the
+  native "open with" chooser, the terminal shell, and PDF rendering). The build
+  selects the platform implementation per OS, preparing for macOS/Windows ports.
+
 ## [0.3.3] - 2026-06-07
 
 Icon view and multi-selection (start of Phase 3).

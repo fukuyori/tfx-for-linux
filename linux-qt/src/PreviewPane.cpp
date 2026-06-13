@@ -1,8 +1,8 @@
 #include "PreviewPane.h"
 #include "UiText.h"
+#include "platform/Platform.h"
 
 #include <QDateTime>
-#include <QDesktopServices>
 #include <QFile>
 #include <QFileInfo>
 #include <QImageReader>
@@ -11,9 +11,7 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QPixmap>
-#include <QProcess>
 #include <QRegularExpression>
-#include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTextDocumentFragment>
 #include <QTextStream>
@@ -292,9 +290,8 @@ bool PreviewPane::showPdf(const QString &path)
         return false;
     }
 
-    const QString pdftoppm = QStandardPaths::findExecutable("pdftoppm");
-    if (pdftoppm.isEmpty()) {
-        m_text->setPlainText(UiText::t("PDF preview requires pdftoppm.", "PDF プレビューには pdftoppm が必要です。"));
+    if (!tfx::platform::pdfPreviewAvailable()) {
+        m_text->setPlainText(UiText::t("PDF preview is unavailable on this system.", "この環境では PDF プレビューを利用できません。"));
         setRenderAvailable(false);
         m_stack->setCurrentWidget(m_text);
         return true;
@@ -305,17 +302,15 @@ bool PreviewPane::showPdf(const QString &path)
         return false;
     }
 
-    const QString outputPrefix = tempDir.filePath("preview");
-    QProcess process;
-    process.start(pdftoppm, {"-f", "1", "-singlefile", "-png", "-scale-to", "900", path, outputPrefix});
-    if (!process.waitForStarted(1000) || !process.waitForFinished(5000) || process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
+    const QString outputPng = tempDir.filePath("preview.png");
+    if (!tfx::platform::renderPdfPreview(path, outputPng, 900)) {
         m_text->setPlainText(UiText::t("Could not render PDF preview.", "PDF プレビューを作成できませんでした。"));
         setRenderAvailable(false);
         m_stack->setCurrentWidget(m_text);
         return true;
     }
 
-    QPixmap pixmap(outputPrefix + ".png");
+    QPixmap pixmap(outputPng);
     if (pixmap.isNull()) {
         return false;
     }
@@ -390,5 +385,5 @@ void PreviewPane::openCurrentImageExternally()
     if (m_currentImagePath.isEmpty()) {
         return;
     }
-    QDesktopServices::openUrl(QUrl::fromLocalFile(m_currentImagePath));
+    tfx::platform::openPath(m_currentImagePath);
 }

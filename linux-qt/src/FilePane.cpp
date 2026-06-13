@@ -1,14 +1,14 @@
 #include "FilePane.h"
 #include "UiText.h"
+#include "core/FileOperations.h"
+#include "core/FileTypeInfo.h"
+#include "core/GitService.h"
+#include "platform/Platform.h"
 
 #include <QApplication>
 #include <QClipboard>
-#include <QDesktopServices>
 #include <QDir>
 #include <QEvent>
-#include <QDBusConnection>
-#include <QDBusMessage>
-#include <QDBusUnixFileDescriptor>
 #include <QDrag>
 #include <QDragEnterEvent>
 #include <QDragMoveEvent>
@@ -52,6 +52,9 @@
 
 #include <algorithm>
 #include <functional>
+
+using namespace tfx::core;
+using namespace tfx::platform;
 
 namespace {
 bool selectionDebugEnabled()
@@ -455,185 +458,6 @@ int defaultColumnWidth(int column)
         return 28;
     default:
         return 120;
-    }
-}
-
-QString permissionTriplet(QFile::Permissions permissions, QFile::Permission read, QFile::Permission write, QFile::Permission execute)
-{
-    QString text;
-    text.append(permissions.testFlag(read) ? 'r' : '-');
-    text.append(permissions.testFlag(write) ? 'w' : '-');
-    text.append(permissions.testFlag(execute) ? 'x' : '-');
-    return text;
-}
-
-QString modeString(const QFileInfo &info)
-{
-    QString text;
-    if (info.isSymLink()) {
-        text.append('l');
-    } else if (info.isDir()) {
-        text.append('d');
-    } else {
-        text.append('-');
-    }
-
-    const QFile::Permissions permissions = info.permissions();
-    text.append(permissionTriplet(permissions, QFile::ReadOwner, QFile::WriteOwner, QFile::ExeOwner));
-    text.append(permissionTriplet(permissions, QFile::ReadGroup, QFile::WriteGroup, QFile::ExeGroup));
-    text.append(permissionTriplet(permissions, QFile::ReadOther, QFile::WriteOther, QFile::ExeOther));
-    return text;
-}
-
-QString sizeString(qint64 bytes)
-{
-    if (bytes < 1024) {
-        return QString("%1 Byte").arg(bytes);
-    }
-    double value = bytes / 1024.0;
-    static const QStringList units = {"KiB", "MiB", "GiB", "TiB", "PiB"};
-    int unit = 0;
-    while (value >= 1024.0 && unit < units.size() - 1) {
-        value /= 1024.0;
-        ++unit;
-    }
-    return QString("%1 %2").arg(value, 0, 'f', 2).arg(units.at(unit));
-}
-
-QString englishTypeName(const QFileInfo &info)
-{
-    if (info.isDir()) {
-        return QStringLiteral("Folder");
-    }
-
-    static const QMimeDatabase mimeDb;
-    const QMimeType mime = mimeDb.mimeTypeForFile(info);
-    const QString name = mime.name();
-
-    static const QHash<QString, QString> kNames = {
-        {"text/plain", "Plain text"},
-        {"text/markdown", "Markdown"},
-        {"text/html", "HTML document"},
-        {"text/csv", "CSV document"},
-        {"text/css", "CSS"},
-        {"application/json", "JSON"},
-        {"application/xml", "XML"},
-        {"text/xml", "XML"},
-        {"application/javascript", "JavaScript"},
-        {"application/pdf", "PDF document"},
-        {"application/zip", "ZIP archive"},
-        {"application/gzip", "Gzip archive"},
-        {"application/x-tar", "Tar archive"},
-        {"application/x-shellscript", "Shell script"},
-        {"application/octet-stream", "Binary file"},
-    };
-    const auto it = kNames.constFind(name);
-    if (it != kNames.constEnd()) {
-        return it.value();
-    }
-
-    if (name.startsWith("image/")) {
-        return name.mid(6).toUpper() + " image";
-    }
-    if (name.startsWith("audio/")) {
-        return name.mid(6).toUpper() + " audio";
-    }
-    if (name.startsWith("video/")) {
-        return name.mid(6).toUpper() + " video";
-    }
-
-    const QString suffix = info.suffix();
-    if (!suffix.isEmpty()) {
-        return suffix.toUpper() + " file";
-    }
-    if (name.startsWith("text/")) {
-        return QStringLiteral("Plain text");
-    }
-    return mime.isValid() ? name : QStringLiteral("File");
-}
-
-QString porcelainStatusLabel(const QString &status)
-{
-    if (status.contains("??")) {
-        return "?";
-    }
-    if (status.contains("A")) {
-        return "A";
-    }
-    if (status.contains("D")) {
-        return "D";
-    }
-    if (status.contains("R")) {
-        return "R";
-    }
-    if (status.contains("C")) {
-        return "C";
-    }
-    if (status.contains("U")) {
-        return "U";
-    }
-    if (status.contains("M")) {
-        return "M";
-    }
-    if (status.contains("!")) {
-        return "!";
-    }
-    return status.trimmed();
-}
-
-QString porcelainPath(QString path)
-{
-    path = path.trimmed();
-    const int renameArrow = path.indexOf(" -> ");
-    if (renameArrow >= 0) {
-        path = path.mid(renameArrow + 4);
-    }
-    if (path.size() >= 2 && path.startsWith('"') && path.endsWith('"')) {
-        path = path.mid(1, path.size() - 2);
-    }
-    return path;
-}
-
-bool copyRecursively(const QString &sourcePath, const QString &destinationPath)
-{
-    const QFileInfo sourceInfo(sourcePath);
-    if (sourceInfo.isDir()) {
-        QDir destinationDir(destinationPath);
-        if (!destinationDir.exists() && !QDir().mkpath(destinationPath)) {
-            return false;
-        }
-
-        QDirIterator iterator(sourcePath, QDir::NoDotAndDotDot | QDir::AllEntries);
-        while (iterator.hasNext()) {
-            iterator.next();
-            const QString childSource = iterator.filePath();
-            const QString childDestination = QDir(destinationPath).filePath(iterator.fileName());
-            if (!copyRecursively(childSource, childDestination)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    return QFile::copy(sourcePath, destinationPath);
-}
-
-QString uniquePathInDirectory(const QString &directory, const QString &baseName)
-{
-    const QString first = QDir(directory).filePath(baseName);
-    if (!QFileInfo::exists(first)) {
-        return first;
-    }
-
-    const QFileInfo info(first);
-    for (int index = 2; ; ++index) {
-        const QString name = info.suffix().isEmpty()
-            ? QString("%1 %2").arg(info.completeBaseName()).arg(index)
-            : QString("%1 %2.%3").arg(info.completeBaseName()).arg(index).arg(info.suffix());
-        const QString candidate = QDir(directory).filePath(name);
-        if (!QFileInfo::exists(candidate)) {
-            return candidate;
-        }
     }
 }
 
@@ -1479,7 +1303,7 @@ void FilePane::openSelected()
             selectParentEntry();
         });
     } else {
-        QDesktopServices::openUrl(QUrl::fromLocalFile(info.absoluteFilePath()));
+        openPath(info.absoluteFilePath());
     }
 }
 
@@ -1541,9 +1365,11 @@ void FilePane::moveSelectedToTrash()
             UiText::t("Move selected item(s) to trash?", "選択項目をゴミ箱へ移動しますか?")) != QMessageBox::Yes) {
         return;
     }
+    QStringList paths;
     for (const QUrl &url : urls) {
-        QFile::moveToTrash(url.toLocalFile());
+        paths << url.toLocalFile();
     }
+    moveToTrash(paths);
     updateStatusLine();
 }
 
@@ -1852,7 +1678,7 @@ void FilePane::showEmptyAreaContextMenu(const QPoint &point)
         ->setEnabled(m_proxyModel->rowCount(m_view->rootIndex()) > 0);
     menu.addSeparator();
     menu.addAction(UiText::t("Reveal in File Manager", "ファイルマネージャで表示"), this, [this]() {
-        QDesktopServices::openUrl(QUrl::fromLocalFile(m_currentPath));
+        revealInFileManager(m_currentPath);
     });
     menu.addAction(UiText::t("Copy Current Path", "現在のパスをコピー"), this, [this]() {
         QApplication::clipboard()->setText(m_currentPath);
@@ -2018,7 +1844,7 @@ void FilePane::revealSelectionInFileManager()
     if (!info.exists()) {
         return;
     }
-    QDesktopServices::openUrl(QUrl::fromLocalFile(info.isDir() ? info.absoluteFilePath() : info.absolutePath()));
+    revealInFileManager(info.absoluteFilePath());
 }
 
 void FilePane::createLinkForSelection()
@@ -2044,26 +1870,12 @@ void FilePane::openWithCustomApplication()
         return;
     }
 
-    // Prefer the desktop's native "Open With" application chooser via the
-    // xdg-desktop-portal OpenURI interface (ask = true shows the chooser).
-    QFile file(info.absoluteFilePath());
-    if (file.open(QIODevice::ReadOnly)) {
-        QDBusMessage message = QDBusMessage::createMethodCall(
-            "org.freedesktop.portal.Desktop",
-            "/org/freedesktop/portal/desktop",
-            "org.freedesktop.portal.OpenURI",
-            "OpenFile");
-        message << QString()
-                << QVariant::fromValue(QDBusUnixFileDescriptor(file.handle()))
-                << QVariantMap{{"ask", true}};
-        const QDBusMessage reply = QDBusConnection::sessionBus().call(message);
-        file.close();
-        if (reply.type() != QDBusMessage::ErrorMessage) {
-            return;
-        }
+    // Prefer the desktop's native "Open With" application chooser.
+    if (openWithChooser(info.absoluteFilePath())) {
+        return;
     }
 
-    // Fallback: ask for a launch command when the portal is unavailable.
+    // Fallback: ask for a launch command when no native chooser is available.
     bool ok = false;
     const QString command = QInputDialog::getText(this,
         UiText::t("Open With", "このアプリケーションで開く"),

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(tfx-for-linux VERSION 0.4.0 LANGUAGES CXX)
+project(tfx-for-linux VERSION 0.4.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -23,6 +23,11 @@ qt_add_executable(tfx
     src/core/FileTypeInfo.h
     src/core/GitService.cpp
     src/core/GitService.h
+    src/models/FileColumns.h
+    src/models/FileSystemProxyModel.cpp
+    src/models/FileSystemProxyModel.h
+    src/views/FileViews.cpp
+    src/views/FileViews.h
     src/platform/Platform.h
     ${TFX_PLATFORM_SOURCES}
     src/AppConfig.cpp

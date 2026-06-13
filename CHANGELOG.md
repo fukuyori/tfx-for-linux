@@ -2,6 +2,18 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.4.1] - 2026-06-13
+
+Internal refactor (no behavior change).
+
+### Changed
+
+- Split the oversized `FilePane` translation unit into focused units: the column
+  model moved to `models/` (`FileSystemProxyModel`, `FileColumns`) and the file
+  list views moved to `views/` (`FileItemDelegate`, `FileTableView`,
+  `FileIconView`, selection helpers). `FilePane.cpp` shrank from ~2500 to ~1750
+  lines.
+
 ## [0.4.0] - 2026-06-13
 
 Architecture restructuring and dockable panes.

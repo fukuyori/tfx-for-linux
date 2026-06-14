@@ -2,6 +2,31 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.5.1] - 2026-06-14
+
+Terminal and dock-layout fixes.
+
+### Fixed
+
+- Terminal font now resolves to a verified fixed-pitch family, reducing the
+  QTermWidget "variable-width font" warnings.
+- Docked panes can be resized again: the `QMainWindow::separator` is given a
+  grabbable width (the stylesheet had collapsed it to zero).
+- The terminal restarts correctly after the shell exits with `exit`: the
+  finished widget is recreated and the configured font/colour scheme reapplied.
+- The terminal pane now spans the full width beneath both file panes with a
+  draggable separator, instead of a non-resizable bottom dock area.
+- Toggling the split view no longer changes the folder-tree (sidebar) width.
+
+### Added
+
+- "Reset Layout" in the View menu restores the default dock arrangement
+  (re-docking any floating panes) while keeping each pane's visibility.
+
+### Changed
+
+- The left/right file panes no longer show "Left"/"Right" dock titles.
+
 ## [0.5.0] - 2026-06-13
 
 Phase 3 features: ZIP browsing, interactive terminal, and font control.

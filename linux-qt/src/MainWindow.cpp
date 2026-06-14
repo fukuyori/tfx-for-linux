@@ -308,22 +308,18 @@ MainWindow::MainWindow(const QString &initialPath, QWidget *parent)
     setDockOptions(QMainWindow::AnimatedDocks | QMainWindow::AllowNestedDocks
                    | QMainWindow::AllowTabbedDocks);
     auto *centerFiller = new QWidget(this);
-    centerFiller->setFixedSize(0, 0);
+    centerFiller->setMaximumSize(0, 0);
     setCentralWidget(centerFiller);
 
     m_dockSidebar = makeDock("dockSidebar", UiText::t("Folders", "フォルダー"), m_sidebar);
-    m_dockLeftPane = makeDock("dockLeftPane", UiText::t("Left", "左"), m_leftPane);
-    m_dockRightPane = makeDock("dockRightPane", UiText::t("Right", "右"), m_rightPane);
+    // The left/right file panes are identified by position, so their dock
+    // titles are left blank.
+    m_dockLeftPane = makeDock("dockLeftPane", QString(), m_leftPane);
+    m_dockRightPane = makeDock("dockRightPane", QString(), m_rightPane);
     m_dockPreview = makeDock("dockPreview", UiText::t("Preview", "プレビュー"), m_previewPane);
     m_dockTerminal = makeDock("dockTerminal", UiText::t("Terminal", "ターミナル"), m_terminalPane);
 
-    addDockWidget(Qt::LeftDockWidgetArea, m_dockSidebar);
-    splitDockWidget(m_dockSidebar, m_dockLeftPane, Qt::Horizontal);
-    splitDockWidget(m_dockLeftPane, m_dockRightPane, Qt::Horizontal);
-    splitDockWidget(m_dockRightPane, m_dockPreview, Qt::Horizontal);
-    addDockWidget(Qt::BottomDockWidgetArea, m_dockTerminal);
-    resizeDocks({m_dockSidebar, m_dockLeftPane, m_dockRightPane, m_dockPreview},
-                {200, 460, 460, 360}, Qt::Horizontal);
+    applyDefaultDockLayout();
     m_dockTerminal->hide();
 
     const auto wirePane = [this](FilePane *pane) {
@@ -347,8 +343,8 @@ MainWindow::MainWindow(const QString &initialPath, QWidget *parent)
         });
         connect(pane, &FilePane::pinFolderRequested, this, &MainWindow::addPinnedFolder);
         connect(pane, &FilePane::openTerminalHereRequested, this, [this](const QString &path) {
-            m_terminalPane->setWorkingDirectory(path);
-            m_terminalPane->show();
+            m_terminalPane->openAt(path);
+            setTerminalVisible(true);
         });
     };
     wirePane(m_leftPane);
@@ -428,6 +424,10 @@ void MainWindow::buildActions()
     addMenuAction(viewMenu, UiText::t("File List Settings...", "ファイル一覧設定..."), this, [this]() {
         activePane()->showColumnSettingsDialog();
     });
+
+    viewMenu->addSeparator();
+    addMenuAction(viewMenu, UiText::t("Reset Layout", "レイアウトを初期化"), this,
+                  [this]() { resetDockLayout(); });
 
     auto *tabMenu = menuBar()->addMenu(UiText::t("Tabs", "タブ"));
     addMenuAction(tabMenu, UiText::t("New Tab", "新規タブ"), this, [this]() { activePane()->newTab(); }, QKeySequence(m_config.shortcut("newTab", "Ctrl+T")));
@@ -557,8 +557,8 @@ void MainWindow::buildFolderSidebar(const QString &initialPath)
             addPinnedFolder(path);
         });
         menu.addAction(UiText::t("Open Terminal Here", "ここでターミナルを開く"), this, [this, path]() {
-            m_terminalPane->setWorkingDirectory(path);
-            m_terminalPane->show();
+            m_terminalPane->openAt(path);
+            setTerminalVisible(true);
         });
         menu.exec(m_treeView->viewport()->mapToGlobal(point));
     });
@@ -648,8 +648,8 @@ void MainWindow::buildFolderSidebar(const QString &initialPath)
             removePinnedFolder(path);
         });
         menu.addAction(UiText::t("Open Terminal Here", "ここでターミナルを開く"), this, [this, path]() {
-            m_terminalPane->setWorkingDirectory(path);
-            m_terminalPane->show();
+            m_terminalPane->openAt(path);
+            setTerminalVisible(true);
         });
         menu.exec(m_pinnedList->viewport()->mapToGlobal(point));
     });
@@ -831,6 +831,14 @@ void MainWindow::applyTerminalTheme()
         QSplitter::handle {
             background: #222A30;
         }
+        QMainWindow::separator {
+            background: #222A30;
+            width: 7px;
+            height: 7px;
+        }
+        QMainWindow::separator:hover {
+            background: #5C7484;
+        }
         QSplitter#fileSplitter::handle {
             background: #20272D;
             border-left: 1px solid #2E3941;
@@ -951,19 +959,9 @@ void MainWindow::applyTerminalTheme()
     qApp->setStyleSheet(styleSheet);
 
     // The terminal renders its own text, so its font is set directly.
-    {
-        QFont terminalFont;
-        if (!m_config.font.terminalFamily.isEmpty()) {
-            terminalFont.setFamilies({m_config.font.terminalFamily});
-        } else {
-            terminalFont.setFamily(QStringLiteral("Monospace"));
-            terminalFont.setStyleHint(QFont::Monospace);
-        }
-        terminalFont.setFixedPitch(true);
-        terminalFont.setPointSize(m_config.font.terminalSize > 0 ? m_config.font.terminalSize
-                                                                 : m_config.font.size);
-        m_terminalPane->setContentFont(terminalFont);
-    }
+    m_terminalPane->setContentFont(TerminalPane::resolveFont(
+        m_config.font.terminalFamily,
+        m_config.font.terminalSize > 0 ? m_config.font.terminalSize : m_config.font.size));
     m_terminalPane->setColorScheme(m_config.terminalColorScheme);
     m_leftPane->setThemeColors(m_config.colors.foreground, m_config.colors.directoryForeground);
     m_rightPane->setThemeColors(m_config.colors.foreground, m_config.colors.directoryForeground);
@@ -1033,9 +1031,11 @@ void MainWindow::restoreSettings()
     }
 
     // Restore the saved dock layout, then apply per-pane visibility on top.
+    // Version 1: terminal moved into the vertical splitter (was a bottom dock
+    // area). A mismatching/older state is ignored, keeping the layout built above.
     const QByteArray state = settings.value("MainWindow/state").toByteArray();
     if (!state.isEmpty()) {
-        restoreState(state);
+        restoreState(state, 1);
     }
 
     m_dockSidebar->setVisible(true);
@@ -1116,7 +1116,7 @@ void MainWindow::saveSettings()
     settings.setValue("MainWindow/geometry", saveGeometry());
     // saveState() captures the full dock layout (positions, sizes, floating)
     // and the toolbar, replacing the old per-splitter persistence.
-    settings.setValue("MainWindow/state", saveState());
+    settings.setValue("MainWindow/state", saveState(1));
     settings.setValue("View/splitVisible", m_dockRightPane->isVisible());
     settings.setValue("View/previewVisible", m_dockPreview->isVisible());
     settings.setValue("View/terminalVisible", m_dockTerminal->isVisible());
@@ -1170,12 +1170,67 @@ QDockWidget *MainWindow::makeDock(const QString &objectName, const QString &titl
     return dock;
 }
 
+void MainWindow::applyDefaultDockLayout()
+{
+    // Re-dock everything (in case any pane is floating) and rebuild the default
+    // arrangement: a vertical splitter with the file panes across the top row
+    // and the terminal spanning the full width beneath them. Splitting the
+    // terminal in first makes it the bottom child of the vertical splitter, so
+    // it sits below BOTH file panes with a draggable separator.
+    for (QDockWidget *dock : {m_dockSidebar, m_dockLeftPane, m_dockRightPane,
+                              m_dockPreview, m_dockTerminal}) {
+        dock->setFloating(false);
+    }
+    addDockWidget(Qt::LeftDockWidgetArea, m_dockSidebar);
+    splitDockWidget(m_dockSidebar, m_dockTerminal, Qt::Vertical);
+    splitDockWidget(m_dockSidebar, m_dockLeftPane, Qt::Horizontal);
+    splitDockWidget(m_dockLeftPane, m_dockRightPane, Qt::Horizontal);
+    splitDockWidget(m_dockRightPane, m_dockPreview, Qt::Horizontal);
+    resizeDocks({m_dockSidebar, m_dockLeftPane, m_dockRightPane, m_dockPreview},
+                {200, 460, 460, 360}, Qt::Horizontal);
+}
+
+void MainWindow::resetDockLayout()
+{
+    // Preserve which panes are currently shown; only their arrangement resets.
+    const bool rightVisible = m_dockRightPane->isVisible();
+    const bool previewVisible = m_dockPreview->isVisible();
+    const bool terminalVisible = m_dockTerminal->isVisible();
+
+    applyDefaultDockLayout();
+
+    m_dockSidebar->setVisible(true);
+    m_dockLeftPane->setVisible(true);
+    m_dockRightPane->setVisible(rightVisible);
+    m_dockPreview->setVisible(previewVisible);
+    m_dockTerminal->setVisible(terminalVisible);
+
+    if (!m_isRestoringSettings) {
+        saveSettings();
+    }
+}
+
 void MainWindow::setSplitVisible(bool visible)
 {
     if (visible && !m_dockRightPane->isVisible()) {
         m_rightPane->applySharedColumnLayout();
     }
+    // Toggling the right pane must not change the folder-tree width: QMainWindow
+    // redistributes the freed/needed width across the whole row. Pin the sidebar
+    // to its current width during the relayout so the change is absorbed by the
+    // file panes, then release the constraint so the user can still resize it.
+    const bool pinSidebar = m_dockSidebar->isVisible() && !m_dockSidebar->isFloating();
+    if (pinSidebar) {
+        const int sidebarWidth = m_dockSidebar->width();
+        m_dockSidebar->setFixedWidth(sidebarWidth);
+    }
     m_dockRightPane->setVisible(visible);
+    if (pinSidebar) {
+        QTimer::singleShot(0, this, [this]() {
+            m_dockSidebar->setMinimumWidth(0);
+            m_dockSidebar->setMaximumWidth(QWIDGETSIZE_MAX);
+        });
+    }
     {
         const QSignalBlocker blocker(m_splitButton);
         m_splitButton->setChecked(visible);

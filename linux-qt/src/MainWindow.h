@@ -43,6 +43,8 @@ private:
     void setActivePane(FilePane *pane);
     void focusOtherPane();
     QDockWidget *makeDock(const QString &objectName, const QString &title, QWidget *content);
+    void applyDefaultDockLayout();
+    void resetDockLayout();
     FilePane *activePane() const;
 
     QFileSystemModel *m_treeModel;

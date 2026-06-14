@@ -3,19 +3,50 @@
 
 #include <QDir>
 #include <QFileInfo>
+#include <QFontDatabase>
+#include <QFontInfo>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
 #include <QShowEvent>
+#include <QTimer>
 #include <QToolButton>
 #include <QVBoxLayout>
 
 #ifdef TFX_HAVE_QTERMWIDGET
 #include <qtermwidget.h>
 
-#include <QFontDatabase>
 #include <QProcess>
 #endif
+
+QFont TerminalPane::resolveFont(const QString &family, int size)
+{
+    QFont font;
+    if (!family.isEmpty()) {
+        font.setFamily(family);
+    } else {
+        static const QStringList candidates = {
+            "DejaVu Sans Mono", "Liberation Mono", "Hack", "Source Code Pro",
+            "Ubuntu Mono", "Noto Sans Mono", "monospace"};
+        QString chosen;
+        for (const QString &candidate : candidates) {
+            const QFontInfo info{QFont(candidate)};
+            if (info.fixedPitch() && info.family().compare(candidate, Qt::CaseInsensitive) == 0) {
+                chosen = candidate;
+                break;
+            }
+        }
+        if (chosen.isEmpty()) {
+            font = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+        } else {
+            font.setFamily(chosen);
+        }
+    }
+    font.setStyleHint(QFont::Monospace);
+    font.setFixedPitch(true);
+    font.setPointSize(size > 0 ? size : 11);
+    return font;
+}
 
 TerminalPane::TerminalPane(QWidget *parent)
     : QWidget(parent),
@@ -45,23 +76,9 @@ TerminalPane::TerminalPane(QWidget *parent)
     layout->addLayout(headerLayout);
 
 #ifdef TFX_HAVE_QTERMWIDGET
-    m_term = new QTermWidget(0, this); // 0: do not start the shell yet
-    QFont monoFont(QStringLiteral("Monospace"));
-    monoFont.setStyleHint(QFont::Monospace);
-    monoFont.setFixedPitch(true);
-    monoFont.setPointSize(11);
-    m_font = monoFont;
-    m_term->setTerminalFont(m_font);
-    const QStringList schemes = QTermWidget::availableColorSchemes();
-    for (const QString &preferred : {QStringLiteral("DarkPastels"), QStringLiteral("Linux"),
-                                     QStringLiteral("Solarized Dark")}) {
-        if (schemes.contains(preferred)) {
-            m_term->setColorScheme(preferred);
-            break;
-        }
-    }
-    connect(m_term, &QTermWidget::finished, this, &TerminalPane::closeRequested);
-    layout->addWidget(m_term, 1);
+    m_layout = layout;
+    m_font = resolveFont(QString(), 11);
+    createTermWidget();
 #else
     m_output = new QPlainTextEdit(this);
     m_command = new QLineEdit(this);
@@ -98,6 +115,11 @@ void TerminalPane::showEvent(QShowEvent *event)
 {
     QWidget::showEvent(event);
 #ifdef TFX_HAVE_QTERMWIDGET
+    // A finished shell tears its QTermWidget down (it cannot be restarted), so
+    // recreate one before starting a fresh session.
+    if (!m_term) {
+        createTermWidget();
+    }
     if (m_term && !m_started) {
         startTerminal();
     }
@@ -107,8 +129,11 @@ void TerminalPane::showEvent(QShowEvent *event)
 void TerminalPane::setColorScheme(const QString &name)
 {
 #ifdef TFX_HAVE_QTERMWIDGET
-    if (!name.isEmpty() && m_term && QTermWidget::availableColorSchemes().contains(name)) {
-        m_term->setColorScheme(name);
+    if (!name.isEmpty() && QTermWidget::availableColorSchemes().contains(name)) {
+        m_colorScheme = name;
+        if (m_term) {
+            m_term->setColorScheme(name);
+        }
     }
 #else
     Q_UNUSED(name);
@@ -134,11 +159,21 @@ void TerminalPane::setContentFont(const QFont &font)
 
 void TerminalPane::setWorkingDirectory(const QString &path)
 {
+    // Only remember the directory for the next shell start; a running shell is
+    // never moved automatically (it stays where the user left it).
+    if (QFileInfo(path).isDir()) {
+        m_workingDirectory = path;
+    }
+}
+
+void TerminalPane::openAt(const QString &path)
+{
     if (!QFileInfo(path).isDir()) {
         return;
     }
     m_workingDirectory = path;
 #ifdef TFX_HAVE_QTERMWIDGET
+    // Explicit "open terminal here": cd a running shell to the folder.
     if (m_started && m_term) {
         QString quoted = path;
         quoted.replace('\'', "'\\''");
@@ -148,6 +183,43 @@ void TerminalPane::setWorkingDirectory(const QString &path)
 }
 
 #ifdef TFX_HAVE_QTERMWIDGET
+void TerminalPane::createTermWidget()
+{
+    m_term = new QTermWidget(0, this); // 0: do not start the shell yet
+    m_started = false;
+    m_term->setTerminalFont(m_font);
+
+    const QStringList schemes = QTermWidget::availableColorSchemes();
+    QString scheme = m_colorScheme;
+    if (scheme.isEmpty() || !schemes.contains(scheme)) {
+        scheme.clear();
+        for (const QString &preferred : {QStringLiteral("DarkPastels"), QStringLiteral("Linux"),
+                                         QStringLiteral("Solarized Dark")}) {
+            if (schemes.contains(preferred)) {
+                scheme = preferred;
+                break;
+            }
+        }
+    }
+    if (!scheme.isEmpty()) {
+        m_term->setColorScheme(scheme);
+    }
+
+    connect(m_term, &QTermWidget::finished, this, [this]() {
+        // The shell exited. QTermWidget cannot restart its session, so discard
+        // this widget; showEvent() will build a fresh one in the active
+        // directory the next time the pane is shown.
+        if (m_term) {
+            m_layout->removeWidget(m_term);
+            m_term->deleteLater();
+            m_term = nullptr;
+        }
+        m_started = false;
+        emit closeRequested();
+    });
+    m_layout->addWidget(m_term, 1);
+}
+
 void TerminalPane::startTerminal()
 {
     m_started = true;
@@ -155,11 +227,20 @@ void TerminalPane::startTerminal()
     QStringList environment = QProcess::systemEnvironment();
     environment << QStringLiteral("COLORTERM=truecolor");
     m_term->setEnvironment(environment);
+    m_term->setTerminalFont(m_font);
     m_term->startShellProgram();
     // Re-apply the font after the session starts; QTermWidget can otherwise
     // fall back to its default terminal font on shell start.
     m_term->setTerminalFont(m_font);
     m_term->setFocus();
+    // A freshly recreated widget may not be laid out yet when the shell starts,
+    // and QTermWidget can reset the font during that first layout. Re-apply it
+    // once the event loop has realised the terminal.
+    QTimer::singleShot(0, this, [this]() {
+        if (m_term) {
+            m_term->setTerminalFont(m_font);
+        }
+    });
 }
 #else
 void TerminalPane::runCommand()

@@ -2,6 +2,22 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.5.5] - 2026-07-04
+
+View polish, naming control, and documentation closure.
+
+### Added
+
+- Markdown preview uses GitHub-style rendering, embeds local images as `data:`
+  URLs, and only shows the external-image button when remote images are present.
+- Drag-and-drop now highlights the target row/item or empty pane area and
+  refreshes affected panes immediately after successful transfers.
+- Startup window geometry can be set with `-g` / `--geometry` or
+  `[startup] geometry`.
+- `[naming] placeholderLanguage` controls generated placeholder names.
+- Column-header sorting now shows and saves the active sort column/direction.
+- English command-configuration documentation is complete.
+
 ## [0.5.4] - 2026-07-04
 
 View and preview workflow polish.

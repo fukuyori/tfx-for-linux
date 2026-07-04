@@ -49,6 +49,7 @@ public:
     void focusFileList();
     void applySharedColumnLayout();
     void setUserCommands(const QList<UserCommand> &commands);
+    void setPlaceholderLanguage(const QString &language);
     void runUserCommand(int index);
 
 signals:
@@ -59,6 +60,7 @@ signals:
     void statusMessageRequested(const QString &message);
     void pinFolderRequested(const QString &path);
     void openTerminalHereRequested(const QString &path);
+    void fileOperationPathsChanged(const QStringList &directories);
     void commandOutputReady(const QString &name,
                             const QString &commandLine,
                             const QString &workingDirectory,
@@ -124,6 +126,7 @@ private:
     void updateStatusLine();
     void commitPathEditor();
     QString displayPath(const QString &path) const;
+    QString placeholderText(const QString &english, const QString &japanese) const;
     QString tabTitleForPath(const QString &path) const;
     void updateCurrentTabPath(const QString &path);
     void pushHistory(const QString &path);
@@ -168,4 +171,5 @@ private:
     bool m_suppressColumnSave = false;
     bool m_isSwitchingTabs = false;
     QList<UserCommand> m_userCommands;
+    QString m_placeholderLanguage = "auto";
 };

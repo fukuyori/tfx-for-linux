@@ -1,7 +1,7 @@
 # tfx for Linux
 
 **Terminal-inspired interface File eXplorer for Linux**  
-Version: **0.5.4**
+Version: **0.5.5**
 
 English | [Japanese](README.ja.md)
 
@@ -41,6 +41,12 @@ To open a specific folder:
 ./build/tfx /path/to/folder
 ```
 
+To set the initial window geometry:
+
+```sh
+./build/tfx --geometry 1280x780+80+40
+```
+
 When no folder is specified, the application opens the current working directory.
 
 ## Current Scope
@@ -52,8 +58,10 @@ When no folder is specified, the application opens the current working directory
 - Range selection (click then Shift+click) and toggle selection (Ctrl+click)
 - Startup path handling: the left pane opens the command-line folder, or the current working directory when no folder is specified
 - Startup visibility control for preview, terminal, and folder sidebar
+- Startup window geometry via `--geometry` or `[startup] geometry`
 - Preview pane with source/rendered switching, an external image viewer button, and a multi-selection summary
 - Preview keyboard shortcuts for source/rendered switching and opening the current preview externally
+- Markdown preview with GitHub-style tables and local image embedding
 - Browse ZIP archives as folders (navigate in, open/extract entries)
 - Interactive terminal pane (QTermWidget) whose working directory follows the active pane; falls back to a simple command pane when unavailable
 - User-editable `config.toml` created under `~/.config/tfx/`, including window/pane transparency, per-pane fonts, and the terminal colour scheme
@@ -61,6 +69,7 @@ When no folder is specified, the application opens the current working directory
 - Window, dock layout, pane visibility, tab, and column setting restoration
 - File operations: open, open with (native chooser), rename, link, new file/folder, trash, copy/cut/paste, copy path
 - Drag-and-drop of files and folders between panes and to/from external file managers (drop onto a folder to move, or hold Ctrl to copy)
+- Drag-and-drop target highlighting and immediate refresh of affected panes
 - Conflict handling for paste/drop operations with overwrite, skip, and rename choices
 - Clipboard-to-file paste for images, rich/plain text, URLs, CSV, and TSV, plus Paste as Plain Text
 - Recursive subfolder search: type a term and press Enter; results stream into a dedicated view and the search is cancelled when the pane changes folder
@@ -78,6 +87,8 @@ When no folder is specified, the application opens the current working directory
   - Git Status
 
 Column visibility and order can be changed from the file-list header menu. Column order is changed by dragging item names in the settings dialog.
+Clicking column headers sorts the file list and preserves the sort column and
+direction with the column layout.
 
 ## Configuration
 
@@ -95,6 +106,7 @@ Currently supported sections are:
 - `[colors]`
 - `[opacity]` (`background`, `inactivePane`, `disabledItem`)
 - `[startup]`
+- `[naming]`
 - `[shortcuts]`
 - `[terminal]`
 - `[openWith]` is parsed for compatibility; detailed behavior is still being wired in.

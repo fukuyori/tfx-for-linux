@@ -62,8 +62,14 @@ struct AppStartupConfig
     QString preview = "restore";
     QString terminal = "restore";
     QString folderTree = "restore";
+    QString geometry;
     QString rightFolder;
     QStringList rightFolders;
+};
+
+struct AppNamingConfig
+{
+    QString placeholderLanguage = "auto";
 };
 
 struct AppOpacityConfig
@@ -86,6 +92,7 @@ public:
     AppColors colors;
     AppFontConfig font;
     AppStartupConfig startup;
+    AppNamingConfig naming;
     AppOpacityConfig opacity;
     QHash<QString, QString> shortcuts;
     QHash<QString, QString> openWith;

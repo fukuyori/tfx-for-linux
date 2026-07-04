@@ -191,21 +191,32 @@ bool looksLikeDelimitedText(const QString &text, QChar separator)
     return expected > 0;
 }
 
-QString plainTextClipboardBaseName(const QString &text)
+QString placeholderName(const QString &language, const QString &english, const QString &japanese)
+{
+    if (language == "en") {
+        return english;
+    }
+    if (language == "ja") {
+        return japanese;
+    }
+    return UiText::isJapanese() ? japanese : english;
+}
+
+QString plainTextClipboardBaseName(const QString &text, const QString &language)
 {
     const QString trimmed = text.trimmed();
     const QUrl url(trimmed);
     if (url.isValid() && !url.scheme().isEmpty()
         && (url.scheme() == "http" || url.scheme() == "https" || url.scheme() == "ftp")) {
-        return "Clipboard URL.url";
+        return placeholderName(language, "Clipboard URL.url", "クリップボード URL.url");
     }
     if (looksLikeDelimitedText(text, '\t')) {
-        return "Clipboard.tsv";
+        return placeholderName(language, "Clipboard.tsv", "クリップボード.tsv");
     }
     if (looksLikeDelimitedText(text, ',')) {
-        return "Clipboard.csv";
+        return placeholderName(language, "Clipboard.csv", "クリップボード.csv");
     }
-    return "Clipboard.txt";
+    return placeholderName(language, "Clipboard.txt", "クリップボード.txt");
 }
 
 bool writeBytesToFile(const QString &path, const QByteArray &data)
@@ -331,6 +342,7 @@ FilePane::FilePane(const QString &label, const QString &initialPath, QWidget *pa
     m_view->horizontalHeader()->setMinimumSectionSize(24);
     m_view->horizontalHeader()->setDefaultAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     m_view->horizontalHeader()->setHighlightSections(false);
+    m_view->horizontalHeader()->setSortIndicatorShown(true);
     m_view->horizontalHeader()->setSectionsMovable(true);
     m_view->horizontalHeader()->setContextMenuPolicy(Qt::CustomContextMenu);
     for (int column = 0; column < kColumnCount; ++column) {
@@ -626,6 +638,9 @@ FilePane::FilePane(const QString &label, const QString &initialPath, QWidget *pa
     connect(m_view->horizontalHeader(), &QHeaderView::sectionResized, this, [this]() {
         saveColumnSettings();
     });
+    connect(m_view->horizontalHeader(), &QHeaderView::sortIndicatorChanged, this, [this]() {
+        saveColumnSettings();
+    });
     connect(m_tabBar, &QTabBar::currentChanged, this, [this](int index) {
         if (index < 0) {
             return;
@@ -738,6 +753,13 @@ QStringList FilePane::selectedLocalPaths() const
 void FilePane::setUserCommands(const QList<UserCommand> &commands)
 {
     m_userCommands = commands;
+}
+
+void FilePane::setPlaceholderLanguage(const QString &language)
+{
+    if (language == "en" || language == "ja" || language == "auto") {
+        m_placeholderLanguage = language;
+    }
 }
 
 void FilePane::runUserCommand(int index)
@@ -1112,7 +1134,7 @@ void FilePane::createFolder()
         UiText::t("New Folder", "新規フォルダ"),
         UiText::t("Name:", "名前:"),
         QLineEdit::Normal,
-        UiText::t("New Folder", "新規フォルダ"));
+        placeholderText("New Folder", "新規フォルダ"));
     if (name.isEmpty()) {
         return;
     }
@@ -1125,7 +1147,7 @@ void FilePane::createFolder()
 
 void FilePane::createFile()
 {
-    const QString path = uniqueChildPath("New File.txt");
+    const QString path = uniqueChildPath(placeholderText("New File.txt", "新規ファイル.txt"));
     QFile file(path);
     if (!file.open(QIODevice::NewOnly | QIODevice::WriteOnly | QIODevice::Text)) {
         QMessageBox::warning(this, "tfx", UiText::t("Could not create file.", "ファイルを作成できませんでした。"));
@@ -1182,6 +1204,8 @@ void FilePane::performDrop(const QList<QUrl> &urls, Qt::DropAction action, const
     const QDir dir(targetDir);
     const QString targetCanonical = QFileInfo(targetDir).absoluteFilePath();
     bool changed = false;
+    QSet<QString> changedDirectories;
+    changedDirectories.insert(targetCanonical);
 
     for (const QUrl &url : urls) {
         const QString source = url.toLocalFile();
@@ -1229,6 +1253,8 @@ void FilePane::performDrop(const QList<QUrl> &urls, Qt::DropAction action, const
         const bool ok = transferPath(source, destination, move);
         if (ok) {
             changed = true;
+            changedDirectories.insert(sourceInfo.absolutePath());
+            changedDirectories.insert(QFileInfo(destination).absolutePath());
         } else {
             emit statusMessageRequested(UiText::t("Could not transfer item: %1", "項目を移動/コピーできませんでした: %1").arg(sourceInfo.fileName()));
         }
@@ -1236,6 +1262,7 @@ void FilePane::performDrop(const QList<QUrl> &urls, Qt::DropAction action, const
 
     if (changed) {
         reload();
+        emit fileOperationPathsChanged(QStringList(changedDirectories.begin(), changedDirectories.end()));
     }
     updateStatusLine();
 }
@@ -1251,6 +1278,8 @@ void FilePane::pasteIntoCurrentDirectory()
     const bool move = mime->hasFormat("application/x-tfx-cut");
     if (mime->hasUrls()) {
         bool changed = false;
+        QSet<QString> changedDirectories;
+        changedDirectories.insert(QFileInfo(m_currentPath).absoluteFilePath());
         for (const QUrl &url : mime->urls()) {
             const QString source = url.toLocalFile();
             if (source.isEmpty()) {
@@ -1292,12 +1321,15 @@ void FilePane::pasteIntoCurrentDirectory()
 
             if (transferPath(source, destination, move)) {
                 changed = true;
+                changedDirectories.insert(sourceInfo.absolutePath());
+                changedDirectories.insert(QFileInfo(destination).absolutePath());
             } else {
                 emit statusMessageRequested(UiText::t("Could not paste item: %1", "項目をペーストできませんでした: %1").arg(source));
             }
         }
         if (changed) {
             reload();
+            emit fileOperationPathsChanged(QStringList(changedDirectories.begin(), changedDirectories.end()));
         }
         updateStatusLine();
         if (sawLocalUrl) {
@@ -1327,19 +1359,21 @@ bool FilePane::pasteClipboardAsFile(bool plainTextOnly)
 
     if (!plainTextOnly && mime->hasImage()) {
         clipboardImage = qvariant_cast<QImage>(mime->imageData());
-        baseName = "Clipboard Image.png";
+        baseName = placeholderText("Clipboard Image.png", "クリップボード画像.png");
         image = !clipboardImage.isNull();
     } else if (!plainTextOnly && mime->hasFormat("text/rtf")) {
-        baseName = "Clipboard.rtf";
+        baseName = placeholderText("Clipboard.rtf", "クリップボード.rtf");
         data = mime->data("text/rtf");
     } else if (!plainTextOnly && mime->hasHtml()) {
-        baseName = "Clipboard.html";
+        baseName = placeholderText("Clipboard.html", "クリップボード.html");
         data = mime->html().toUtf8();
     } else if (mime->hasText()) {
-        baseName = plainTextOnly ? "Clipboard.txt" : plainTextClipboardBaseName(mime->text());
+        baseName = plainTextOnly
+            ? placeholderText("Clipboard.txt", "クリップボード.txt")
+            : plainTextClipboardBaseName(mime->text(), m_placeholderLanguage);
         data = mime->text().toUtf8();
     } else if (!plainTextOnly && mime->hasUrls() && !mime->urls().isEmpty()) {
-        baseName = "Clipboard URL.url";
+        baseName = placeholderText("Clipboard URL.url", "クリップボード URL.url");
         data = mime->urls().first().toString().toUtf8();
     } else {
         return false;
@@ -1774,7 +1808,7 @@ void FilePane::createLinkForSelection()
     if (!info.exists()) {
         return;
     }
-    const QString linkPath = uniqueChildPath(info.fileName() + UiText::t(" link", " のリンク"));
+    const QString linkPath = uniqueChildPath(info.fileName() + placeholderText(" link", " のリンク"));
     if (QFile::link(info.absoluteFilePath(), linkPath)) {
         QTimer::singleShot(0, this, [this, linkPath]() {
             setCurrentIndexForPath(linkPath);
@@ -1834,7 +1868,7 @@ void FilePane::compressSelectedItemsToZip()
 
     QString archiveBaseName = urls.size() == 1
         ? QFileInfo(urls.first().toLocalFile()).completeBaseName() + ".zip"
-        : "Archive.zip";
+        : placeholderText("Archive.zip", "アーカイブ.zip");
     const QString archivePath = uniquePathInDirectory(m_currentPath, archiveBaseName);
 
     QStringList arguments;
@@ -1949,7 +1983,15 @@ void FilePane::applySharedColumnLayout()
         const int width = settings.value(QString("width%1").arg(column), defaultColumnWidth(column)).toInt();
         header->resizeSection(column, std::max(24, width));
     }
+    const int sortColumn = settings.value("sortColumn", ColumnName).toInt();
+    const int sortOrder = settings.value("sortOrder", static_cast<int>(Qt::AscendingOrder)).toInt();
     settings.endGroup();
+
+    if (sortColumn >= 0 && sortColumn < kColumnCount) {
+        m_view->sortByColumn(sortColumn, sortOrder == static_cast<int>(Qt::DescendingOrder)
+            ? Qt::DescendingOrder
+            : Qt::AscendingOrder);
+    }
 }
 
 void FilePane::saveColumnSettings()
@@ -1978,6 +2020,8 @@ void FilePane::saveColumnSettings()
         settings.setValue(QString("visible%1").arg(column), !m_view->isColumnHidden(column));
         settings.setValue(QString("width%1").arg(column), header->sectionSize(column));
     }
+    settings.setValue("sortColumn", header->sortIndicatorSection());
+    settings.setValue("sortOrder", static_cast<int>(header->sortIndicatorOrder()));
     settings.endGroup();
 }
 
@@ -2057,6 +2101,11 @@ QString FilePane::displayPath(const QString &path) const
         return "~" + path.mid(home.size());
     }
     return path;
+}
+
+QString FilePane::placeholderText(const QString &english, const QString &japanese) const
+{
+    return placeholderName(m_placeholderLanguage, english, japanese);
 }
 
 QString FilePane::tabTitleForPath(const QString &path) const

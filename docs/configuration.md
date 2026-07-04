@@ -21,6 +21,7 @@ Session state such as window placement, last-opened paths, pinned folders, colum
 - `[colors]`
 - `[opacity]`
 - `[startup]`
+- `[naming]`
 - `[shortcuts]`
 - `[terminal]`
 - `[openWith]`
@@ -92,8 +93,12 @@ quit = "ctrl+q"
 # preview = "restore"
 # terminal = "restore"
 # folderTree = "restore"
+# geometry = "1280x780+80+40"
 # rightFolder = "~/Downloads"
 # rightFolders = ["~/Downloads", "~/Documents"]
+
+# [naming]
+# placeholderLanguage = "auto"
 
 # [opacity]
 # background = 0.40     # window background opacity (0.0 = transparent, 1.0 = opaque)
@@ -154,6 +159,26 @@ terminalSize = 13
 `[startup] folderTree` accepts `show`, `hide`, or `restore`.
 
 `rightFolder` and `rightFolders` accept absolute paths or `~`-expanded paths. When `rightFolders` is used, the first valid folder is used for the right pane.
+
+`geometry` accepts `WIDTHxHEIGHT` or `WIDTHxHEIGHT+X+Y`. The command-line
+option `-g` / `--geometry` uses the same format and takes precedence over
+`config.toml`.
+
+## Naming
+
+`[naming] placeholderLanguage` controls generated placeholder names such as
+new files, new folders, links, archives, and clipboard-created files.
+
+Accepted values:
+
+- `auto` — follow the system UI language.
+- `en` — use English placeholder names.
+- `ja` — use Japanese placeholder names.
+
+```toml
+[naming]
+placeholderLanguage = "en"
+```
 
 ## Opacity
 

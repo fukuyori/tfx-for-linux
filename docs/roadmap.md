@@ -1,6 +1,6 @@
 # tfx for Linux Roadmap
 
-Current version: **0.5.4**
+Current version: **0.5.5**
 
 This roadmap tracks the practical development steps for the Linux Qt port as it
 moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
@@ -42,7 +42,7 @@ moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
   `{cwd}`, `{scripts}`. (done)
 - User-defined keyboard shortcuts with conflict detection. (done)
 - A command Output dock showing the result and history of runs. (done)
-- English and Japanese documentation for command configuration. (Japanese done)
+- English and Japanese documentation for command configuration. (done)
 
 ## Phase 5: File-operation robustness and clipboard (from tfx macOS 0.8.0 / 0.8.3)
 
@@ -58,18 +58,17 @@ moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
 
 - Folder-tree visibility toggle. (done)
 - Folder-tree collapse-all button. (done)
-- Click-to-sort column headers with ascending/descending indicators (coexisting
-  with name-column resize); confirm drag-to-reorder columns.
-- Markdown rendering improvements: horizontal rules, ordered lists, tables, and
-  embedding local images as `data:` URLs; show the external-image button only
-  when remote images are present.
+- Click-to-sort column headers with ascending/descending indicators and saved
+  sort state; drag-to-reorder columns remains supported. (done)
+- Markdown rendering improvements: horizontal rules, ordered lists, tables,
+  embedding local images as `data:` URLs, and remote-image external button. (done)
 - Preview-pane keyboard shortcuts (source/rendered toggle, open externally). (done)
-- Drag-and-drop refinements: highlight the target folder, show a pane drop
-  border when dragging over empty area, remove the moved row immediately, and
-  avoid snap-back on a successful drop.
+- Drag-and-drop refinements: highlight the target row/item, show a pane drop
+  border when dragging over empty area, refresh affected panes immediately, and
+  avoid snap-back on a successful drop. (done)
 - Startup visibility options for terminal/preview/folder-tree. (done)
-- Window geometry option (`-g`/`--geometry` and `config.toml`).
-- `[naming]` config for placeholder language (auto/en/ja).
+- Window geometry option (`-g`/`--geometry` and `config.toml`). (done)
+- `[naming]` config for placeholder language (auto/en/ja). (done)
 
 ## Phase 7: Theme, hardening, and packaging
 

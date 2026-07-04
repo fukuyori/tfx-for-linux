@@ -81,6 +81,7 @@ protected:
     void dragEnterEvent(QDragEnterEvent *event) override
     {
         if (event->mimeData()->hasUrls()) {
+            updateDropHighlight(event->position().toPoint());
             event->acceptProposedAction();
         } else {
             QTableView::dragEnterEvent(event);
@@ -90,10 +91,17 @@ protected:
     void dragMoveEvent(QDragMoveEvent *event) override
     {
         if (event->mimeData()->hasUrls()) {
+            updateDropHighlight(event->position().toPoint());
             event->acceptProposedAction();
         } else {
             QTableView::dragMoveEvent(event);
         }
+    }
+
+    void dragLeaveEvent(QDragLeaveEvent *event) override
+    {
+        clearDropHighlight();
+        QTableView::dragLeaveEvent(event);
     }
 
     void dropEvent(QDropEvent *event) override
@@ -107,7 +115,14 @@ protected:
             ? Qt::CopyAction
             : Qt::MoveAction;
         dropHandler(event->mimeData()->urls(), action, target);
+        clearDropHighlight();
         event->acceptProposedAction();
+    }
+
+    void paintEvent(QPaintEvent *event) override
+    {
+        QTableView::paintEvent(event);
+        paintDropHighlight();
     }
 
     void mousePressEvent(QMouseEvent *event) override
@@ -189,6 +204,47 @@ protected:
     }
 
 private:
+    void updateDropHighlight(const QPoint &pos)
+    {
+        m_dropTarget = indexAt(pos);
+        m_dropActive = true;
+        viewport()->update();
+    }
+
+    void clearDropHighlight()
+    {
+        if (!m_dropActive && !m_dropTarget.isValid()) {
+            return;
+        }
+        m_dropActive = false;
+        m_dropTarget = QPersistentModelIndex();
+        viewport()->update();
+    }
+
+    void paintDropHighlight()
+    {
+        if (!m_dropActive) {
+            return;
+        }
+        QPainter painter(viewport());
+        painter.setRenderHint(QPainter::Antialiasing);
+        const QColor accent("#63F28D");
+        if (m_dropTarget.isValid()) {
+            QRect rect = visualRect(m_dropTarget);
+            rect.setLeft(0);
+            rect.setRight(viewport()->width() - 1);
+            painter.fillRect(rect, QColor(99, 242, 141, 42));
+            QPen pen(accent, 2);
+            painter.setPen(pen);
+            painter.drawRect(rect.adjusted(1, 1, -2, -2));
+            return;
+        }
+        QPen pen(accent, 2);
+        pen.setStyle(Qt::DashLine);
+        painter.setPen(pen);
+        painter.drawRoundedRect(viewport()->rect().adjusted(3, 3, -4, -4), 6, 6);
+    }
+
     QPixmap dragPixmap() const
     {
         if (!selectionModel() || !model()) {
@@ -270,9 +326,11 @@ private:
     }
 
     QPersistentModelIndex m_pressedIndex;
+    QPersistentModelIndex m_dropTarget;
     Qt::KeyboardModifiers m_pressedModifiers;
     QPoint m_pressPos;
     int m_anchorRow = -1;
+    bool m_dropActive = false;
 };
 
 // Icon-mode counterpart of FileTableView. Drag-out uses the base view's default
@@ -316,6 +374,7 @@ protected:
     void dragEnterEvent(QDragEnterEvent *event) override
     {
         if (event->mimeData()->hasUrls()) {
+            updateDropHighlight(event->position().toPoint());
             event->acceptProposedAction();
         } else {
             QListView::dragEnterEvent(event);
@@ -325,10 +384,17 @@ protected:
     void dragMoveEvent(QDragMoveEvent *event) override
     {
         if (event->mimeData()->hasUrls()) {
+            updateDropHighlight(event->position().toPoint());
             event->acceptProposedAction();
         } else {
             QListView::dragMoveEvent(event);
         }
+    }
+
+    void dragLeaveEvent(QDragLeaveEvent *event) override
+    {
+        clearDropHighlight();
+        QListView::dragLeaveEvent(event);
     }
 
     void dropEvent(QDropEvent *event) override
@@ -342,10 +408,57 @@ protected:
             ? Qt::CopyAction
             : Qt::MoveAction;
         dropHandler(event->mimeData()->urls(), action, target);
+        clearDropHighlight();
         event->acceptProposedAction();
     }
 
+    void paintEvent(QPaintEvent *event) override
+    {
+        QListView::paintEvent(event);
+        paintDropHighlight();
+    }
+
 private:
+    void updateDropHighlight(const QPoint &pos)
+    {
+        m_dropTarget = indexAt(pos);
+        m_dropActive = true;
+        viewport()->update();
+    }
+
+    void clearDropHighlight()
+    {
+        if (!m_dropActive && !m_dropTarget.isValid()) {
+            return;
+        }
+        m_dropActive = false;
+        m_dropTarget = QPersistentModelIndex();
+        viewport()->update();
+    }
+
+    void paintDropHighlight()
+    {
+        if (!m_dropActive) {
+            return;
+        }
+        QPainter painter(viewport());
+        painter.setRenderHint(QPainter::Antialiasing);
+        const QColor accent("#63F28D");
+        if (m_dropTarget.isValid()) {
+            const QRect rect = visualRect(m_dropTarget).adjusted(2, 2, -3, -3);
+            painter.fillRect(rect, QColor(99, 242, 141, 38));
+            painter.setPen(QPen(accent, 2));
+            painter.drawRoundedRect(rect, 5, 5);
+            return;
+        }
+        QPen pen(accent, 2);
+        pen.setStyle(Qt::DashLine);
+        painter.setPen(pen);
+        painter.drawRoundedRect(viewport()->rect().adjusted(3, 3, -4, -4), 6, 6);
+    }
+
     QPoint m_pressPos;
+    QPersistentModelIndex m_dropTarget;
     bool m_pressValid = false;
+    bool m_dropActive = false;
 };

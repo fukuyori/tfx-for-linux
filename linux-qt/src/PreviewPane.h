@@ -23,7 +23,8 @@ public slots:
 
 private:
     QString metadataText(const QFileInfo &info) const;
-    QString renderHtmlForTextFile(const QString &path, const QString &content) const;
+    QString renderHtmlForTextFile(const QString &path, const QString &content);
+    QString renderMarkdown(const QString &path, const QString &content);
     QString csvToHtmlTable(const QString &content, QChar delimiter) const;
     QString escapeHtml(const QString &text) const;
     bool showImage(const QString &path);
@@ -40,6 +41,7 @@ private:
     QToolButton *m_sourceToggle;
     QToolButton *m_openExternal;
     QString m_currentImagePath;
+    QString m_externalPreviewUrl;
     bool m_renderAvailable = false;
     bool m_prefersRendered = true;
 };

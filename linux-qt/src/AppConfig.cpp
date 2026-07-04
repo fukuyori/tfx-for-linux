@@ -211,8 +211,12 @@ QString AppConfig::defaultConfigText()
         "# preview = \"restore\"\n"
         "# terminal = \"restore\"\n"
         "# folderTree = \"restore\"\n"
+        "# geometry = \"1280x780+80+40\"\n"
         "# rightFolder = \"~/Downloads\"\n"
         "# rightFolders = [\"~/Downloads\", \"~/Documents\"]\n"
+        "\n"
+        "# [naming]\n"
+        "# placeholderLanguage = \"auto\"  # auto, en, or ja\n"
         "\n"
         "# [opacity]\n"
         "# background = 0.40     # ウィンドウ背景の不透明度 (0.0=透明, 1.0=不透明)\n"
@@ -404,7 +408,7 @@ void AppConfig::applyValue(const QString &section, const QString &key, const QSt
 
     if (section == "startup") {
         bool ok = false;
-        if (key == "layout" || key == "preview" || key == "terminal" || key == "folderTree" || key == "rightFolder") {
+        if (key == "layout" || key == "preview" || key == "terminal" || key == "folderTree" || key == "geometry" || key == "rightFolder") {
             const QString text = unquote(value, &ok);
             if (!ok) {
                 addWarning(lineNumber, "Invalid startup value");
@@ -414,6 +418,7 @@ void AppConfig::applyValue(const QString &section, const QString &key, const QSt
             else if (key == "preview" && (text == "show" || text == "hide" || text == "restore")) startup.preview = text;
             else if (key == "terminal" && (text == "show" || text == "hide" || text == "restore")) startup.terminal = text;
             else if (key == "folderTree" && (text == "show" || text == "hide" || text == "restore")) startup.folderTree = text;
+            else if (key == "geometry") startup.geometry = text;
             else if (key == "rightFolder") startup.rightFolder = expandPath(text);
             return;
         }
@@ -433,6 +438,25 @@ void AppConfig::applyValue(const QString &section, const QString &key, const QSt
             shortcuts.insert(key, normalizedShortcut(text));
         } else {
             addWarning(lineNumber, "Invalid shortcut value");
+        }
+        return;
+    }
+
+    if (section == "naming") {
+        bool ok = false;
+        const QString text = unquote(value, &ok);
+        if (!ok) {
+            addWarning(lineNumber, "Invalid naming value");
+            return;
+        }
+        if (key == "placeholderLanguage") {
+            if (text == "auto" || text == "en" || text == "ja") {
+                naming.placeholderLanguage = text;
+            } else {
+                addWarning(lineNumber, "Invalid placeholderLanguage value");
+            }
+        } else {
+            addWarning(lineNumber, QString("Unknown naming key: %1").arg(key));
         }
         return;
     }

@@ -3,6 +3,7 @@
 #include "platform/Platform.h"
 
 #include <QDateTime>
+#include <QDesktopServices>
 #include <QFile>
 #include <QFileInfo>
 #include <QImageReader>
@@ -13,9 +14,11 @@
 #include <QPixmap>
 #include <QRegularExpression>
 #include <QTemporaryDir>
+#include <QTextDocument>
 #include <QTextDocumentFragment>
 #include <QTextStream>
 #include <QToolButton>
+#include <QUrl>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 
@@ -72,6 +75,33 @@ bool hasTextPreviewSuffix(const QString &path)
         "json", "xml", "js", "ts", "css",
         "csv", "tsv", "txt", "log", "ini", "toml", "yaml", "yml"
     }).contains(suffix);
+}
+
+QString imageDataUrl(const QString &path)
+{
+    QImageReader reader(path);
+    if (!reader.canRead()) {
+        return {};
+    }
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        return {};
+    }
+    QMimeDatabase database;
+    const QString mime = database.mimeTypeForFile(path).name();
+    return QString("data:%1;base64,%2")
+        .arg(mime, QString::fromLatin1(file.readAll().toBase64()));
+}
+
+QString cleanedMarkdownUrl(QString url)
+{
+    url = url.trimmed();
+    if ((url.startsWith('<') && url.endsWith('>'))
+        || (url.startsWith('"') && url.endsWith('"'))
+        || (url.startsWith('\'') && url.endsWith('\''))) {
+        url = url.mid(1, url.size() - 2);
+    }
+    return url;
 }
 }
 
@@ -137,6 +167,7 @@ void PreviewPane::previewPath(const QString &path)
 {
     const QFileInfo info(path);
     m_currentImagePath.clear();
+    m_externalPreviewUrl.clear();
     m_openExternal->setVisible(false);
     m_title->setVisible(true);
     if (!info.exists()) {
@@ -168,6 +199,7 @@ void PreviewPane::previewPath(const QString &path)
 void PreviewPane::previewSelection(const QStringList &paths)
 {
     m_currentImagePath.clear();
+    m_externalPreviewUrl.clear();
     m_openExternal->setVisible(false);
     m_title->setVisible(true);
     setRenderAvailable(false);
@@ -208,12 +240,11 @@ QString PreviewPane::metadataText(const QFileInfo &info) const
         .arg(info.absoluteFilePath());
 }
 
-QString PreviewPane::renderHtmlForTextFile(const QString &path, const QString &content) const
+QString PreviewPane::renderHtmlForTextFile(const QString &path, const QString &content)
 {
     const QString suffix = QFileInfo(path).suffix().toLower();
     if (suffix == "md" || suffix == "markdown" || suffix == "mdown" || suffix == "mkd") {
-        return QString("<body style='background:#151a1e;color:#d9e1e8;font-family:sans-serif;line-height:1.5;'>%1</body>")
-            .arg(QTextDocumentFragment::fromMarkdown(content).toHtml());
+        return renderMarkdown(path, content);
     }
     if (suffix == "html" || suffix == "htm") {
         return content;
@@ -233,6 +264,53 @@ QString PreviewPane::renderHtmlForTextFile(const QString &path, const QString &c
         return csvToHtmlTable(content, '\t');
     }
     return {};
+}
+
+QString PreviewPane::renderMarkdown(const QString &path, const QString &content)
+{
+    QString markdown = content;
+    const QDir baseDir(QFileInfo(path).absolutePath());
+    QRegularExpression imagePattern("!\\[([^\\]]*)\\]\\(([^\\)]*)\\)");
+    QRegularExpressionMatchIterator iterator = imagePattern.globalMatch(content);
+    QList<QPair<QString, QString>> replacements;
+
+    while (iterator.hasNext()) {
+        const QRegularExpressionMatch match = iterator.next();
+        const QString rawTarget = match.captured(2);
+        QString target = cleanedMarkdownUrl(rawTarget);
+        const int titleStart = target.indexOf(QRegularExpression("\\s+['\"]"));
+        if (titleStart > 0) {
+            target = target.left(titleStart).trimmed();
+        }
+        const QUrl url(target);
+        if (url.scheme() == "http" || url.scheme() == "https") {
+            if (m_externalPreviewUrl.isEmpty()) {
+                m_externalPreviewUrl = target;
+            }
+            continue;
+        }
+        if (!url.scheme().isEmpty() && url.scheme() != "file") {
+            continue;
+        }
+
+        const QString localPath = url.isLocalFile()
+            ? url.toLocalFile()
+            : baseDir.filePath(QUrl::fromPercentEncoding(target.toUtf8()));
+        const QString dataUrl = imageDataUrl(localPath);
+        if (!dataUrl.isEmpty()) {
+            replacements.prepend({match.captured(0), QString("![%1](%2)").arg(match.captured(1), dataUrl)});
+        }
+    }
+
+    for (const auto &replacement : replacements) {
+        markdown.replace(replacement.first, replacement.second);
+    }
+
+    const QString body = QTextDocumentFragment::fromMarkdown(
+        markdown,
+        QTextDocument::MarkdownDialectGitHub).toHtml();
+    return QString("<body style='background:#151a1e;color:#d9e1e8;font-family:sans-serif;line-height:1.5;'>%1</body>")
+        .arg(body);
 }
 
 QString PreviewPane::csvToHtmlTable(const QString &content, QChar delimiter) const
@@ -343,6 +421,7 @@ bool PreviewPane::showText(const QString &path)
     if (!renderedHtml.isEmpty()) {
         m_rendered->document()->setBaseUrl(QUrl::fromLocalFile(QFileInfo(path).absolutePath() + "/"));
         m_rendered->setHtml(renderedHtml);
+        m_openExternal->setVisible(!m_externalPreviewUrl.isEmpty());
     } else {
         m_rendered->clear();
     }
@@ -386,6 +465,10 @@ void PreviewPane::toggleSourceRendered()
 
 void PreviewPane::openCurrentPreviewExternally()
 {
+    if (!m_externalPreviewUrl.isEmpty()) {
+        QDesktopServices::openUrl(QUrl(m_externalPreviewUrl));
+        return;
+    }
     if (m_currentImagePath.isEmpty()) {
         return;
     }

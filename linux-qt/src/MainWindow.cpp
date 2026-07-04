@@ -26,6 +26,7 @@
 #include <QPolygonF>
 #include <QPixmap>
 #include <QShortcut>
+#include <QRegularExpression>
 #include <QSettings>
 #include <QSignalBlocker>
 #include <QSizePolicy>
@@ -42,6 +43,37 @@
 #include <functional>
 
 namespace {
+struct ParsedGeometry
+{
+    QSize size;
+    QPoint position;
+    bool hasPosition = false;
+};
+
+bool parseWindowGeometry(const QString &text, ParsedGeometry *geometry)
+{
+    static const QRegularExpression pattern(R"(^\s*(\d+)x(\d+)([+-]\d+)?([+-]\d+)?\s*$)");
+    const QRegularExpressionMatch match = pattern.match(text);
+    if (!match.hasMatch()) {
+        return false;
+    }
+
+    bool widthOk = false;
+    bool heightOk = false;
+    const int width = match.captured(1).toInt(&widthOk);
+    const int height = match.captured(2).toInt(&heightOk);
+    if (!widthOk || !heightOk || width < 400 || height < 300) {
+        return false;
+    }
+
+    geometry->size = QSize(width, height);
+    if (!match.captured(3).isEmpty() && !match.captured(4).isEmpty()) {
+        geometry->position = QPoint(match.captured(3).toInt(), match.captured(4).toInt());
+        geometry->hasPosition = true;
+    }
+    return true;
+}
+
 QAction *addMenuAction(QMenu *menu,
                        const QString &text,
                        QObject *receiver,
@@ -255,7 +287,7 @@ private:
 };
 }
 
-MainWindow::MainWindow(const QString &initialPath, QWidget *parent)
+MainWindow::MainWindow(const QString &initialPath, const QString &geometryOverride, QWidget *parent)
     : QMainWindow(parent),
       m_treeModel(new QFileSystemModel(this)),
       m_treeView(new QTreeView(this)),
@@ -273,7 +305,8 @@ MainWindow::MainWindow(const QString &initialPath, QWidget *parent)
       m_terminalPane(new TerminalPane(this)),
       m_commandOutputPane(new CommandOutputPane(this)),
       m_config(AppConfig::loadOrCreate()),
-      m_initialPath(initialPath)
+      m_initialPath(initialPath),
+      m_geometryOverride(geometryOverride)
 {
     setWindowTitle("tfx");
     resize(1280, 780);
@@ -283,6 +316,8 @@ MainWindow::MainWindow(const QString &initialPath, QWidget *parent)
     }
     m_leftPane->setUserCommands(m_config.commands);
     m_rightPane->setUserCommands(m_config.commands);
+    m_leftPane->setPlaceholderLanguage(m_config.naming.placeholderLanguage);
+    m_rightPane->setPlaceholderLanguage(m_config.naming.placeholderLanguage);
     applyTerminalTheme();
     buildTopToolbar();
     buildFolderSidebar(initialPath);
@@ -361,6 +396,13 @@ MainWindow::MainWindow(const QString &initialPath, QWidget *parent)
         connect(pane, &FilePane::openTerminalHereRequested, this, [this](const QString &path) {
             m_terminalPane->openAt(path);
             setTerminalVisible(true);
+        });
+        connect(pane, &FilePane::fileOperationPathsChanged, this, [this](const QStringList &directories) {
+            for (FilePane *candidate : {m_leftPane, m_rightPane}) {
+                if (directories.contains(candidate->currentPath())) {
+                    candidate->reload();
+                }
+            }
         });
         connect(pane, &FilePane::commandOutputReady, this,
                 [this](const QString &name,
@@ -1099,9 +1141,25 @@ void MainWindow::restoreSettings()
         sidebarVisible = false;
     }
 
-    const QByteArray geometry = settings.value("MainWindow/geometry").toByteArray();
-    if (!geometry.isEmpty()) {
-        restoreGeometry(geometry);
+    const QString requestedGeometry = !m_geometryOverride.isEmpty()
+        ? m_geometryOverride
+        : m_config.startup.geometry;
+    if (!requestedGeometry.isEmpty()) {
+        ParsedGeometry geometry;
+        if (parseWindowGeometry(requestedGeometry, &geometry)) {
+            if (geometry.hasPosition) {
+                setGeometry(QRect(geometry.position, geometry.size));
+            } else {
+                resize(geometry.size);
+            }
+        } else {
+            statusBar()->showMessage(UiText::t("Invalid geometry: %1", "無効なジオメトリ: %1").arg(requestedGeometry), 6000);
+        }
+    } else {
+        const QByteArray geometry = settings.value("MainWindow/geometry").toByteArray();
+        if (!geometry.isEmpty()) {
+            restoreGeometry(geometry);
+        }
     }
 
     // Restore the saved dock layout, then apply per-pane visibility on top.

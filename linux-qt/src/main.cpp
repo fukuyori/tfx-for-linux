@@ -10,10 +10,22 @@ int main(int argc, char *argv[])
     QApplication::setOrganizationName("fukuyori");
 
     QString initialPath = QDir::currentPath();
+    QString geometryOverride;
     const QStringList args = app.arguments();
     for (int i = 1; i < args.size(); ++i) {
-        if (!args.at(i).startsWith('-')) {
-            QFileInfo info(args.at(i));
+        const QString arg = args.at(i);
+        if (arg == "-g" || arg == "--geometry") {
+            if (i + 1 < args.size()) {
+                geometryOverride = args.at(++i);
+            }
+            continue;
+        }
+        if (arg.startsWith("--geometry=")) {
+            geometryOverride = arg.mid(QString("--geometry=").size());
+            continue;
+        }
+        if (!arg.startsWith('-')) {
+            QFileInfo info(arg);
             if (info.exists() && info.isDir()) {
                 initialPath = info.absoluteFilePath();
                 break;
@@ -21,7 +33,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    MainWindow window(initialPath);
+    MainWindow window(initialPath, geometryOverride);
     window.show();
 
     return app.exec();

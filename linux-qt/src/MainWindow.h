@@ -22,7 +22,9 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 
 public:
-    explicit MainWindow(const QString &initialPath, QWidget *parent = nullptr);
+    explicit MainWindow(const QString &initialPath,
+                        const QString &geometryOverride = QString(),
+                        QWidget *parent = nullptr);
 
 private:
     void closeEvent(QCloseEvent *event) override;
@@ -83,6 +85,7 @@ private:
     QDockWidget *m_dockCommandOutput = nullptr;
     AppConfig m_config;
     QString m_initialPath;
+    QString m_geometryOverride;
     bool m_showHiddenFiles = false;
     bool m_isRestoringSettings = true;
 };

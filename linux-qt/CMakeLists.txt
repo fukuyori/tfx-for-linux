@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(tfx-for-linux VERSION 0.6.1 LANGUAGES CXX)
+project(tfx-for-linux VERSION 0.6.2 LANGUAGES CXX)
 
 include(GNUInstallDirs)
 include(CTest)
@@ -69,6 +69,13 @@ qt_add_executable(tfx
     src/FilePaneState.cpp
     src/FilePaneTabs.cpp
     src/FilePaneUi.cpp
+    src/MainWindowDock.cpp
+    src/MainWindowFileOps.cpp
+    src/MainWindowMenus.cpp
+    src/MainWindowSettings.cpp
+    src/MainWindowSidebar.cpp
+    src/MainWindowSidebar.h
+    src/MainWindowTheme.cpp
     src/MainWindow.cpp
     src/MainWindow.h
     src/PreviewPane.cpp

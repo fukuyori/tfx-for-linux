@@ -2,6 +2,17 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.6.2] - 2026-07-04
+
+Maintenance release for MainWindow refactoring.
+
+### Changed
+
+- Split `MainWindow` responsibilities into focused translation units for file
+  operations, menus/toolbars, settings/search history, sidebar/pinned folders,
+  theme application, and dock/visibility handling. `MainWindow.cpp` now keeps
+  the main construction flow plus active-pane focus handling.
+
 ## [0.6.1] - 2026-07-04
 
 Maintenance release for FilePane refactoring and documentation cleanup.

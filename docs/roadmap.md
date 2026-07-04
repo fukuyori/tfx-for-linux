@@ -1,6 +1,6 @@
 # tfx for Linux Roadmap
 
-Current version: **0.6.2**
+Current version: **0.6.3**
 
 This roadmap tracks the practical development steps for the Linux Qt port as it
 moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
@@ -101,3 +101,98 @@ moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
 - FilePane refactor: split UI setup, signal wiring, navigation, state,
   actions, file operations, clipboard/drop, archives, columns, tabs, search,
   and commands into focused translation units. (done)
+
+## 0.6.3 — Phase 8: File safety (from tfx macOS 0.9.2) (done)
+
+Data-loss prevention in the copy/move/paste pipeline. Every item ships with
+Qt Test coverage in the file-operation worker suite.
+
+- Copy symbolic links as links instead of materializing their targets, and do
+  not recurse into directories reached through a link
+  (`FileOperationWorker::copyPath`, `copyRecursively`). Preserve
+  relative/absolute link text as-is; removing a moved link never touches the
+  link target's contents. (done)
+- Include hidden and system entries when copying directory trees; dotfiles
+  were silently skipped before. (done)
+- Atomic replace on overwrite: the copy is written to a hidden temporary name
+  in the destination directory and swapped in with `rename(2)` on success, so
+  a mid-copy failure never destroys the existing file. Directory replacement
+  moves the old tree aside first and rolls it back if the swap fails. The UI
+  no longer deletes the destination before the operation starts. (done)
+- Canonicalize source and destination in the shared
+  `transferWouldNestInsideSource` helper so the self/descendant copy guard
+  cannot be bypassed through a symlinked path. (done)
+- Treat write/flush/close errors as copy failures instead of reporting
+  success. (done)
+- Regression tests: link-preserving copy (file, directory, and broken links),
+  replace failure keeps the original, symlinked nesting detected, write error
+  fails the batch, hidden files copied, moved directory link keeps target
+  contents. (done)
+
+## 0.6.4 — Phase 9: Stability and process hygiene (from tfx macOS 0.9.3)
+
+External-process and long-run robustness so a hung tool or huge tree cannot
+wedge the UI.
+
+- Git watchdog: give every `git status` invocation a hard timeout
+  (30 s, terminate then kill), drain stderr concurrently, and scope the query
+  to the current directory with a pathspec in addition to the existing
+  debounce; throttle refreshes to at most one per second per pane.
+- Bound subfolder search with an explicit depth limit (128) as a second guard
+  beside the existing no-follow-symlinks iterator flags, and surface "search
+  truncated" in the status line when the bound is hit.
+- Audit every `QProcess` site (`zip`, `unzip`, git, user commands) for output
+  handling that could stall on full pipe buffers; read incrementally instead
+  of relying on `waitForFinished` + `readAll`.
+- Terminal shutdown: confirm QTermWidget teardown reaps the shell (no zombie
+  processes after closing the pane or the window); add explicit
+  SIGTERM-then-SIGKILL escalation if it does not.
+- Move pre-copy byte tallies and free-space checks for progress reporting off
+  the UI thread if any remain there.
+- Crash audit: replace unchecked pointer/optional assumptions on the
+  preview/shortcut/QuickLook-equivalent paths with graceful degradation.
+
+## 0.6.5 — Phase 10: Security hardening, round 2
+
+Follow-up to the Phase 7 hardening, focused on untrusted file content and
+filenames reaching shells or parsers.
+
+- Preview resource limits: stream CSV/TSV parsing with hard caps
+  (1,000 rows × 100 columns) and RFC 4180 quote handling instead of the
+  current 200-line `split()`; replace the flat 256 KB text read with a shared
+  size-capped loader (staged read, explicit cap, "truncated" indicator) used
+  by text, Markdown, JSON, and CSV previews.
+- Argument-injection audit for external commands: pass `--` before
+  user-controlled paths for `zip`, `unzip`, `git`, and trash/open helpers so
+  filenames beginning with `-` cannot become options.
+- ZIP hardening follow-up: reject symlink entries on extraction (zip-slip via
+  link targets), cap total extracted size/entry count, and extract into a
+  temporary directory before moving into place.
+- User-command token expansion: re-audit `{path}`/`{paths}` quoting so
+  filenames containing quotes, `$`, backticks, or newlines cannot break out of
+  the generated command line; document the guarantee in the commands docs.
+- Clipboard materialization: sanitize generated file names (strip path
+  separators and control characters) and create files with `0600`-style
+  conservative permissions before content is written.
+- Config robustness: fuzz-style tests for `config.toml` parsing (oversized
+  values, invalid UTF-8, deeply nested arrays) so a broken config degrades to
+  defaults with a warning instead of crashing at startup.
+
+## 0.6.6 — Phase 11: Performance (from tfx macOS 0.9.3 / 0.9.4)
+
+Measured before/after on a large directory (100k entries) and a deep search
+tree; no behavior changes.
+
+- Cache file icons per extension (single stat/lookup per extension, not per
+  row) for the search-results and ZIP views that currently call
+  `QFileIconProvider` per item.
+- Insert search-result batches incrementally instead of rebuilding lookups per
+  batch; match names before constructing full row items.
+- Evaluate seeding folder-tree children from completed pane listings to avoid
+  double enumeration; skip if the independent `QFileSystemModel` tree makes
+  the win negligible, and record the decision here.
+- Case-only rename support (`foo` → `Foo`) via a two-step rename on
+  case-insensitive mounts (exFAT/NTFS/ciopfs); no-op on case-sensitive
+  filesystems.
+- Profile directory load and scroll after the above and note remaining
+  hotspots as candidates for the next phase.

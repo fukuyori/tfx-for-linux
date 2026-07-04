@@ -5,18 +5,25 @@
 #include <QFile>
 #include <QFileInfo>
 
+#include <climits>
+#include <unistd.h>
+
 namespace tfx::core {
 
 bool copyRecursively(const QString &source, const QString &destination)
 {
     const QFileInfo sourceInfo(source);
+    if (sourceInfo.isSymLink()) {
+        return copySymbolicLink(source, destination);
+    }
     if (sourceInfo.isDir()) {
         QDir destinationDir(destination);
         if (!destinationDir.exists() && !QDir().mkpath(destination)) {
             return false;
         }
 
-        QDirIterator iterator(source, QDir::NoDotAndDotDot | QDir::AllEntries);
+        QDirIterator iterator(source,
+                              QDir::NoDotAndDotDot | QDir::AllEntries | QDir::Hidden | QDir::System);
         while (iterator.hasNext()) {
             iterator.next();
             const QString childSource = iterator.filePath();
@@ -29,6 +36,36 @@ bool copyRecursively(const QString &source, const QString &destination)
     }
 
     return QFile::copy(source, destination);
+}
+
+bool copySymbolicLink(const QString &source, const QString &destination)
+{
+    const QByteArray sourceBytes = QFile::encodeName(source);
+    QByteArray linkText(PATH_MAX, '\0');
+    const ssize_t length = ::readlink(sourceBytes.constData(), linkText.data(), linkText.size());
+    if (length < 0 || length >= linkText.size()) {
+        return false;
+    }
+    linkText.truncate(static_cast<int>(length));
+    return ::symlink(linkText.constData(), QFile::encodeName(destination).constData()) == 0;
+}
+
+bool transferWouldNestInsideSource(const QString &sourcePath, const QString &targetDirectory)
+{
+    const QFileInfo sourceInfo(sourcePath);
+    if (sourceInfo.isSymLink() || !sourceInfo.isDir()) {
+        return false;
+    }
+    QString source = sourceInfo.canonicalFilePath();
+    if (source.isEmpty()) {
+        source = sourceInfo.absoluteFilePath();
+    }
+    const QFileInfo targetInfo(targetDirectory);
+    QString target = targetInfo.canonicalFilePath();
+    if (target.isEmpty()) {
+        target = targetInfo.absoluteFilePath();
+    }
+    return (target + QLatin1Char('/')).startsWith(source + QLatin1Char('/'));
 }
 
 QString uniquePathInDirectory(const QString &directory, const QString &baseName)

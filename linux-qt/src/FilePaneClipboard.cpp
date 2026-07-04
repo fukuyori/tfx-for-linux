@@ -26,13 +26,10 @@ enum class ConflictChoice {
     Cancel,
 };
 
-bool removeExistingPath(const QString &path)
+bool pathOccupied(const QString &path)
 {
     const QFileInfo info(path);
-    if (!info.exists()) {
-        return true;
-    }
-    return info.isDir() ? QDir(path).removeRecursively() : QFile::remove(path);
+    return info.isSymLink() || info.exists();
 }
 
 ConflictChoice askConflict(QWidget *parent, const QString &fileName)
@@ -161,14 +158,13 @@ void FilePane::performDrop(const QList<QUrl> &urls, Qt::DropAction action, const
             continue;
         }
         const QFileInfo sourceInfo(source);
-        if (!sourceInfo.exists()) {
+        if (!sourceInfo.isSymLink() && !sourceInfo.exists()) {
             continue;
         }
         if (move && sourceInfo.absolutePath() == targetCanonical) {
             continue;
         }
-        if (sourceInfo.isDir()
-            && (targetCanonical + "/").startsWith(sourceInfo.absoluteFilePath() + "/")) {
+        if (transferWouldNestInsideSource(source, targetDir)) {
             emit statusMessageRequested(UiText::t("Cannot transfer a folder into itself.", "フォルダを自身の中へは移動/コピーできません。"));
             continue;
         }
@@ -177,9 +173,10 @@ void FilePane::performDrop(const QList<QUrl> &urls, Qt::DropAction action, const
         if (samePath && move) {
             continue;
         }
+        bool overwrite = false;
         if (samePath && !move) {
             destination = uniquePathInDirectory(targetDir, sourceInfo.fileName());
-        } else if (QFileInfo::exists(destination)) {
+        } else if (pathOccupied(destination)) {
             const ConflictChoice choice = askConflict(this, sourceInfo.fileName());
             if (choice == ConflictChoice::Cancel) {
                 break;
@@ -189,13 +186,12 @@ void FilePane::performDrop(const QList<QUrl> &urls, Qt::DropAction action, const
             }
             if (choice == ConflictChoice::Rename) {
                 destination = uniquePathInDirectory(targetDir, sourceInfo.fileName());
-            } else if (!removeExistingPath(destination)) {
-                emit statusMessageRequested(UiText::t("Could not overwrite item: %1", "項目を上書きできませんでした: %1").arg(sourceInfo.fileName()));
-                continue;
+            } else {
+                overwrite = true;
             }
         }
 
-        requests.append({source, destination, move});
+        requests.append({source, destination, move, overwrite});
     }
 
     if (!requests.isEmpty()) {
@@ -222,11 +218,10 @@ void FilePane::pasteIntoCurrentDirectory()
             }
             sawLocalUrl = true;
             const QFileInfo sourceInfo(source);
-            if (!sourceInfo.exists()) {
+            if (!sourceInfo.isSymLink() && !sourceInfo.exists()) {
                 continue;
             }
-            if (sourceInfo.isDir()
-                && (QFileInfo(m_currentPath).absoluteFilePath() + "/").startsWith(sourceInfo.absoluteFilePath() + "/")) {
+            if (transferWouldNestInsideSource(source, m_currentPath)) {
                 emit statusMessageRequested(UiText::t("Cannot transfer a folder into itself.", "フォルダを自身の中へは移動/コピーできません。"));
                 continue;
             }
@@ -236,9 +231,10 @@ void FilePane::pasteIntoCurrentDirectory()
             if (samePath && move) {
                 continue;
             }
+            bool overwrite = false;
             if (samePath && !move) {
                 destination = uniquePathInDirectory(m_currentPath, sourceInfo.fileName());
-            } else if (QFileInfo::exists(destination)) {
+            } else if (pathOccupied(destination)) {
                 const ConflictChoice choice = askConflict(this, sourceInfo.fileName());
                 if (choice == ConflictChoice::Cancel) {
                     break;
@@ -248,13 +244,12 @@ void FilePane::pasteIntoCurrentDirectory()
                 }
                 if (choice == ConflictChoice::Rename) {
                     destination = uniquePathInDirectory(m_currentPath, sourceInfo.fileName());
-                } else if (!removeExistingPath(destination)) {
-                    emit statusMessageRequested(UiText::t("Could not overwrite item: %1", "項目を上書きできませんでした: %1").arg(sourceInfo.fileName()));
-                    continue;
+                } else {
+                    overwrite = true;
                 }
             }
 
-            requests.append({source, destination, move});
+            requests.append({source, destination, move, overwrite});
         }
         if (!requests.isEmpty()) {
             emit fileOperationRequested(requests);

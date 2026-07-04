@@ -12,6 +12,9 @@ struct FileOperationRequest
     QString source;
     QString destination;
     bool move = false;
+    // Replace an existing destination atomically: the copy is written to a
+    // hidden temporary name and swapped in only after it fully succeeds.
+    bool overwrite = false;
 };
 
 class FileOperationWorker : public QObject
@@ -34,6 +37,7 @@ signals:
 
 private:
     int countEntries(const QString &path) const;
+    bool replaceDestination(const FileOperationRequest &request, int requestEntries, QString *errorText);
     bool copyPath(const QString &source, const QString &destination, QString *errorText);
     bool copyFile(const QString &source, const QString &destination, QString *errorText);
     bool copyDirectory(const QString &source, const QString &destination, QString *errorText);

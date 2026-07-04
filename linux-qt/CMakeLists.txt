@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(tfx-for-linux VERSION 0.6.2 LANGUAGES CXX)
+project(tfx-for-linux VERSION 0.6.3 LANGUAGES CXX)
 
 include(GNUInstallDirs)
 include(CTest)
@@ -132,6 +132,8 @@ if(BUILD_TESTING AND Qt6Test_FOUND)
         tests/FileOperationWorkerTest.cpp
         src/core/FileOperationWorker.cpp
         src/core/FileOperationWorker.h
+        src/core/FileOperations.cpp
+        src/core/FileOperations.h
     )
     target_include_directories(tfx_file_operation_worker_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(tfx_file_operation_worker_test PRIVATE Qt6::Core Qt6::Test)

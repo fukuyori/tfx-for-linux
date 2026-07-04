@@ -1,12 +1,24 @@
 #include "core/FileOperationWorker.h"
+#include "core/FileOperations.h"
 
 #include <QDir>
 #include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
 
+#include <cstdio>
+
 namespace {
 constexpr qint64 CopyChunkSize = 1024 * 1024;
+constexpr QDir::Filters CopyEntryFilters =
+    QDir::NoDotAndDotDot | QDir::AllEntries | QDir::Hidden | QDir::System;
+
+bool renamePath(const QString &from, const QString &to)
+{
+    // rename(2) instead of QFile::rename: replacing an existing destination
+    // atomically is the point here, and QFile::rename refuses to overwrite.
+    return ::rename(QFile::encodeName(from).constData(), QFile::encodeName(to).constData()) == 0;
+}
 
 void addUnique(QStringList *items, const QString &item)
 {
@@ -47,6 +59,25 @@ void FileOperationWorker::run()
         addUnique(&m_changedDirectories, destinationInfo.absolutePath());
 
         const int requestEntries = qMax(1, countEntries(request.source));
+
+        const QFileInfo occupant(request.destination);
+        if (request.overwrite && (occupant.isSymLink() || occupant.exists())) {
+            QString errorText;
+            if (!replaceDestination(request, requestEntries, &errorText)) {
+                if (isCanceled()) {
+                    cleanupCreatedRoots();
+                    emit canceled(changedDirectories());
+                    return;
+                }
+                const QString message = errorText.isEmpty()
+                    ? tr("Could not replace item: %1").arg(occupant.fileName())
+                    : errorText;
+                emit failed(message, changedDirectories());
+                return;
+            }
+            continue;
+        }
+
         if (request.move && QFile::rename(request.source, request.destination)) {
             m_completed += requestEntries;
             emit progress(m_completed, m_total, request.destination);
@@ -101,6 +132,9 @@ void FileOperationWorker::cancel()
 int FileOperationWorker::countEntries(const QString &path) const
 {
     const QFileInfo info(path);
+    if (info.isSymLink()) {
+        return 1;
+    }
     if (!info.exists()) {
         return 0;
     }
@@ -109,7 +143,7 @@ int FileOperationWorker::countEntries(const QString &path) const
     }
 
     int count = 1;
-    QDirIterator iterator(path, QDir::NoDotAndDotDot | QDir::AllEntries, QDirIterator::Subdirectories);
+    QDirIterator iterator(path, CopyEntryFilters, QDirIterator::Subdirectories);
     while (iterator.hasNext()) {
         iterator.next();
         ++count;
@@ -117,11 +151,107 @@ int FileOperationWorker::countEntries(const QString &path) const
     return count;
 }
 
+bool FileOperationWorker::replaceDestination(const FileOperationRequest &request, int requestEntries, QString *errorText)
+{
+    const QFileInfo sourceInfo(request.source);
+    const QFileInfo destinationInfo(request.destination);
+    const bool sourceIsRealDir = !sourceInfo.isSymLink() && sourceInfo.isDir();
+    const bool destinationIsRealDir = !destinationInfo.isSymLink() && destinationInfo.isDir();
+
+    // Same-filesystem move over a non-directory destination: rename(2)
+    // replaces the destination atomically in one step.
+    if (request.move && !sourceIsRealDir && !destinationIsRealDir
+        && renamePath(request.source, request.destination)) {
+        m_completed += requestEntries;
+        emit progress(m_completed, m_total, request.destination);
+        return true;
+    }
+
+    const QString parent = destinationInfo.absolutePath();
+    const QString name = destinationInfo.fileName();
+    const QString temp = tfx::core::uniquePathInDirectory(
+        parent, QStringLiteral(".%1.tfx-replace").arg(name));
+    m_createdRoots.append(temp);
+    if (!copyPath(request.source, temp, errorText)) {
+        removePath(temp);
+        m_createdRoots.removeAll(temp);
+        return false;
+    }
+
+    const QFileInfo tempInfo(temp);
+    const bool tempIsRealDir = !tempInfo.isSymLink() && tempInfo.isDir();
+    bool swapped = false;
+    if (!tempIsRealDir && !destinationIsRealDir) {
+        swapped = renamePath(temp, request.destination);
+    } else {
+        // rename(2) cannot replace a non-empty directory, so move the old
+        // destination aside first and roll it back if the swap fails.
+        const QString aside = tfx::core::uniquePathInDirectory(
+            parent, QStringLiteral(".%1.tfx-old").arg(name));
+        if (renamePath(request.destination, aside)) {
+            if (renamePath(temp, request.destination)) {
+                swapped = true;
+                removePath(aside);
+            } else {
+                renamePath(aside, request.destination);
+            }
+        }
+    }
+    if (!swapped) {
+        removePath(temp);
+        m_createdRoots.removeAll(temp);
+        if (errorText) {
+            *errorText = tr("Could not replace item: %1").arg(name);
+        }
+        return false;
+    }
+    m_createdRoots.removeAll(temp);
+
+    if (request.move && !removePath(request.source)) {
+        if (errorText) {
+            *errorText = tr("Copied but could not remove source: %1").arg(sourceInfo.fileName());
+        }
+        return false;
+    }
+    return true;
+}
+
 bool FileOperationWorker::copyPath(const QString &source, const QString &destination, QString *errorText)
 {
     const QFileInfo sourceInfo(source);
+    if (sourceInfo.isSymLink()) {
+        if (isCanceled()) {
+            return false;
+        }
+        if (!QDir().mkpath(QFileInfo(destination).absolutePath())) {
+            if (errorText) {
+                *errorText = tr("Could not create folder: %1").arg(QFileInfo(destination).absolutePath());
+            }
+            return false;
+        }
+        if (!tfx::core::copySymbolicLink(source, destination)) {
+            if (errorText) {
+                *errorText = tr("Could not copy link: %1").arg(source);
+            }
+            return false;
+        }
+        emitStep(destination);
+        return true;
+    }
     if (sourceInfo.isDir()) {
         return copyDirectory(source, destination, errorText);
+    }
+    if (!sourceInfo.exists()) {
+        if (errorText) {
+            *errorText = tr("Could not read item: %1").arg(source);
+        }
+        return false;
+    }
+    if (!sourceInfo.isFile()) {
+        // Sockets, FIFOs, and device nodes cannot be copied as content;
+        // count them as handled so progress stays consistent.
+        emitStep(source);
+        return true;
     }
     return copyFile(source, destination, errorText);
 }
@@ -177,6 +307,20 @@ bool FileOperationWorker::copyFile(const QString &source, const QString &destina
         }
     }
 
+    if (!output.flush()) {
+        if (errorText) {
+            *errorText = tr("Could not write item: %1").arg(destination);
+        }
+        return false;
+    }
+    output.close();
+    if (output.error() != QFileDevice::NoError) {
+        if (errorText) {
+            *errorText = tr("Could not write item: %1").arg(destination);
+        }
+        return false;
+    }
+
     QFile::setPermissions(destination, input.permissions());
     emitStep(destination);
     return true;
@@ -195,7 +339,7 @@ bool FileOperationWorker::copyDirectory(const QString &source, const QString &de
     }
     emitStep(destination);
 
-    QDirIterator iterator(source, QDir::NoDotAndDotDot | QDir::AllEntries);
+    QDirIterator iterator(source, CopyEntryFilters);
     while (iterator.hasNext()) {
         if (isCanceled()) {
             return false;
@@ -213,6 +357,11 @@ bool FileOperationWorker::copyDirectory(const QString &source, const QString &de
 bool FileOperationWorker::removePath(const QString &path)
 {
     const QFileInfo info(path);
+    if (info.isSymLink()) {
+        // Remove the link itself; QDir::removeRecursively on a link to a
+        // directory would delete the link target's contents.
+        return QFile::remove(path);
+    }
     if (!info.exists()) {
         return true;
     }

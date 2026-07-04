@@ -1,7 +1,7 @@
 # tfx for Linux
 
 **Terminal-inspired interface File eXplorer for Linux**  
-Version: **0.6.2**
+Version: **0.6.3**
 
 English | [Japanese](README.ja.md)
 
@@ -78,10 +78,10 @@ test for the Linux Qt target.
 - Window, dock layout, pane visibility, tab, and column setting restoration
 - Multi-tab file panes with close buttons, duplicate-tab suppression, tab
   context menu actions, and restored tab cleanup
-- File operations: open, open with (native chooser), rename, link, new file/folder, trash, background copy/cut/paste with progress/cancel, copy path
+- File operations: open, open with (native chooser), rename, link, new file/folder, trash, background copy/cut/paste with progress/cancel, copy path; symbolic links are copied as links with their link text preserved
 - Drag-and-drop of files and folders between panes and to/from external file managers (drop onto a folder to move, or hold Ctrl to copy)
 - Drag-and-drop target highlighting and immediate refresh of affected panes
-- Conflict handling for paste/drop operations with overwrite, skip, and rename choices
+- Conflict handling for paste/drop operations with overwrite, skip, and rename choices; overwrite replaces the existing item atomically so a failed copy never destroys it
 - Clipboard-to-file paste for images, rich/plain text, URLs, CSV, and TSV, plus Paste as Plain Text
 - Recursive subfolder search: type a term and press Enter; results stream into a dedicated view and the search is cancelled when the pane changes folder
 - Search-result keyboard navigation, context menu actions, sortable result

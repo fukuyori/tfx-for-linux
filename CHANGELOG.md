@@ -2,6 +2,44 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.6.3] - 2026-07-04
+
+File-safety release for the copy/move/paste pipeline (from tfx macOS 0.9.2).
+
+### Added
+
+- Symbolic links are now copied as links, preserving their raw relative or
+  absolute link text, instead of materializing the link target. Directories
+  reached through a link are no longer recursed into, and moving a link
+  removes only the link itself, never the target's contents.
+- Overwrite ("Replace") during paste/drop is now atomic: the copy is written
+  to a hidden temporary name in the destination directory and swapped in with
+  `rename(2)` only after it fully succeeds, so a mid-copy failure keeps the
+  existing file intact. Replacing a directory moves the old tree aside first
+  and rolls it back if the swap fails. Same-filesystem moves over a file
+  replace it in a single atomic rename.
+- Qt Test coverage for link-preserving copies (file, directory, and broken
+  links), atomic replacement of files and directories, original preservation
+  when a replace fails, hidden-file copies, symlinked nesting detection, and
+  write-error propagation.
+
+### Changed
+
+- The self/descendant transfer guard now canonicalizes both sides through the
+  shared `transferWouldNestInsideSource` helper, so nesting a folder into
+  itself through a symlinked path is refused.
+- Directory copies now include hidden and system entries; dotfiles were
+  silently skipped before.
+- Name-conflict detection now also triggers when the destination is a broken
+  symbolic link.
+
+### Fixed
+
+- Write, flush, and close errors during a copy now fail the operation instead
+  of being reported as success.
+- Overwriting no longer deletes the destination up front on the UI thread;
+  the replacement happens on the worker after the new copy is complete.
+
 ## [0.6.2] - 2026-07-04
 
 Maintenance release for MainWindow refactoring.

@@ -9,7 +9,37 @@
 #include <QTemporaryDir>
 #include <QTextStream>
 
+#include <unistd.h>
+
 namespace {
+bool makeSymlink(const QString &linkText, const QString &linkPath)
+{
+    return ::symlink(QFile::encodeName(linkText).constData(),
+                     QFile::encodeName(linkPath).constData()) == 0;
+}
+
+QString rawLinkText(const QString &path)
+{
+    QByteArray buffer(4096, '\0');
+    const ssize_t length = ::readlink(QFile::encodeName(path).constData(), buffer.data(), buffer.size());
+    if (length < 0) {
+        return QString();
+    }
+    return QFile::decodeName(buffer.left(static_cast<int>(length)));
+}
+
+QStringList hiddenWorkFiles(const QString &directory)
+{
+    QStringList leftovers;
+    const QStringList entries = QDir(directory).entryList(QDir::AllEntries | QDir::Hidden | QDir::System | QDir::NoDotAndDotDot);
+    for (const QString &entry : entries) {
+        if (entry.contains(".tfx-replace") || entry.contains(".tfx-old")) {
+            leftovers.append(entry);
+        }
+    }
+    return leftovers;
+}
+
 bool writeTextFile(const QString &path, const QString &text)
 {
     QFile file(path);
@@ -41,6 +71,14 @@ private slots:
     void movesFilesWithCopyFallbackWhenRenameCannotCreateParent();
     void cancelsBeforeStarting();
     void cancelsDuringDirectoryCopyAndCleansDestination();
+    void copiesSymlinksAsLinks();
+    void movingDirectorySymlinkKeepsTargetContents();
+    void copiesHiddenFilesInDirectories();
+    void overwriteReplacesExistingFile();
+    void overwriteKeepsExistingFileWhenCopyFails();
+    void overwriteReplacesExistingDirectory();
+    void overwriteMoveReplacesFileAndRemovesSource();
+    void writeErrorFailsCopy();
 };
 
 void FileOperationWorkerTest::copiesDirectoryTrees()
@@ -170,6 +208,221 @@ void FileOperationWorkerTest::cancelsDuringDirectoryCopyAndCleansDestination()
     QVERIFY(QFileInfo::exists(QDir(sourceRoot).filePath("one.txt")));
     QVERIFY(QFileInfo::exists(QDir(sourceRoot).filePath("two.txt")));
     QVERIFY(!QFileInfo::exists(destinationRoot));
+}
+
+void FileOperationWorkerTest::copiesSymlinksAsLinks()
+{
+    QTemporaryDir temp;
+    QVERIFY(temp.isValid());
+
+    const QString sourceRoot = QDir(temp.path()).filePath("source");
+    const QString subDir = QDir(sourceRoot).filePath("sub");
+    const QString destinationRoot = QDir(temp.path()).filePath("destination");
+    QVERIFY(QDir().mkpath(subDir));
+    QVERIFY(writeTextFile(QDir(sourceRoot).filePath("data.txt"), "payload"));
+    QVERIFY(writeTextFile(QDir(subDir).filePath("inner.txt"), "inner"));
+    QVERIFY(makeSymlink("data.txt", QDir(sourceRoot).filePath("rel-link")));
+    QVERIFY(makeSymlink("sub", QDir(sourceRoot).filePath("dir-link")));
+    QVERIFY(makeSymlink("missing-target", QDir(sourceRoot).filePath("broken")));
+
+    FileOperationWorker worker({{sourceRoot, destinationRoot, false}});
+    QSignalSpy finishedSpy(&worker, &FileOperationWorker::finished);
+    QSignalSpy failedSpy(&worker, &FileOperationWorker::failed);
+    QSignalSpy preparedSpy(&worker, &FileOperationWorker::prepared);
+
+    worker.run();
+
+    QCOMPARE(failedSpy.count(), 0);
+    QCOMPARE(finishedSpy.count(), 1);
+    // root + data.txt + sub + inner.txt + rel-link + dir-link + broken
+    QCOMPARE(preparedSpy.first().at(0).toInt(), 7);
+
+    const QString relLink = QDir(destinationRoot).filePath("rel-link");
+    QVERIFY(QFileInfo(relLink).isSymLink());
+    QCOMPARE(rawLinkText(relLink), QString("data.txt"));
+
+    const QString dirLink = QDir(destinationRoot).filePath("dir-link");
+    QVERIFY(QFileInfo(dirLink).isSymLink());
+    QCOMPARE(rawLinkText(dirLink), QString("sub"));
+    // The link target's contents were not duplicated through the link.
+    QCOMPARE(readTextFile(QDir(destinationRoot).filePath("sub/inner.txt")), QString("inner"));
+
+    const QString broken = QDir(destinationRoot).filePath("broken");
+    QVERIFY(QFileInfo(broken).isSymLink());
+    QCOMPARE(rawLinkText(broken), QString("missing-target"));
+}
+
+void FileOperationWorkerTest::movingDirectorySymlinkKeepsTargetContents()
+{
+    QTemporaryDir temp;
+    QVERIFY(temp.isValid());
+
+    const QString targetDir = QDir(temp.path()).filePath("target");
+    QVERIFY(QDir().mkpath(targetDir));
+    QVERIFY(writeTextFile(QDir(targetDir).filePath("keep.txt"), "keep"));
+
+    const QString link = QDir(temp.path()).filePath("link");
+    QVERIFY(makeSymlink(targetDir, link));
+
+    // A destination with a missing parent forces the copy-then-remove-source
+    // fallback, which must delete only the link, never the link target.
+    const QString destination = QDir(temp.path()).filePath("new-parent/link");
+
+    FileOperationWorker worker({{link, destination, true}});
+    QSignalSpy finishedSpy(&worker, &FileOperationWorker::finished);
+    QSignalSpy failedSpy(&worker, &FileOperationWorker::failed);
+
+    worker.run();
+
+    QCOMPARE(failedSpy.count(), 0);
+    QCOMPARE(finishedSpy.count(), 1);
+    QVERIFY(QFileInfo(destination).isSymLink());
+    QVERIFY(!QFileInfo(link).isSymLink());
+    QCOMPARE(readTextFile(QDir(targetDir).filePath("keep.txt")), QString("keep"));
+}
+
+void FileOperationWorkerTest::copiesHiddenFilesInDirectories()
+{
+    QTemporaryDir temp;
+    QVERIFY(temp.isValid());
+
+    const QString sourceRoot = QDir(temp.path()).filePath("source");
+    const QString destinationRoot = QDir(temp.path()).filePath("destination");
+    QVERIFY(QDir().mkpath(sourceRoot));
+    QVERIFY(writeTextFile(QDir(sourceRoot).filePath(".hidden"), "dot"));
+
+    FileOperationWorker worker({{sourceRoot, destinationRoot, false}});
+    QSignalSpy finishedSpy(&worker, &FileOperationWorker::finished);
+
+    worker.run();
+
+    QCOMPARE(finishedSpy.count(), 1);
+    QCOMPARE(readTextFile(QDir(destinationRoot).filePath(".hidden")), QString("dot"));
+}
+
+void FileOperationWorkerTest::overwriteReplacesExistingFile()
+{
+    QTemporaryDir temp;
+    QVERIFY(temp.isValid());
+
+    const QString source = QDir(temp.path()).filePath("source.txt");
+    const QString destination = QDir(temp.path()).filePath("destination.txt");
+    QVERIFY(writeTextFile(source, "new"));
+    QVERIFY(writeTextFile(destination, "old"));
+
+    FileOperationWorker worker({{source, destination, false, true}});
+    QSignalSpy finishedSpy(&worker, &FileOperationWorker::finished);
+    QSignalSpy failedSpy(&worker, &FileOperationWorker::failed);
+
+    worker.run();
+
+    QCOMPARE(failedSpy.count(), 0);
+    QCOMPARE(finishedSpy.count(), 1);
+    QCOMPARE(readTextFile(destination), QString("new"));
+    QCOMPARE(readTextFile(source), QString("new"));
+    QVERIFY(hiddenWorkFiles(temp.path()).isEmpty());
+}
+
+void FileOperationWorkerTest::overwriteKeepsExistingFileWhenCopyFails()
+{
+    QTemporaryDir temp;
+    QVERIFY(temp.isValid());
+
+    const QString source = QDir(temp.path()).filePath("source.txt");
+    const QString destination = QDir(temp.path()).filePath("destination.txt");
+    QVERIFY(writeTextFile(source, "new"));
+    QVERIFY(writeTextFile(destination, "old"));
+    QVERIFY(QFile::setPermissions(source, QFileDevice::WriteOwner));
+    {
+        QFile probe(source);
+        if (probe.open(QIODevice::ReadOnly)) {
+            QSKIP("Source stays readable (running as root); cannot exercise the failure path.");
+        }
+    }
+
+    FileOperationWorker worker({{source, destination, false, true}});
+    QSignalSpy finishedSpy(&worker, &FileOperationWorker::finished);
+    QSignalSpy failedSpy(&worker, &FileOperationWorker::failed);
+
+    worker.run();
+
+    QCOMPARE(finishedSpy.count(), 0);
+    QCOMPARE(failedSpy.count(), 1);
+    QCOMPARE(readTextFile(destination), QString("old"));
+    QVERIFY(hiddenWorkFiles(temp.path()).isEmpty());
+}
+
+void FileOperationWorkerTest::overwriteReplacesExistingDirectory()
+{
+    QTemporaryDir temp;
+    QVERIFY(temp.isValid());
+
+    const QString sourceRoot = QDir(temp.path()).filePath("source");
+    const QString destinationRoot = QDir(temp.path()).filePath("destination");
+    QVERIFY(QDir().mkpath(sourceRoot));
+    QVERIFY(QDir().mkpath(destinationRoot));
+    QVERIFY(writeTextFile(QDir(sourceRoot).filePath("new.txt"), "new"));
+    QVERIFY(writeTextFile(QDir(destinationRoot).filePath("old.txt"), "old"));
+
+    FileOperationWorker worker({{sourceRoot, destinationRoot, false, true}});
+    QSignalSpy finishedSpy(&worker, &FileOperationWorker::finished);
+    QSignalSpy failedSpy(&worker, &FileOperationWorker::failed);
+
+    worker.run();
+
+    QCOMPARE(failedSpy.count(), 0);
+    QCOMPARE(finishedSpy.count(), 1);
+    QCOMPARE(readTextFile(QDir(destinationRoot).filePath("new.txt")), QString("new"));
+    QVERIFY(!QFileInfo::exists(QDir(destinationRoot).filePath("old.txt")));
+    QVERIFY(hiddenWorkFiles(temp.path()).isEmpty());
+}
+
+void FileOperationWorkerTest::overwriteMoveReplacesFileAndRemovesSource()
+{
+    QTemporaryDir temp;
+    QVERIFY(temp.isValid());
+
+    const QString source = QDir(temp.path()).filePath("source.txt");
+    const QString destination = QDir(temp.path()).filePath("destination.txt");
+    QVERIFY(writeTextFile(source, "new"));
+    QVERIFY(writeTextFile(destination, "old"));
+
+    FileOperationWorker worker({{source, destination, true, true}});
+    QSignalSpy finishedSpy(&worker, &FileOperationWorker::finished);
+    QSignalSpy failedSpy(&worker, &FileOperationWorker::failed);
+
+    worker.run();
+
+    QCOMPARE(failedSpy.count(), 0);
+    QCOMPARE(finishedSpy.count(), 1);
+    QCOMPARE(readTextFile(destination), QString("new"));
+    QVERIFY(!QFileInfo::exists(source));
+    QVERIFY(hiddenWorkFiles(temp.path()).isEmpty());
+}
+
+void FileOperationWorkerTest::writeErrorFailsCopy()
+{
+    if (::geteuid() == 0) {
+        QSKIP("Not safe to exercise /dev/full while running as root.");
+    }
+    const QFileInfo devFull("/dev/full");
+    if (!devFull.exists() || !devFull.isWritable()) {
+        QSKIP("/dev/full is unavailable.");
+    }
+
+    QTemporaryDir temp;
+    QVERIFY(temp.isValid());
+    const QString source = QDir(temp.path()).filePath("source.txt");
+    QVERIFY(writeTextFile(source, "does not fit"));
+
+    FileOperationWorker worker({{source, "/dev/full", false}});
+    QSignalSpy finishedSpy(&worker, &FileOperationWorker::finished);
+    QSignalSpy failedSpy(&worker, &FileOperationWorker::failed);
+
+    worker.run();
+
+    QCOMPARE(finishedSpy.count(), 0);
+    QCOMPARE(failedSpy.count(), 1);
 }
 
 QTEST_MAIN(FileOperationWorkerTest)

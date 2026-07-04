@@ -7,7 +7,25 @@
 #include <QTemporaryDir>
 #include <QTextStream>
 
+#include <unistd.h>
+
 namespace {
+bool makeSymlink(const QString &linkText, const QString &linkPath)
+{
+    return ::symlink(QFile::encodeName(linkText).constData(),
+                     QFile::encodeName(linkPath).constData()) == 0;
+}
+
+QString rawLinkText(const QString &path)
+{
+    QByteArray buffer(4096, '\0');
+    const ssize_t length = ::readlink(QFile::encodeName(path).constData(), buffer.data(), buffer.size());
+    if (length < 0) {
+        return QString();
+    }
+    return QFile::decodeName(buffer.left(static_cast<int>(length)));
+}
+
 bool writeTextFile(const QString &path)
 {
     QFile file(path);
@@ -30,6 +48,9 @@ private slots:
     void uniquePathInDirectoryAddsNumericSuffixes();
     void copyRecursivelyCopiesNestedDirectories();
     void copyRecursivelyFailsWhenDestinationExists();
+    void copyRecursivelyPreservesSymlinksAndHiddenFiles();
+    void transferWouldNestInsideSourceDetectsDescendants();
+    void transferWouldNestInsideSourceResolvesSymlinkedTargets();
 };
 
 void PathHandlingTest::canonicalDirectoryPathAcceptsOnlyExistingDirectories()
@@ -111,6 +132,68 @@ void PathHandlingTest::copyRecursivelyFailsWhenDestinationExists()
     QVERIFY(writeTextFile(destination));
 
     QVERIFY(!tfx::core::copyRecursively(source, destination));
+}
+
+void PathHandlingTest::copyRecursivelyPreservesSymlinksAndHiddenFiles()
+{
+    QTemporaryDir temp;
+    QVERIFY(temp.isValid());
+
+    const QDir root(temp.path());
+    const QString source = root.filePath("source");
+    const QString destination = root.filePath("destination");
+    QVERIFY(QDir().mkpath(source));
+    QVERIFY(writeTextFile(QDir(source).filePath("data.txt")));
+    QVERIFY(writeTextFile(QDir(source).filePath(".hidden")));
+    QVERIFY(makeSymlink("data.txt", QDir(source).filePath("rel-link")));
+
+    QVERIFY(tfx::core::copyRecursively(source, destination));
+    QVERIFY(QFileInfo::exists(QDir(destination).filePath(".hidden")));
+    const QString link = QDir(destination).filePath("rel-link");
+    QVERIFY(QFileInfo(link).isSymLink());
+    QCOMPARE(rawLinkText(link), QString("data.txt"));
+}
+
+void PathHandlingTest::transferWouldNestInsideSourceDetectsDescendants()
+{
+    QTemporaryDir temp;
+    QVERIFY(temp.isValid());
+
+    const QDir root(temp.path());
+    const QString source = root.filePath("source");
+    const QString nested = QDir(source).filePath("nested");
+    const QString sibling = root.filePath("sibling");
+    const QString file = root.filePath("file.txt");
+    QVERIFY(QDir().mkpath(nested));
+    QVERIFY(QDir().mkpath(sibling));
+    QVERIFY(writeTextFile(file));
+
+    QVERIFY(tfx::core::transferWouldNestInsideSource(source, source));
+    QVERIFY(tfx::core::transferWouldNestInsideSource(source, nested));
+    QVERIFY(!tfx::core::transferWouldNestInsideSource(source, sibling));
+    QVERIFY(!tfx::core::transferWouldNestInsideSource(file, source));
+}
+
+void PathHandlingTest::transferWouldNestInsideSourceResolvesSymlinkedTargets()
+{
+    QTemporaryDir temp;
+    QVERIFY(temp.isValid());
+
+    const QDir root(temp.path());
+    const QString source = root.filePath("source");
+    const QString nested = QDir(source).filePath("nested");
+    QVERIFY(QDir().mkpath(nested));
+
+    // A symlink outside the source that points inside it must still be
+    // recognized as nesting.
+    const QString alias = root.filePath("alias");
+    QVERIFY(makeSymlink(nested, alias));
+    QVERIFY(tfx::core::transferWouldNestInsideSource(source, alias));
+
+    // A symlink to a directory is copied as a link, so it can never nest.
+    const QString sourceLink = root.filePath("source-link");
+    QVERIFY(makeSymlink(source, sourceLink));
+    QVERIFY(!tfx::core::transferWouldNestInsideSource(sourceLink, nested));
 }
 
 QTEST_GUILESS_MAIN(PathHandlingTest)

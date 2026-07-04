@@ -11,6 +11,7 @@
 
 #include <QApplication>
 #include <QClipboard>
+#include <QDateTime>
 #include <QDir>
 #include <QEvent>
 #include <QDrag>
@@ -65,6 +66,9 @@ using namespace tfx::models;
 using namespace tfx::platform;
 
 namespace {
+constexpr int SearchPathRole = Qt::UserRole;
+constexpr int SearchSortRole = Qt::UserRole + 32;
+
 enum class ConflictChoice {
     Overwrite,
     Skip,
@@ -425,12 +429,14 @@ FilePane::FilePane(const QString &label, const QString &initialPath, QWidget *pa
         columnTitle(ColumnModified),
         columnTitle(ColumnMode),
     });
+    m_searchModel->setSortRole(SearchSortRole);
     m_searchView = new QTableView(this);
     m_searchView->setObjectName("fileTable");
     m_searchView->setModel(m_searchModel);
     m_searchView->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_searchView->setSelectionMode(QAbstractItemView::ExtendedSelection);
     m_searchView->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    m_searchView->setSortingEnabled(true);
     m_searchView->setShowGrid(false);
     m_searchView->setFrameShape(QFrame::NoFrame);
     m_searchView->setIconSize(QSize(18, 18));
@@ -442,6 +448,7 @@ FilePane::FilePane(const QString &label, const QString &initialPath, QWidget *pa
     m_searchView->setColumnWidth(1, 120);
     m_searchView->setColumnWidth(2, 96);
     m_searchView->setColumnWidth(3, 160);
+    m_searchView->sortByColumn(0, Qt::AscendingOrder);
     m_searchView->setContextMenuPolicy(Qt::CustomContextMenu);
     m_searchView->installEventFilter(this);
 
@@ -545,7 +552,7 @@ FilePane::FilePane(const QString &label, const QString &initialPath, QWidget *pa
         if (!index.isValid()) {
             return;
         }
-        const QString path = m_searchModel->item(index.row(), 0)->data(Qt::UserRole).toString();
+        const QString path = m_searchModel->item(index.row(), 0)->data(SearchPathRole).toString();
         const QFileInfo info(path);
         if (!info.exists()) {
             return;
@@ -903,15 +910,23 @@ void FilePane::searchStep()
             continue;
         }
         const QFileInfo info = m_searchIterator->fileInfo();
+        const QString relativePath = base.relativeFilePath(path);
+        const QString typeName = englishTypeName(info);
+        const QString mode = modeString(info);
 
-        auto *nameItem = new QStandardItem(m_iconProvider.icon(info), base.relativeFilePath(path));
-        nameItem->setData(path, Qt::UserRole);
+        auto *nameItem = new QStandardItem(m_iconProvider.icon(info), relativePath);
+        nameItem->setData(path, SearchPathRole);
+        nameItem->setData(relativePath.toCaseFolded(), SearchSortRole);
         nameItem->setForeground(QColor(info.isDir() ? m_directoryForeground : m_fileForeground));
-        auto *typeItem = new QStandardItem(englishTypeName(info));
+        auto *typeItem = new QStandardItem(typeName);
+        typeItem->setData(typeName.toCaseFolded(), SearchSortRole);
         auto *sizeItem = new QStandardItem(info.isDir() ? QString() : sizeString(info.size()));
+        sizeItem->setData(info.isDir() ? -1 : info.size(), SearchSortRole);
         sizeItem->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
         auto *modifiedItem = new QStandardItem(info.lastModified().toString("yyyy-MM-dd HH:mm:ss"));
-        auto *modeItem = new QStandardItem(modeString(info));
+        modifiedItem->setData(info.lastModified().toMSecsSinceEpoch(), SearchSortRole);
+        auto *modeItem = new QStandardItem(mode);
+        modeItem->setData(mode, SearchSortRole);
         m_searchModel->appendRow({nameItem, typeItem, sizeItem, modifiedItem, modeItem});
         ++m_searchMatches;
     }
@@ -939,10 +954,12 @@ void FilePane::cancelSearch()
     if (m_searchModel) {
         m_searchModel->removeRows(0, m_searchModel->rowCount());
     }
+    m_searchTerm.clear();
     if (m_viewStack && m_view) {
         m_viewStack->setCurrentWidget(m_iconMode ? static_cast<QWidget *>(m_iconView)
                                                  : static_cast<QWidget *>(m_view));
     }
+    updateStatusLine();
 }
 
 void FilePane::openZip(const QString &path)
@@ -1562,7 +1579,7 @@ QString FilePane::searchResultPath(const QModelIndex &index) const
         return QString();
     }
     QStandardItem *item = m_searchModel->item(index.row(), 0);
-    return item ? item->data(Qt::UserRole).toString() : QString();
+    return item ? item->data(SearchPathRole).toString() : QString();
 }
 
 QStringList FilePane::selectedSearchResultPaths() const
@@ -2275,7 +2292,7 @@ void FilePane::updatePreviewFromSearchSelection()
     if (rows.size() > 1) {
         QStringList paths;
         for (const QModelIndex &index : rows) {
-            const QString path = m_searchModel->item(index.row(), 0)->data(Qt::UserRole).toString();
+            const QString path = m_searchModel->item(index.row(), 0)->data(SearchPathRole).toString();
             if (QFileInfo::exists(path)) {
                 paths << path;
             }
@@ -2295,7 +2312,7 @@ void FilePane::updatePreviewFromSearchSelection()
         return;
     }
 
-    const QString path = m_searchModel->item(index.row(), 0)->data(Qt::UserRole).toString();
+    const QString path = m_searchModel->item(index.row(), 0)->data(SearchPathRole).toString();
     emit selectionPreviewRequested(QFileInfo::exists(path) ? path : m_currentPath);
 }
 

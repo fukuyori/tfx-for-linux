@@ -6,6 +6,7 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QCloseEvent>
+#include <QComboBox>
 #include <QDir>
 #include <QDrag>
 #include <QDragEnterEvent>
@@ -297,7 +298,7 @@ MainWindow::MainWindow(const QString &initialPath, const QString &geometryOverri
       m_treeView(new QTreeView(this)),
       m_pinnedList(new PinnedListWidget(this)),
       m_pinnedSpacer(new QWidget(this)),
-      m_searchEdit(new QLineEdit(this)),
+      m_searchEdit(new QComboBox(this)),
       m_topToolbar(new QToolBar(this)),
       m_splitButton(new QToolButton(this)),
       m_previewButton(new QToolButton(this)),
@@ -768,18 +769,32 @@ void MainWindow::buildTopToolbar()
     addToolBar(Qt::TopToolBarArea, m_topToolbar);
 
     m_searchEdit->setObjectName("searchEdit");
+    m_searchEdit->setEditable(true);
     m_searchEdit->setPlaceholderText(UiText::t("Search (Enter to search subfolders)", "検索 (Enter でサブフォルダ検索)"));
-    m_searchEdit->setClearButtonEnabled(true);
+    m_searchEdit->lineEdit()->setClearButtonEnabled(true);
     m_searchEdit->setMaximumWidth(260);
-    connect(m_searchEdit, &QLineEdit::returnPressed, this, [this]() {
-        activePane()->startSearch(m_searchEdit->text());
+    m_searchEdit->setInsertPolicy(QComboBox::NoInsert);
+    connect(m_searchEdit->lineEdit(), &QLineEdit::returnPressed, this, &MainWindow::runSearchFromToolbar);
+    connect(m_searchEdit, &QComboBox::activated, this, [this](int) {
+        runSearchFromToolbar();
     });
     auto *focusSearchShortcut = new QShortcut(QKeySequence(m_config.shortcut("focusSearch", "Ctrl+F")), this);
     connect(focusSearchShortcut, &QShortcut::activated, m_searchEdit, [this]() {
         m_searchEdit->setFocus();
-        m_searchEdit->selectAll();
+        m_searchEdit->lineEdit()->selectAll();
     });
     m_topToolbar->addWidget(m_searchEdit);
+    auto *cancelSearchButton = new QToolButton(this);
+    cancelSearchButton->setObjectName("toolbarIconButton");
+    cancelSearchButton->setText("x");
+    cancelSearchButton->setFixedSize(24, 24);
+    cancelSearchButton->setToolTip(UiText::t("Close search results", "検索結果を閉じる"));
+    connect(cancelSearchButton, &QToolButton::clicked, this, [this]() {
+        activePane()->cancelSearch();
+        activePane()->focusFileList();
+        m_searchEdit->clearEditText();
+    });
+    m_topToolbar->addWidget(cancelSearchButton);
 
     auto *spacer = new QWidget(this);
     spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
@@ -1005,13 +1020,18 @@ void MainWindow::applyTerminalTheme()
             padding: 5px 10px;
             font-weight: 700;
         }
-        QLineEdit#searchEdit {
+        QComboBox#searchEdit,
+        QComboBox#searchEdit QLineEdit {
             background: #10161A;
             color: #D9E1E8;
             border: 1px solid #2A333A;
             border-radius: 0;
             padding: 5px 9px;
             selection-background-color: #243947;
+        }
+        QComboBox#searchEdit::drop-down {
+            border: 0;
+            width: 18px;
         }
         QWidget#sidebar {
             background: #171C20;
@@ -1423,6 +1443,14 @@ void MainWindow::restoreSettings()
         }
         updatePinnedFolderArea();
     }
+    const QStringList searchHistory = settings.value("Search/history").toStringList();
+    m_searchEdit->clear();
+    for (const QString &term : searchHistory) {
+        if (!term.trimmed().isEmpty()) {
+            m_searchEdit->addItem(term.trimmed());
+        }
+    }
+    m_searchEdit->clearEditText();
 
     setHiddenFilesVisible(settings.value("View/showHiddenFiles", false).toBool());
     {
@@ -1488,12 +1516,48 @@ void MainWindow::saveSettings()
     settings.setValue("Tabs/rightPaths", m_rightPane->tabPaths());
     settings.setValue("Tabs/leftActiveIndex", m_leftPane->activeTabIndex());
     settings.setValue("Tabs/rightActiveIndex", m_rightPane->activeTabIndex());
+    QStringList searchHistory;
+    for (int index = 0; index < m_searchEdit->count(); ++index) {
+        searchHistory << m_searchEdit->itemText(index);
+    }
+    settings.setValue("Search/history", searchHistory);
 
     QStringList pinnedPaths;
     for (int row = 0; row < m_pinnedList->count(); ++row) {
         pinnedPaths.append(m_pinnedList->item(row)->data(Qt::UserRole).toString());
     }
     settings.setValue("Sidebar/pinnedFolders", pinnedPaths);
+}
+
+void MainWindow::runSearchFromToolbar()
+{
+    const QString term = m_searchEdit->currentText().trimmed();
+    if (term.isEmpty()) {
+        return;
+    }
+    rememberSearchTerm(term);
+    activePane()->startSearch(term);
+}
+
+void MainWindow::rememberSearchTerm(const QString &term)
+{
+    const QString trimmed = term.trimmed();
+    if (trimmed.isEmpty()) {
+        return;
+    }
+
+    for (int index = m_searchEdit->count() - 1; index >= 0; --index) {
+        if (m_searchEdit->itemText(index).compare(trimmed, Qt::CaseInsensitive) == 0) {
+            m_searchEdit->removeItem(index);
+        }
+    }
+    m_searchEdit->insertItem(0, trimmed);
+    while (m_searchEdit->count() > 10) {
+        m_searchEdit->removeItem(m_searchEdit->count() - 1);
+    }
+    m_searchEdit->setCurrentIndex(0);
+    m_searchEdit->setEditText(trimmed);
+    saveSettings();
 }
 
 void MainWindow::setIconViewEnabled(bool enabled)
@@ -1725,7 +1789,7 @@ void MainWindow::setActivePane(FilePane *pane)
     applyPaneOpacity(m_leftPane, pane == m_leftPane);
     applyPaneOpacity(m_rightPane, pane == m_rightPane);
 
-    m_searchEdit->clear();
+    m_searchEdit->clearEditText();
 }
 
 void MainWindow::focusOtherPane()

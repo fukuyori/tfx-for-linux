@@ -79,6 +79,7 @@ public slots:
     void goBack();
     void goForward();
     void reload();
+    void cancelSearch();
     void openSelected();
     void renameSelected();
     void createFolder();
@@ -119,7 +120,6 @@ private:
     void applyDefaultColumns();
     void saveColumnSettings();
     void searchStep();
-    void cancelSearch();
     void openZip(const QString &path);
     void populateZipView();
     void exitZipMode();

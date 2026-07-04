@@ -2,7 +2,7 @@
 
 This file records notable changes to `tfx-for-linux`.
 
-## [0.5.8] - 2026-07-04
+## [0.5.9] - 2026-07-04
 
 Packaging and install support.
 
@@ -56,6 +56,12 @@ Packaging and install support.
   whether a search is still running.
 - Search results now have a context menu for opening a result, jumping to its
   containing folder, revealing it in the file manager, and copying paths.
+- Search-result columns are now sortable, with size and modified-time columns
+  sorted by their underlying values instead of display text.
+- Added a toolbar button to close search results and return focus to the active
+  file list.
+- Search terms are now kept in a persistent toolbar history, with newest terms
+  first and duplicates collapsed.
 - Added a terminal header button that syncs the active file pane to the
   terminal's current working directory.
 - File-pane tabs now show close buttons when multiple tabs are open, keep the

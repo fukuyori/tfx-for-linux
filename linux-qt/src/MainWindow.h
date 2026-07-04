@@ -7,7 +7,7 @@
 #include "TerminalPane.h"
 
 #include <QFileSystemModel>
-#include <QLineEdit>
+#include <QComboBox>
 #include <QListWidget>
 #include <QMainWindow>
 #include <QDockWidget>
@@ -48,6 +48,8 @@ private:
     void updatePinnedFolderArea();
     void restoreSettings();
     void saveSettings();
+    void runSearchFromToolbar();
+    void rememberSearchTerm(const QString &term);
     void setSplitVisible(bool visible);
     void setSidebarVisible(bool visible);
     void setPreviewVisible(bool visible);
@@ -68,7 +70,7 @@ private:
     QTreeView *m_treeView;
     QListWidget *m_pinnedList;
     QWidget *m_pinnedSpacer;
-    QLineEdit *m_searchEdit;
+    QComboBox *m_searchEdit;
     QToolBar *m_topToolbar;
     QToolButton *m_splitButton;
     QToolButton *m_previewButton;

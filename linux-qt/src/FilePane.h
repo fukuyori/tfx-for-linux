@@ -157,6 +157,8 @@ private:
     void createLinkForSelection();
     void openWithConfiguredApplication(const QString &program);
     void openWithCustomApplication();
+    bool tryRunExecutable(const QFileInfo &info);
+    bool launchExecutable(const QFileInfo &info);
 
     // Clipboard and drag/drop
     bool pasteClipboardAsFile(bool plainTextOnly);

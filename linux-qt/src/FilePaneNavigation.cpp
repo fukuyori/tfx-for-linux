@@ -125,6 +125,8 @@ void FilePane::openSelected()
         });
     } else if (info.suffix().compare("zip", Qt::CaseInsensitive) == 0) {
         openZip(info.absoluteFilePath());
+    } else if (tryRunExecutable(info)) {
+        // Handled as an executable (binary run directly, script prompted).
     } else {
         tfx::platform::openPath(info.absoluteFilePath());
     }

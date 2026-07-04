@@ -10,8 +10,10 @@
 #include <QInputDialog>
 #include <QLineEdit>
 #include <QMenu>
+#include <QMessageBox>
 #include <QMimeData>
 #include <QProcess>
+#include <QPushButton>
 #include <QTimer>
 
 using namespace tfx::platform;
@@ -195,6 +197,72 @@ void FilePane::openWithCustomApplication()
     if (!QProcess::startDetached(command, {info.absoluteFilePath()})) {
         emit statusMessageRequested(UiText::t("Could not launch: %1", "起動できませんでした: %1").arg(command));
     }
+}
+
+bool FilePane::launchExecutable(const QFileInfo &info)
+{
+    const bool started = QProcess::startDetached(
+        info.absoluteFilePath(), {}, info.absolutePath());
+    if (!started) {
+        emit statusMessageRequested(
+            UiText::t("Could not run: %1", "実行できませんでした: %1").arg(info.fileName()));
+    }
+    return started;
+}
+
+bool FilePane::tryRunExecutable(const QFileInfo &info)
+{
+    if (!info.isFile() || !info.isExecutable()) {
+        return false;
+    }
+
+    // Peek at the leading bytes to decide binary vs. text script.
+    QFile file(info.absoluteFilePath());
+    if (!file.open(QIODevice::ReadOnly)) {
+        return false;
+    }
+    const QByteArray head = file.read(512);
+    file.close();
+    if (head.isEmpty()) {
+        return false;
+    }
+
+    const bool isElf = head.startsWith("\x7f""ELF");
+    const bool hasNullByte = head.contains('\0');
+    // Treat ELF and any other binary blob as a program to run directly.
+    if (isElf || hasNullByte) {
+        launchExecutable(info);
+        return true;
+    }
+
+    // Otherwise it is an executable text file (script): let the user choose.
+    QMessageBox box(this);
+    box.setWindowTitle(UiText::t("Executable Script", "実行可能なスクリプト"));
+    box.setIcon(QMessageBox::Question);
+    box.setText(UiText::t("\"%1\" is an executable script.", "\"%1\" は実行可能なスクリプトです。")
+                    .arg(info.fileName()));
+    box.setInformativeText(
+        UiText::t("Do you want to run it, or open it for editing?",
+                  "実行しますか、それとも編集用に開きますか？"));
+    QPushButton *runButton =
+        box.addButton(UiText::t("Run", "実行"), QMessageBox::AcceptRole);
+    QPushButton *editButton =
+        box.addButton(UiText::t("Edit", "編集"), QMessageBox::RejectRole);
+    box.addButton(QMessageBox::Cancel);
+    box.setDefaultButton(editButton);
+    box.exec();
+
+    QAbstractButton *clicked = box.clickedButton();
+    if (clicked == runButton) {
+        launchExecutable(info);
+        return true;
+    }
+    if (clicked == editButton) {
+        tfx::platform::openPath(info.absoluteFilePath());
+        return true;
+    }
+    // Cancel: consume the open action without doing anything.
+    return true;
 }
 
 void FilePane::openTerminalHere()

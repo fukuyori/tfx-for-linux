@@ -2,6 +2,16 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.6.7] - 2026-07-04
+
+### Fixed
+
+- Opening an executable file now actually runs it. Previously "Open" always
+  handed the file to the desktop's URL handler, which never executes
+  programs. Binary executables (ELF and other non-text files with the execute
+  bit) launch directly in their own directory; executable text scripts prompt
+  whether to run or open for editing.
+
 ## [0.6.6] - 2026-07-04
 
 Performance release (from tfx macOS 0.9.3 / 0.9.4).

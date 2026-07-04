@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(tfx-for-linux VERSION 0.6.4 LANGUAGES CXX)
+project(tfx-for-linux VERSION 0.6.5 LANGUAGES CXX)
 
 include(GNUInstallDirs)
 include(CTest)
@@ -24,12 +24,16 @@ else()
 endif()
 
 qt_add_executable(tfx
+    src/core/DelimitedText.cpp
+    src/core/DelimitedText.h
     src/core/FileOperations.cpp
     src/core/FileOperations.h
     src/core/FileOperationWorker.cpp
     src/core/FileOperationWorker.h
     src/core/FileTypeInfo.cpp
     src/core/FileTypeInfo.h
+    src/core/PreviewText.cpp
+    src/core/PreviewText.h
     src/core/GitService.cpp
     src/core/GitService.h
     src/core/SearchState.cpp
@@ -212,6 +216,10 @@ if(BUILD_TESTING AND Qt6Test_FOUND)
         src/PreviewPane.h
         src/UiText.cpp
         src/UiText.h
+        src/core/DelimitedText.cpp
+        src/core/DelimitedText.h
+        src/core/PreviewText.cpp
+        src/core/PreviewText.h
         ${TFX_PLATFORM_SOURCES}
         src/platform/Platform.h
     )
@@ -219,6 +227,17 @@ if(BUILD_TESTING AND Qt6Test_FOUND)
     target_link_libraries(tfx_preview_security_test PRIVATE Qt6::Core Qt6::DBus Qt6::Gui Qt6::Widgets Qt6::Test)
     add_test(NAME preview_security COMMAND tfx_preview_security_test)
     set_tests_properties(preview_security PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+    qt_add_executable(tfx_preview_text_test
+        tests/PreviewTextTest.cpp
+        src/core/DelimitedText.cpp
+        src/core/DelimitedText.h
+        src/core/PreviewText.cpp
+        src/core/PreviewText.h
+    )
+    target_include_directories(tfx_preview_text_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(tfx_preview_text_test PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME preview_text COMMAND tfx_preview_text_test)
 elseif(BUILD_TESTING)
     message(STATUS "tfx: Qt Test not found — file operation worker tests disabled")
 endif()

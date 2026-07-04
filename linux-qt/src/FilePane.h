@@ -212,6 +212,7 @@ private:
     QString m_zipPath;
     QString m_zipDir;
     QStringList m_zipEntries;
+    QStringList m_zipSymlinkEntries;
 
     // Status and appearance
     GitStatusController *m_gitController = nullptr;

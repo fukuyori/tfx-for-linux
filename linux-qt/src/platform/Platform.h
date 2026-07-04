@@ -27,9 +27,21 @@ QStringList terminalRunArguments(const QString &command);
 // List the entries inside a ZIP archive. Directory entries end with '/'.
 QStringList listZipEntries(const QString &zipPath);
 
+// Detailed archive inspection used before extraction: entry names, which
+// entries are symbolic links, and the total uncompressed size.
+struct ZipInspection
+{
+    QStringList entries;
+    QStringList symlinkEntries;
+    qint64 totalUncompressedBytes = 0;
+    bool ok = false;
+};
+ZipInspection inspectZipArchive(const QString &zipPath);
+
 // Return whether a ZIP entry name is safe to extract under a destination
-// directory. Absolute paths, parent traversal, drive names, and backslashes are
-// rejected.
+// directory. Absolute paths, parent traversal, drive names, backslashes, and
+// names starting with '-' (which the archive tools would parse as options)
+// are rejected.
 bool zipEntryPathIsSafe(const QString &entry);
 
 // Extract a single entry from a ZIP into destDir (preserving the entry's

@@ -32,6 +32,7 @@ private slots:
     void lightThemeAppliesPaletteAndColorOverrides();
     void invalidThemeFallsBackToDarkAndWarns();
     void openWithMappingsLoadExtensionsAndFallback();
+    void malformedConfigFallsBackToDefaults();
 };
 
 void AppConfigTest::lightThemeAppliesPaletteAndColorOverrides()
@@ -89,6 +90,42 @@ void AppConfigTest::openWithMappingsLoadExtensionsAndFallback()
     QCOMPARE(config.openWith.value("md"), QString("code"));
     QCOMPARE(config.openWith.value("*"), QString("xdg-open"));
     QVERIFY(config.warningText().isEmpty());
+}
+
+void AppConfigTest::malformedConfigFallsBackToDefaults()
+{
+    QTemporaryDir temp;
+    QVERIFY(temp.isValid());
+    qputenv("XDG_CONFIG_HOME", temp.path().toUtf8());
+
+    // Invalid UTF-8, an unterminated string, an oversized value, control
+    // characters, and junk syntax must not crash the loader; parsing degrades
+    // to defaults (possibly with warnings).
+    QByteArray content;
+    content += "version = 1\n";
+    content += "theme = \"dark\n";              // unterminated string
+    content += "\xFF\xFE\x80 = \"broken\"\n";   // invalid UTF-8 key
+    content += "[colors]\n";
+    content += "fileForeground = \"#";
+    content += QByteArray(2 * 1024 * 1024, 'F'); // oversized value
+    content += "\"\n";
+    content += "[[commands]]\n";
+    content += "name = \"a\x01\x02\"\n";        // control characters
+    content += "= = =\n";                        // junk line
+    content += "[]\n";                           // empty section
+
+    const QString directory = QDir(temp.path()).filePath("tfx");
+    QVERIFY(QDir().mkpath(directory));
+    QFile file(QDir(directory).filePath("config.toml"));
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    QVERIFY(file.write(content) == content.size());
+    file.close();
+
+    const AppConfig config = AppConfig::loadOrCreate();
+
+    // Defaults survive: dark palette and no crash.
+    QCOMPARE(config.theme.name, QString("dark"));
+    QCOMPARE(config.colors.panelBackground, QString("#151A1E"));
 }
 
 QTEST_GUILESS_MAIN(AppConfigTest)

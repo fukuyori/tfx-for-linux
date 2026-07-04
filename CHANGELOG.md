@@ -2,6 +2,49 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.6.5] - 2026-07-04
+
+Security-hardening release, round 2: untrusted file content and filenames
+reaching parsers and external tools.
+
+### Added
+
+- CSV/TSV previews now use an RFC 4180 parser: quoted fields, escaped quotes,
+  and embedded delimiters/newlines render correctly, capped at 1,000 rows ×
+  100 columns with a visible notice when the limit is hit.
+- Text previews load through a shared size-capped loader (4 MB) with a
+  truncation indicator; the cut never splits a multi-byte UTF-8 character.
+  Previously a flat 256 KB was read silently.
+- Full-archive extraction is now refused for archives containing symbolic
+  links (a link entry followed by files under its name can write outside the
+  destination — unzip extracts links by default), and is capped at 100,000
+  entries / 4 GiB uncompressed.
+- Extraction runs into a hidden work directory that is renamed into place on
+  success, so a failed extraction leaves nothing under the final name.
+- Symbolic-link entries can no longer be opened from the archive browser.
+- Qt Test coverage: RFC 4180 parsing, size-capped loading with UTF-8
+  boundaries, zip inspection (symlink and size detection), option-like entry
+  names, and malformed `config.toml` inputs (invalid UTF-8, unterminated
+  strings, oversized values, control characters).
+
+### Changed
+
+- `zip` compression passes `--` before user-controlled file names so a name
+  beginning with `-` cannot be parsed as an option.
+- ZIP entry names beginning with `-` are now rejected as unsafe: `unzip` has
+  no reliable end-of-options separator, and such names can inject options
+  (including `-d<dir>`, which redirects extraction).
+- Files created from clipboard content are created owner-read/write only.
+
+### Documentation
+
+- Documented the user-command quoting guarantee: tokens expand inside POSIX
+  single quotes, so quotes, `$`, backticks, and newlines in file names are
+  passed literally and cannot inject shell commands.
+- Audit results: git invocations use fixed arguments with canonical absolute
+  paths, and open/trash helpers receive absolute paths, so no `--` separators
+  were needed there.
+
 ## [0.6.4] - 2026-07-04
 
 Stability and process-hygiene release (from tfx macOS 0.9.3).

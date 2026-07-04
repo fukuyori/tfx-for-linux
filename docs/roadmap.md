@@ -1,6 +1,6 @@
 # tfx for Linux Roadmap
 
-Current version: **0.6.4**
+Current version: **0.6.5**
 
 This roadmap tracks the practical development steps for the Linux Qt port as it
 moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
@@ -169,26 +169,37 @@ wedge the UI.
 Follow-up to the Phase 7 hardening, focused on untrusted file content and
 filenames reaching shells or parsers.
 
-- Preview resource limits: stream CSV/TSV parsing with hard caps
-  (1,000 rows × 100 columns) and RFC 4180 quote handling instead of the
-  current 200-line `split()`; replace the flat 256 KB text read with a shared
-  size-capped loader (staged read, explicit cap, "truncated" indicator) used
-  by text, Markdown, JSON, and CSV previews.
-- Argument-injection audit for external commands: pass `--` before
-  user-controlled paths for `zip`, `unzip`, `git`, and trash/open helpers so
-  filenames beginning with `-` cannot become options.
-- ZIP hardening follow-up: reject symlink entries on extraction (zip-slip via
-  link targets), cap total extracted size/entry count, and extract into a
-  temporary directory before moving into place.
-- User-command token expansion: re-audit `{path}`/`{paths}` quoting so
-  filenames containing quotes, `$`, backticks, or newlines cannot break out of
-  the generated command line; document the guarantee in the commands docs.
-- Clipboard materialization: sanitize generated file names (strip path
-  separators and control characters) and create files with `0600`-style
-  conservative permissions before content is written.
-- Config robustness: fuzz-style tests for `config.toml` parsing (oversized
-  values, invalid UTF-8, deeply nested arrays) so a broken config degrades to
-  defaults with a warning instead of crashing at startup.
+- Preview resource limits: CSV/TSV previews now parse through a shared RFC
+  4180 parser (`core/DelimitedText`, quoted fields, embedded delimiters and
+  newlines) capped at 1,000 rows × 100 columns with a visible limit notice,
+  and text previews load through a shared size-capped loader
+  (`core/PreviewText`, 4 MB cap, UTF-8-boundary-safe truncation with an
+  indicator) instead of a flat 256 KB read. (done)
+- Argument-injection audit: `zip` compression now passes `--` before
+  user-controlled names. `unzip` has no reliable end-of-options separator
+  (verified: a `-d<dir>` entry name redirects extraction), so
+  `zipEntryPathIsSafe` now also rejects entry names beginning with `-`.
+  git invocations use fixed arguments with absolute canonical directories,
+  and open/trash helpers pass absolute paths — no other injectable sites
+  found. (done)
+- ZIP hardening follow-up: archives containing symbolic-link entries are
+  refused for full extraction (zip-slip via link targets; `unzip` extracts
+  links by default — verified) and link entries cannot be opened from the
+  archive browser. Full extraction is capped at 100,000 entries / 4 GiB
+  uncompressed (via `inspectZipArchive`, which parses `zipinfo` modes and
+  sizes) and extracts into a hidden work directory that is renamed into place
+  only on success. (done)
+- User-command token expansion audit: tokens expand inside POSIX single
+  quotes with embedded quotes escaped as `'"'"'`, so quotes, `$`, backticks,
+  and newlines in file names stay literal. The guarantee is now documented in
+  `docs/configuration.md`. (done)
+- Clipboard materialization: files created from clipboard content are opened
+  with `NewOnly` and restricted to owner read/write before content is
+  written; base names are fixed internal placeholders, so no name
+  sanitization is needed. (done)
+- Config robustness: malformed-config test covers invalid UTF-8, an
+  unterminated string, a 2 MB value, control characters, and junk syntax;
+  the parser degrades to defaults without crashing. (done)
 
 ## 0.6.6 — Phase 11: Performance (from tfx macOS 0.9.3 / 0.9.4)
 

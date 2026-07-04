@@ -241,6 +241,11 @@ void FilePane::setupZipView()
         } else if (isDir) {
             m_zipDir = entry;
             populateZipView();
+        } else if (m_zipSymlinkEntries.contains(entry)) {
+            // Opening would extract the link and launch whatever it points at.
+            emit statusMessageRequested(
+                UiText::t("Entry is a symbolic link and was not opened: %1",
+                          "エントリはシンボリックリンクのため開きませんでした: %1").arg(entry));
         } else {
             QTemporaryDir tempDir;
             tempDir.setAutoRemove(false);

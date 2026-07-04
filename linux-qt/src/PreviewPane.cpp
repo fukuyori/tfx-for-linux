@@ -1,5 +1,7 @@
 #include "PreviewPane.h"
 #include "UiText.h"
+#include "core/DelimitedText.h"
+#include "core/PreviewText.h"
 #include "platform/Platform.h"
 
 #include <QCryptographicHash>
@@ -387,17 +389,27 @@ QString PreviewPane::renderMarkdown(const QString &path, const QString &content)
 
 QString PreviewPane::csvToHtmlTable(const QString &content, QChar delimiter) const
 {
+    constexpr int MaxRows = 1000;
+    constexpr int MaxColumns = 100;
+    const tfx::core::DelimitedTable table = tfx::core::parseDelimited(content, delimiter, MaxRows, MaxColumns);
+
     QString html = "<body><table cellspacing='0' cellpadding='6' style='border-collapse:collapse;font-family:monospace;'>";
-    const QStringList lines = content.split(QRegularExpression("[\r\n]+"), Qt::SkipEmptyParts);
-    for (const QString &line : lines.mid(0, 200)) {
+    for (const QStringList &row : table.rows) {
         html += "<tr>";
-        const QStringList cells = line.split(delimiter);
-        for (const QString &cell : cells) {
+        for (const QString &cell : row) {
             html += QString("<td style='border:1px solid #2a333a;'>%1</td>").arg(escapeHtml(cell));
         }
         html += "</tr>";
     }
-    html += "</table></body>";
+    html += "</table>";
+    if (table.rowsTruncated || table.columnsTruncated) {
+        html += QString("<p style='font-family:sans-serif;'>%1</p>")
+            .arg(escapeHtml(UiText::t("Preview limited to %1 rows × %2 columns.",
+                                      "プレビューは %1 行 × %2 列までに制限されています。")
+                                .arg(MaxRows)
+                                .arg(MaxColumns)));
+    }
+    html += "</body>";
     return html;
 }
 
@@ -491,13 +503,21 @@ bool PreviewPane::showText(const QString &path)
         return false;
     }
 
-    QFile file(path);
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+    // Shared size-capped loader: large files preview their head instead of
+    // being read whole into memory.
+    constexpr qint64 TextPreviewCapBytes = 4 * 1024 * 1024;
+    const tfx::core::LoadedText loaded = tfx::core::loadTextCapped(path, TextPreviewCapBytes);
+    if (!loaded.ok) {
         return false;
     }
-    const QByteArray data = file.read(256 * 1024);
-    const QString content = QString::fromUtf8(data);
-    m_text->setPlainText(content);
+    const QString &content = loaded.text;
+    if (loaded.truncated) {
+        m_text->setPlainText(content
+                             + UiText::t("\n… (preview truncated at 4 MB)",
+                                         "\n… （プレビューは 4 MB で打ち切られました）"));
+    } else {
+        m_text->setPlainText(content);
+    }
 
     const QString renderedHtml = renderHtmlForTextFile(path, content);
     setRenderAvailable(!renderedHtml.isEmpty());

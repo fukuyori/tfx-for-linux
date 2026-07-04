@@ -93,13 +93,33 @@ QString plainTextClipboardBaseName(const QString &text, const QString &language)
     return placeholderName(language, "Clipboard.txt", "クリップボード.txt");
 }
 
-bool writeBytesToFile(const QString &path, const QByteArray &data)
+// Create a clipboard-materialized file readable only by the owner; clipboard
+// content can hold anything, so do not inherit a permissive umask.
+bool openNewPrivateFile(QFile &file)
 {
-    QFile file(path);
     if (!file.open(QIODevice::NewOnly | QIODevice::WriteOnly)) {
         return false;
     }
+    file.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+    return true;
+}
+
+bool writeBytesToFile(const QString &path, const QByteArray &data)
+{
+    QFile file(path);
+    if (!openNewPrivateFile(file)) {
+        return false;
+    }
     return file.write(data) == data.size();
+}
+
+bool writeImageToFile(const QString &path, const QImage &image)
+{
+    QFile file(path);
+    if (!openNewPrivateFile(file)) {
+        return false;
+    }
+    return image.save(&file, "PNG");
 }
 
 }
@@ -307,7 +327,7 @@ bool FilePane::pasteClipboardAsFile(bool plainTextOnly)
     }
 
     const QString path = uniquePathInDirectory(m_currentPath, baseName);
-    const bool ok = image ? clipboardImage.save(path, "PNG") : writeBytesToFile(path, data);
+    const bool ok = image ? writeImageToFile(path, clipboardImage) : writeBytesToFile(path, data);
     if (!ok) {
         emit statusMessageRequested(UiText::t("Could not create clipboard file.", "クリップボードからファイルを作成できませんでした。"));
         return false;

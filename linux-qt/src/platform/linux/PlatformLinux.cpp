@@ -83,10 +83,50 @@ QStringList listZipEntries(const QString &zipPath)
     return output.split('\n', Qt::SkipEmptyParts);
 }
 
+ZipInspection inspectZipArchive(const QString &zipPath)
+{
+    ZipInspection inspection;
+    const QString unzip = QStandardPaths::findExecutable("unzip");
+    if (unzip.isEmpty()) {
+        return inspection;
+    }
+    QProcess process;
+    process.start(unzip, {"-Z", zipPath});
+    if (!process.waitForStarted(1000) || !process.waitForFinished(8000)
+        || process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
+        return inspection;
+    }
+
+    // zipinfo lines: mode version os size type method date time name
+    static const QRegularExpression entryPattern(
+        QStringLiteral("^(\\S{10})\\s+\\S+\\s+\\S+\\s+(\\d+)\\s+\\S+\\s+\\S+\\s+\\S+\\s+\\S+\\s+(.+)$"));
+    const QString output = QString::fromLocal8Bit(process.readAllStandardOutput());
+    const QStringList lines = output.split('\n', Qt::SkipEmptyParts);
+    for (const QString &line : lines) {
+        const QRegularExpressionMatch match = entryPattern.match(line);
+        if (!match.hasMatch()) {
+            continue; // header and totals lines
+        }
+        const QString name = match.captured(3);
+        inspection.entries.append(name);
+        inspection.totalUncompressedBytes += match.captured(2).toLongLong();
+        if (match.captured(1).startsWith('l')) {
+            inspection.symlinkEntries.append(name);
+        }
+    }
+    inspection.ok = true;
+    return inspection;
+}
+
 bool zipEntryPathIsSafe(const QString &entry)
 {
     QString normalized = entry.trimmed();
     if (normalized.isEmpty()) {
+        return false;
+    }
+    // unzip has no reliable end-of-options separator, so an entry name
+    // beginning with '-' could be parsed as an option (including "-d<dir>").
+    if (normalized.startsWith('-')) {
         return false;
     }
     normalized.replace('\\', '/');

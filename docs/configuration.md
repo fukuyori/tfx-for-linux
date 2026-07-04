@@ -285,6 +285,13 @@ Supported tokens:
 - `{cwd}` — current pane directory, shell-quoted.
 - `{scripts}` — `~/.config/tfx/scripts`, shell-quoted.
 
+Quoting guarantee: every token expands inside POSIX single quotes (embedded
+single quotes are escaped as `'"'"'`), so file names containing spaces,
+quotes, `$`, backticks, semicolons, or newlines are passed to the shell as
+literal arguments and cannot inject additional commands. Anything you write
+around the tokens in `command` is ordinary shell syntax and is your own
+responsibility.
+
 ## Notes
 
 `[openWith]` maps file extensions to launch programs shown in the file context

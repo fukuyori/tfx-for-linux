@@ -68,14 +68,19 @@ void FilePane::openZip(const QString &path)
 {
     m_zipPath = path;
     m_zipDir.clear();
-    m_zipEntries = tfx::platform::listZipEntries(path);
-    if (m_zipEntries.isEmpty()) {
+    const tfx::platform::ZipInspection inspection = tfx::platform::inspectZipArchive(path);
+    m_zipEntries = inspection.entries;
+    m_zipSymlinkEntries = inspection.symlinkEntries;
+    if (!inspection.ok || m_zipEntries.isEmpty()) {
+        m_zipEntries.clear();
+        m_zipSymlinkEntries.clear();
         emit statusMessageRequested(UiText::t("Could not read archive.", "アーカイブを読み込めませんでした。"));
         return;
     }
     const QString unsafeEntry = firstUnsafeZipEntry(m_zipEntries);
     if (!unsafeEntry.isEmpty()) {
         m_zipEntries.clear();
+        m_zipSymlinkEntries.clear();
         emit statusMessageRequested(
             UiText::t("Archive contains an unsafe path: %1", "アーカイブに安全でないパスが含まれています: %1")
                 .arg(unsafeEntry));
@@ -158,7 +163,7 @@ void FilePane::compressSelectedItemsToZip()
     const QString archivePath = uniquePathInDirectory(m_currentPath, archiveBaseName);
 
     QStringList arguments;
-    arguments << "-r" << archivePath;
+    arguments << "-r" << archivePath << "--"; // "--": a name starting with '-' must not become an option
     for (const QUrl &url : urls) {
         const QString path = url.toLocalFile();
         if (!path.isEmpty()) {
@@ -194,12 +199,12 @@ void FilePane::extractSelectedZip()
     }
 
     const QString destinationPath = uniquePathInDirectory(m_currentPath, archiveInfo.completeBaseName());
-    const QStringList entries = tfx::platform::listZipEntries(archiveInfo.absoluteFilePath());
-    if (entries.isEmpty()) {
+    const tfx::platform::ZipInspection inspection = tfx::platform::inspectZipArchive(archiveInfo.absoluteFilePath());
+    if (!inspection.ok || inspection.entries.isEmpty()) {
         QMessageBox::warning(this, "tfx", UiText::t("Could not read archive.", "アーカイブを読み込めませんでした。"));
         return;
     }
-    const QString unsafeEntry = firstUnsafeZipEntry(entries);
+    const QString unsafeEntry = firstUnsafeZipEntry(inspection.entries);
     if (!unsafeEntry.isEmpty()) {
         QMessageBox::warning(
             this,
@@ -209,16 +214,44 @@ void FilePane::extractSelectedZip()
                 .arg(unsafeEntry));
         return;
     }
+    // A symlink entry followed by files under its name lets an archive write
+    // outside the destination, so refuse archives containing links.
+    if (!inspection.symlinkEntries.isEmpty()) {
+        QMessageBox::warning(
+            this,
+            "tfx",
+            UiText::t("Archive contains a symbolic link and was not extracted:\n%1",
+                      "アーカイブにシンボリックリンクが含まれているため展開しませんでした:\n%1")
+                .arg(inspection.symlinkEntries.first()));
+        return;
+    }
+    constexpr int MaxEntries = 100000;
+    constexpr qint64 MaxTotalBytes = 4LL * 1024 * 1024 * 1024;
+    if (inspection.entries.size() > MaxEntries || inspection.totalUncompressedBytes > MaxTotalBytes) {
+        QMessageBox::warning(
+            this,
+            "tfx",
+            UiText::t("Archive is too large to extract (over %1 entries or %2 GB).",
+                      "アーカイブが大きすぎるため展開しませんでした（%1 エントリまたは %2 GB 超）。")
+                .arg(MaxEntries)
+                .arg(MaxTotalBytes / (1024 * 1024 * 1024)));
+        return;
+    }
 
-    if (!QDir().mkpath(destinationPath)) {
+    // Extract into a hidden work directory first so a failed run never leaves
+    // a partial tree under the final name.
+    const QString workPath = uniquePathInDirectory(
+        m_currentPath, "." + QFileInfo(destinationPath).fileName() + ".tfx-extract");
+    if (!QDir().mkpath(workPath)) {
         QMessageBox::warning(this, "tfx", UiText::t("Could not create extraction folder.", "展開先フォルダを作成できませんでした。"));
         return;
     }
 
     QString errorText;
-    const QStringList arguments = { archiveInfo.absoluteFilePath(), "-d", destinationPath };
-    if (!runProcess(unzipProgram, arguments, m_currentPath, &errorText)) {
-        QDir(destinationPath).removeRecursively();
+    const QStringList arguments = { archiveInfo.absoluteFilePath(), "-d", workPath };
+    if (!runProcess(unzipProgram, arguments, m_currentPath, &errorText)
+        || !QDir().rename(workPath, destinationPath)) {
+        QDir(workPath).removeRecursively();
         QMessageBox::warning(
             this,
             "tfx",

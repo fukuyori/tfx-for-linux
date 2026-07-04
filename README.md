@@ -1,7 +1,7 @@
 # tfx for Linux
 
 **Terminal-inspired interface File eXplorer for Linux**  
-Version: **0.6.4**
+Version: **0.6.5**
 
 English | [Japanese](README.ja.md)
 

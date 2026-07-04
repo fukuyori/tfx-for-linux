@@ -1,6 +1,6 @@
 # tfx for Linux Roadmap
 
-Current version: **0.5.9**
+Current version: **0.5.10**
 
 This roadmap tracks the practical development steps for the Linux Qt port as it
 moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
@@ -96,5 +96,5 @@ moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
   suppression, tab context menu, and state save/restore hardening. (done)
 - Search and filter refinements: search-result keyboard, preview, status,
   context menu, sorting, close controls, and search history. (done)
-- Test coverage for path handling, configuration, column configuration, Git
-  helpers, and file-operation helpers. (coverage started)
+- Test coverage for path handling, configuration, column configuration, Git,
+  search/tab state, and file-operation helpers. (done)

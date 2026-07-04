@@ -26,6 +26,7 @@ class PathHandlingTest : public QObject
 
 private slots:
     void canonicalDirectoryPathAcceptsOnlyExistingDirectories();
+    void canonicalDirectoryPathResolvesAliasesAndTrailingSeparators();
     void uniquePathInDirectoryAddsNumericSuffixes();
     void copyRecursivelyCopiesNestedDirectories();
     void copyRecursivelyFailsWhenDestinationExists();
@@ -44,6 +45,25 @@ void PathHandlingTest::canonicalDirectoryPathAcceptsOnlyExistingDirectories()
     QCOMPARE(tfx::core::canonicalDirectoryPath(directory), QFileInfo(directory).canonicalFilePath());
     QVERIFY(tfx::core::canonicalDirectoryPath(file).isEmpty());
     QVERIFY(tfx::core::canonicalDirectoryPath(QDir(temp.path()).filePath("missing")).isEmpty());
+}
+
+void PathHandlingTest::canonicalDirectoryPathResolvesAliasesAndTrailingSeparators()
+{
+    QTemporaryDir temp;
+    QVERIFY(temp.isValid());
+
+    const QDir root(temp.path());
+    const QString directory = root.filePath("folder");
+    QVERIFY(QDir().mkpath(directory));
+
+    QCOMPARE(tfx::core::canonicalDirectoryPath(directory + QDir::separator()),
+             QFileInfo(directory).canonicalFilePath());
+
+    const QString alias = root.filePath("folder-alias");
+    QFile::link(directory, alias);
+    if (QFileInfo(alias).exists()) {
+        QCOMPARE(tfx::core::canonicalDirectoryPath(alias), QFileInfo(directory).canonicalFilePath());
+    }
 }
 
 void PathHandlingTest::uniquePathInDirectoryAddsNumericSuffixes()

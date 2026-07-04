@@ -13,6 +13,7 @@ class TabStateTest : public QObject
 
 private slots:
     void normalizesRestoredTabPaths();
+    void removesDuplicateRestoredTabPaths();
     void clampsActiveTabIndex();
 };
 
@@ -35,6 +36,30 @@ void TabStateTest::normalizesRestoredTabPaths()
         two,
         oneAlias,
         root.filePath("missing"),
+    });
+
+    QCOMPARE(normalized, QStringList({
+        QFileInfo(one).canonicalFilePath(),
+        QFileInfo(two).canonicalFilePath(),
+    }));
+}
+
+void TabStateTest::removesDuplicateRestoredTabPaths()
+{
+    QTemporaryDir temp;
+    QVERIFY(temp.isValid());
+
+    const QDir root(temp.path());
+    const QString one = root.filePath("one");
+    const QString two = root.filePath("two");
+    QVERIFY(QDir().mkpath(one));
+    QVERIFY(QDir().mkpath(two));
+
+    const QStringList normalized = tfx::core::normalizedTabPaths({
+        one + QDir::separator(),
+        one,
+        two,
+        one,
     });
 
     QCOMPARE(normalized, QStringList({

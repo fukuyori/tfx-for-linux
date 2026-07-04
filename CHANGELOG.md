@@ -2,7 +2,7 @@
 
 This file records notable changes to `tfx-for-linux`.
 
-## [0.5.9] - 2026-07-04
+## [0.5.10] - 2026-07-04
 
 Packaging and install support.
 
@@ -62,6 +62,8 @@ Packaging and install support.
   file list.
 - Search terms are now kept in a persistent toolbar history, with newest terms
   first and duplicates collapsed.
+- Added search-history helper coverage for trimming, duplicate collapse,
+  existing-history cleanup, and history limits.
 - Added a terminal header button that syncs the active file pane to the
   terminal's current working directory.
 - File-pane tabs now show close buttons when multiple tabs are open, keep the
@@ -72,8 +74,9 @@ Packaging and install support.
   that point to the same directory collapse cleanly.
 - File-pane tabs now avoid opening duplicate directories, and the tab bar
   context menu supports new tab, close tab, close other tabs, and copy tab path.
-- Added tab-state helper coverage for restored tab normalization and active-tab
-  index clamping.
+- Added tab-state helper coverage for restored tab normalization, duplicate
+  restored tabs, and active-tab index clamping.
+- Expanded path-handling coverage for trailing separators and directory aliases.
 
 ## [0.5.5] - 2026-07-04
 

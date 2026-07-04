@@ -1,5 +1,6 @@
 #include "MainWindow.h"
 #include "UiText.h"
+#include "core/SearchState.h"
 #include "platform/Platform.h"
 
 #include <QAction>
@@ -1541,22 +1542,22 @@ void MainWindow::runSearchFromToolbar()
 
 void MainWindow::rememberSearchTerm(const QString &term)
 {
-    const QString trimmed = term.trimmed();
-    if (trimmed.isEmpty()) {
+    QStringList history;
+    for (int index = 0; index < m_searchEdit->count(); ++index) {
+        history << m_searchEdit->itemText(index);
+    }
+
+    const QStringList updated = tfx::core::updatedSearchHistory(history, term);
+    if (updated == history) {
         return;
     }
 
-    for (int index = m_searchEdit->count() - 1; index >= 0; --index) {
-        if (m_searchEdit->itemText(index).compare(trimmed, Qt::CaseInsensitive) == 0) {
-            m_searchEdit->removeItem(index);
-        }
-    }
-    m_searchEdit->insertItem(0, trimmed);
-    while (m_searchEdit->count() > 10) {
-        m_searchEdit->removeItem(m_searchEdit->count() - 1);
+    m_searchEdit->clear();
+    for (const QString &item : updated) {
+        m_searchEdit->addItem(item);
     }
     m_searchEdit->setCurrentIndex(0);
-    m_searchEdit->setEditText(trimmed);
+    m_searchEdit->setEditText(updated.first());
     saveSettings();
 }
 

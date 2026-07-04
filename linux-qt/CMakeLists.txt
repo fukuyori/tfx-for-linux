@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(tfx-for-linux VERSION 0.5.9 LANGUAGES CXX)
+project(tfx-for-linux VERSION 0.5.10 LANGUAGES CXX)
 
 include(GNUInstallDirs)
 include(CTest)
@@ -32,6 +32,8 @@ qt_add_executable(tfx
     src/core/FileTypeInfo.h
     src/core/GitService.cpp
     src/core/GitService.h
+    src/core/SearchState.cpp
+    src/core/SearchState.h
     src/core/TabState.cpp
     src/core/TabState.h
     src/controllers/GitStatusController.cpp
@@ -138,6 +140,15 @@ if(BUILD_TESTING AND Qt6Test_FOUND)
     target_include_directories(tfx_git_service_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(tfx_git_service_test PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME git_service COMMAND tfx_git_service_test)
+
+    qt_add_executable(tfx_search_state_test
+        tests/SearchStateTest.cpp
+        src/core/SearchState.cpp
+        src/core/SearchState.h
+    )
+    target_include_directories(tfx_search_state_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(tfx_search_state_test PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME search_state COMMAND tfx_search_state_test)
 
     qt_add_executable(tfx_tab_state_test
         tests/TabStateTest.cpp

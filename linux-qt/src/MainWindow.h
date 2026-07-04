@@ -36,11 +36,13 @@ private:
     void restoreSettings();
     void saveSettings();
     void setSplitVisible(bool visible);
+    void setSidebarVisible(bool visible);
     void setPreviewVisible(bool visible);
     void setTerminalVisible(bool visible);
     void setCommandOutputVisible(bool visible);
     void setHiddenFilesVisible(bool visible);
     void setIconViewEnabled(bool enabled);
+    void collapseFolderTree();
     void syncIconViewToggle();
     void setActivePane(FilePane *pane);
     void focusOtherPane();
@@ -61,6 +63,7 @@ private:
     QToolButton *m_terminalButton = nullptr;
     QWidget *m_sidebar;
     QAction *m_splitAction = nullptr;
+    QAction *m_sidebarAction = nullptr;
     QAction *m_previewAction = nullptr;
     QAction *m_terminalAction = nullptr;
     QAction *m_commandOutputAction = nullptr;

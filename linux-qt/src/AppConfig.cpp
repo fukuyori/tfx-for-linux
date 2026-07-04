@@ -51,6 +51,8 @@ QHash<QString, QString> defaultShortcuts()
         {"reload", normalizedShortcut("f5")},
         {"openTerminal", normalizedShortcut("ctrl+shift+t")},
         {"togglePreview", normalizedShortcut("ctrl+shift+p")},
+        {"togglePreviewSource", normalizedShortcut("ctrl+shift+r")},
+        {"openPreviewExternal", normalizedShortcut("ctrl+shift+i")},
         {"toggleSplit", normalizedShortcut("ctrl+backslash")},
         {"focusSearch", normalizedShortcut("ctrl+f")},
         {"toggleHidden", normalizedShortcut("ctrl+shift+.")},
@@ -182,6 +184,8 @@ QString AppConfig::defaultConfigText()
         "reload = \"f5\"\n"
         "openTerminal = \"ctrl+shift+t\"\n"
         "togglePreview = \"ctrl+shift+p\"\n"
+        "togglePreviewSource = \"ctrl+shift+r\"\n"
+        "openPreviewExternal = \"ctrl+shift+i\"\n"
         "toggleSplit = \"ctrl+backslash\"\n"
         "focusSearch = \"ctrl+f\"\n"
         "toggleHidden = \"ctrl+shift+.\"\n"
@@ -205,6 +209,8 @@ QString AppConfig::defaultConfigText()
         "# [startup]\n"
         "# layout = \"restore\"\n"
         "# preview = \"restore\"\n"
+        "# terminal = \"restore\"\n"
+        "# folderTree = \"restore\"\n"
         "# rightFolder = \"~/Downloads\"\n"
         "# rightFolders = [\"~/Downloads\", \"~/Documents\"]\n"
         "\n"
@@ -398,7 +404,7 @@ void AppConfig::applyValue(const QString &section, const QString &key, const QSt
 
     if (section == "startup") {
         bool ok = false;
-        if (key == "layout" || key == "preview" || key == "rightFolder") {
+        if (key == "layout" || key == "preview" || key == "terminal" || key == "folderTree" || key == "rightFolder") {
             const QString text = unquote(value, &ok);
             if (!ok) {
                 addWarning(lineNumber, "Invalid startup value");
@@ -406,6 +412,8 @@ void AppConfig::applyValue(const QString &section, const QString &key, const QSt
             }
             if (key == "layout" && (text == "single" || text == "split" || text == "restore")) startup.layout = text;
             else if (key == "preview" && (text == "show" || text == "hide" || text == "restore")) startup.preview = text;
+            else if (key == "terminal" && (text == "show" || text == "hide" || text == "restore")) startup.terminal = text;
+            else if (key == "folderTree" && (text == "show" || text == "hide" || text == "restore")) startup.folderTree = text;
             else if (key == "rightFolder") startup.rightFolder = expandPath(text);
             return;
         }

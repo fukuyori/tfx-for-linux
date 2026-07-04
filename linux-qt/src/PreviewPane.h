@@ -18,6 +18,8 @@ public:
 public slots:
     void previewPath(const QString &path);
     void previewSelection(const QStringList &paths);
+    void toggleSourceRendered();
+    void openCurrentPreviewExternally();
 
 private:
     QString metadataText(const QFileInfo &info) const;
@@ -29,7 +31,6 @@ private:
     bool showText(const QString &path);
     void setRenderAvailable(bool available);
     void showPreferredTextView();
-    void openCurrentImageExternally();
 
     QStackedWidget *m_stack;
     QLabel *m_title;

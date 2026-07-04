@@ -297,12 +297,23 @@ MainWindow::MainWindow(const QString &initialPath, QWidget *parent)
     sidebarLayout->setSpacing(6);
     auto *pinnedLabel = new QLabel(UiText::t("Pinned", "ピン留め"), m_sidebar);
     auto *treeLabel = new QLabel(UiText::t("Folders", "フォルダー"), m_sidebar);
+    auto *collapseTreeButton = new QToolButton(m_sidebar);
     pinnedLabel->setObjectName("sectionLabel");
     treeLabel->setObjectName("sectionLabel");
+    collapseTreeButton->setObjectName("toolbarIconButton");
+    collapseTreeButton->setText("-");
+    collapseTreeButton->setToolTip(UiText::t("Collapse all folders", "すべてのフォルダーを折りたたむ"));
+    collapseTreeButton->setFixedSize(24, 22);
+    connect(collapseTreeButton, &QToolButton::clicked, this, &MainWindow::collapseFolderTree);
+    auto *treeHeaderLayout = new QHBoxLayout();
+    treeHeaderLayout->setContentsMargins(0, 0, 0, 0);
+    treeHeaderLayout->addWidget(treeLabel);
+    treeHeaderLayout->addStretch(1);
+    treeHeaderLayout->addWidget(collapseTreeButton);
     sidebarLayout->addWidget(pinnedLabel);
     sidebarLayout->addWidget(m_pinnedList);
     sidebarLayout->addWidget(m_pinnedSpacer);
-    sidebarLayout->addWidget(treeLabel);
+    sidebarLayout->addLayout(treeHeaderLayout);
     sidebarLayout->addWidget(m_treeView, 1);
 
     // Each pane lives in a dock widget so it can be rearranged, floated, or
@@ -378,6 +389,10 @@ MainWindow::MainWindow(const QString &initialPath, QWidget *parent)
     connect(focusOtherPaneShortcut, &QShortcut::activated, this, &MainWindow::focusOtherPane);
     auto *focusPreviousPaneShortcut = new QShortcut(QKeySequence(Qt::SHIFT | Qt::Key_Tab), this);
     connect(focusPreviousPaneShortcut, &QShortcut::activated, this, &MainWindow::focusOtherPane);
+    auto *togglePreviewSourceShortcut = new QShortcut(QKeySequence(m_config.shortcut("togglePreviewSource", "Ctrl+Shift+R")), this);
+    connect(togglePreviewSourceShortcut, &QShortcut::activated, m_previewPane, &PreviewPane::toggleSourceRendered);
+    auto *openPreviewExternalShortcut = new QShortcut(QKeySequence(m_config.shortcut("openPreviewExternal", "Ctrl+Shift+I")), this);
+    connect(openPreviewExternalShortcut, &QShortcut::activated, m_previewPane, &PreviewPane::openCurrentPreviewExternally);
     setActivePane(m_leftPane);
     m_previewPane->previewPath(initialPath);
     restoreSettings();
@@ -415,6 +430,11 @@ void MainWindow::buildActions()
     addMenuAction(editMenu, UiText::t("Copy Path", "パスをコピー"), this, [this]() { activePane()->copySelectedPaths(); }, QKeySequence("Ctrl+Shift+C"));
 
     auto *viewMenu = menuBar()->addMenu(UiText::t("View", "表示"));
+    m_sidebarAction = viewMenu->addAction(UiText::t("Folder Sidebar", "フォルダーサイドバー"));
+    m_sidebarAction->setCheckable(true);
+    m_sidebarAction->setChecked(true);
+    connect(m_sidebarAction, &QAction::toggled, this, &MainWindow::setSidebarVisible);
+
     m_splitAction = viewMenu->addAction(UiText::t("Split Pane", "スプリット表示"));
     m_splitAction->setCheckable(true);
     m_splitAction->setChecked(true);
@@ -592,6 +612,8 @@ void MainWindow::buildFolderSidebar(const QString &initialPath)
         menu.addAction(UiText::t("Copy Path", "パスをコピー"), this, [path]() {
             QApplication::clipboard()->setText(path);
         });
+        menu.addSeparator();
+        menu.addAction(UiText::t("Collapse All", "すべて折りたたむ"), this, &MainWindow::collapseFolderTree);
         menu.addSeparator();
         menu.addAction(UiText::t("Pin Folder", "フォルダをピン留め"), this, [this, path]() {
             addPinnedFolder(path);
@@ -1049,9 +1071,10 @@ void MainWindow::restoreSettings()
 {
     m_isRestoringSettings = true;
     QSettings settings;
+    bool sidebarVisible = settings.value("View/sidebarVisible", true).toBool();
     bool splitVisible = settings.value("View/splitVisible", true).toBool();
     bool previewVisible = settings.value("View/previewVisible", true).toBool();
-    const bool terminalVisible = settings.value("View/terminalVisible", false).toBool();
+    bool terminalVisible = settings.value("View/terminalVisible", false).toBool();
     const bool commandOutputVisible = settings.value("View/commandOutputVisible", false).toBool();
     m_leftPane->setViewMode(settings.value("View/leftIconMode", false).toBool());
     m_rightPane->setViewMode(settings.value("View/rightIconMode", false).toBool());
@@ -1064,6 +1087,16 @@ void MainWindow::restoreSettings()
         previewVisible = true;
     } else if (m_config.startup.preview == "hide") {
         previewVisible = false;
+    }
+    if (m_config.startup.terminal == "show") {
+        terminalVisible = true;
+    } else if (m_config.startup.terminal == "hide") {
+        terminalVisible = false;
+    }
+    if (m_config.startup.folderTree == "show") {
+        sidebarVisible = true;
+    } else if (m_config.startup.folderTree == "hide") {
+        sidebarVisible = false;
     }
 
     const QByteArray geometry = settings.value("MainWindow/geometry").toByteArray();
@@ -1079,7 +1112,7 @@ void MainWindow::restoreSettings()
         restoreState(state, 1);
     }
 
-    m_dockSidebar->setVisible(true);
+    m_dockSidebar->setVisible(sidebarVisible);
     m_dockLeftPane->setVisible(true);
     m_dockRightPane->setVisible(splitVisible);
     m_dockPreview->setVisible(previewVisible);
@@ -1143,6 +1176,10 @@ void MainWindow::restoreSettings()
         const QSignalBlocker terminalButtonBlocker(m_terminalButton);
         m_terminalButton->setChecked(terminalVisible);
     }
+    if (m_sidebarAction) {
+        const QSignalBlocker sidebarActionBlocker(m_sidebarAction);
+        m_sidebarAction->setChecked(sidebarVisible);
+    }
     if (m_commandOutputAction) {
         const QSignalBlocker outputActionBlocker(m_commandOutputAction);
         m_commandOutputAction->setChecked(commandOutputVisible);
@@ -1163,6 +1200,7 @@ void MainWindow::saveSettings()
     // saveState() captures the full dock layout (positions, sizes, floating)
     // and the toolbar, replacing the old per-splitter persistence.
     settings.setValue("MainWindow/state", saveState(1));
+    settings.setValue("View/sidebarVisible", m_dockSidebar->isVisible());
     settings.setValue("View/splitVisible", m_dockRightPane->isVisible());
     settings.setValue("View/previewVisible", m_dockPreview->isVisible());
     settings.setValue("View/terminalVisible", m_dockTerminal->isVisible());
@@ -1192,6 +1230,16 @@ void MainWindow::setIconViewEnabled(bool enabled)
     syncIconViewToggle();
     if (!m_isRestoringSettings) {
         saveSettings();
+    }
+}
+
+void MainWindow::collapseFolderTree()
+{
+    m_treeView->collapseAll();
+    const QModelIndex current = m_treeModel->index(activePane()->currentPath());
+    if (current.isValid()) {
+        m_treeView->setCurrentIndex(current);
+        m_treeView->scrollTo(current, QAbstractItemView::PositionAtCenter);
     }
 }
 
@@ -1288,6 +1336,18 @@ void MainWindow::setSplitVisible(bool visible)
     if (m_splitAction) {
         const QSignalBlocker blocker(m_splitAction);
         m_splitAction->setChecked(visible);
+    }
+    if (!m_isRestoringSettings) {
+        saveSettings();
+    }
+}
+
+void MainWindow::setSidebarVisible(bool visible)
+{
+    m_dockSidebar->setVisible(visible);
+    if (m_sidebarAction && m_sidebarAction->isChecked() != visible) {
+        const QSignalBlocker blocker(m_sidebarAction);
+        m_sidebarAction->setChecked(visible);
     }
     if (!m_isRestoringSettings) {
         saveSettings();

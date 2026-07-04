@@ -65,6 +65,8 @@ size = 12
 reload = "f5"
 openTerminal = "ctrl+shift+t"
 togglePreview = "ctrl+shift+p"
+togglePreviewSource = "ctrl+shift+r"
+openPreviewExternal = "ctrl+shift+i"
 toggleSplit = "ctrl+backslash"
 focusSearch = "ctrl+f"
 toggleHidden = "ctrl+shift+."
@@ -88,6 +90,8 @@ quit = "ctrl+q"
 # [startup]
 # layout = "restore"
 # preview = "restore"
+# terminal = "restore"
+# folderTree = "restore"
 # rightFolder = "~/Downloads"
 # rightFolders = ["~/Downloads", "~/Documents"]
 
@@ -144,6 +148,10 @@ terminalSize = 13
 `[startup] layout` accepts `single`, `split`, or `restore`.
 
 `[startup] preview` accepts `show`, `hide`, or `restore`.
+
+`[startup] terminal` accepts `show`, `hide`, or `restore`.
+
+`[startup] folderTree` accepts `show`, `hide`, or `restore`.
 
 `rightFolder` and `rightFolders` accept absolute paths or `~`-expanded paths. When `rightFolders` is used, the first valid folder is used for the right pane.
 

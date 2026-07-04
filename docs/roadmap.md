@@ -1,6 +1,6 @@
 # tfx for Linux Roadmap
 
-Current version: **0.5.3**
+Current version: **0.5.4**
 
 This roadmap tracks the practical development steps for the Linux Qt port as it
 moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
@@ -56,18 +56,19 @@ moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
 
 ## Phase 6: View and interaction polish (from tfx macOS 0.7.2–0.7.96)
 
-- Folder-tree visibility toggle and a collapse-all button.
+- Folder-tree visibility toggle. (done)
+- Folder-tree collapse-all button. (done)
 - Click-to-sort column headers with ascending/descending indicators (coexisting
   with name-column resize); confirm drag-to-reorder columns.
 - Markdown rendering improvements: horizontal rules, ordered lists, tables, and
   embedding local images as `data:` URLs; show the external-image button only
   when remote images are present.
-- Preview-pane keyboard shortcuts (source/rendered toggle, load images).
+- Preview-pane keyboard shortcuts (source/rendered toggle, open externally). (done)
 - Drag-and-drop refinements: highlight the target folder, show a pane drop
   border when dragging over empty area, remove the moved row immediately, and
   avoid snap-back on a successful drop.
-- Startup visibility options for terminal/preview/folder-tree, and a window
-  geometry option (`-g`/`--geometry` and `config.toml`).
+- Startup visibility options for terminal/preview/folder-tree. (done)
+- Window geometry option (`-g`/`--geometry` and `config.toml`).
 - `[naming]` config for placeholder language (auto/en/ja).
 
 ## Phase 7: Theme, hardening, and packaging

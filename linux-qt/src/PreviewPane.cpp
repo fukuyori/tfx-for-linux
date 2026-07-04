@@ -104,10 +104,7 @@ PreviewPane::PreviewPane(QWidget *parent)
     m_sourceToggle->setCheckable(true);
     m_sourceToggle->setChecked(true);
     m_sourceToggle->setToolButtonStyle(Qt::ToolButtonIconOnly);
-    connect(m_sourceToggle, &QToolButton::clicked, this, [this]() {
-        m_prefersRendered = !m_prefersRendered;
-        showPreferredTextView();
-    });
+    connect(m_sourceToggle, &QToolButton::clicked, this, &PreviewPane::toggleSourceRendered);
 
     m_openExternal->setObjectName("previewOpenExternal");
     m_openExternal->setIcon(previewExternalIcon());
@@ -115,9 +112,7 @@ PreviewPane::PreviewPane(QWidget *parent)
     m_openExternal->setToolButtonStyle(Qt::ToolButtonIconOnly);
     m_openExternal->setToolTip(UiText::t("Open in external viewer", "外部ビューアで開く"));
     m_openExternal->setVisible(false);
-    connect(m_openExternal, &QToolButton::clicked, this, [this]() {
-        openCurrentImageExternally();
-    });
+    connect(m_openExternal, &QToolButton::clicked, this, &PreviewPane::openCurrentPreviewExternally);
 
     m_stack->addWidget(m_text);
     m_stack->addWidget(m_image);
@@ -380,7 +375,16 @@ void PreviewPane::showPreferredTextView()
         : UiText::t("Show source", "ソースを表示"));
 }
 
-void PreviewPane::openCurrentImageExternally()
+void PreviewPane::toggleSourceRendered()
+{
+    if (!m_renderAvailable) {
+        return;
+    }
+    m_prefersRendered = !m_prefersRendered;
+    showPreferredTextView();
+}
+
+void PreviewPane::openCurrentPreviewExternally()
 {
     if (m_currentImagePath.isEmpty()) {
         return;

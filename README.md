@@ -1,7 +1,7 @@
 # tfx for Linux
 
 **Terminal-inspired interface File eXplorer for Linux**  
-Version: **0.5.3**
+Version: **0.5.4**
 
 English | [Japanese](README.ja.md)
 
@@ -46,11 +46,14 @@ When no folder is specified, the application opens the current working directory
 ## Current Scope
 
 - Folder tree and pinned folders (reorder pins by dragging; drop folders to pin)
+- Folder sidebar visibility toggle, collapse-all control, and startup visibility control
 - Single-pane and split-pane file list, with per-pane details and icon view modes
 - Dockable panes: the sidebar, both file panes, the preview, and the terminal can be rearranged, floated, or tabbed; toggling visibility splits the current window instead of resizing it
 - Range selection (click then Shift+click) and toggle selection (Ctrl+click)
 - Startup path handling: the left pane opens the command-line folder, or the current working directory when no folder is specified
+- Startup visibility control for preview, terminal, and folder sidebar
 - Preview pane with source/rendered switching, an external image viewer button, and a multi-selection summary
+- Preview keyboard shortcuts for source/rendered switching and opening the current preview externally
 - Browse ZIP archives as folders (navigate in, open/extract entries)
 - Interactive terminal pane (QTermWidget) whose working directory follows the active pane; falls back to a simple command pane when unavailable
 - User-editable `config.toml` created under `~/.config/tfx/`, including window/pane transparency, per-pane fonts, and the terminal colour scheme

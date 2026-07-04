@@ -2,6 +2,18 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.5.4] - 2026-07-04
+
+View and preview workflow polish.
+
+### Added
+
+- Folder sidebar visibility toggle and `[startup]` visibility controls for the
+  terminal and folder sidebar.
+- Folder-tree collapse-all control in the sidebar and tree context menu.
+- Preview-pane shortcuts for source/rendered switching and opening the current
+  preview externally.
+
 ## [0.5.3] - 2026-07-04
 
 File-operation and clipboard paste improvements.

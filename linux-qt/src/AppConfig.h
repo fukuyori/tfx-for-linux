@@ -60,6 +60,8 @@ struct AppStartupConfig
 {
     QString layout = "restore";
     QString preview = "restore";
+    QString terminal = "restore";
+    QString folderTree = "restore";
     QString rightFolder;
     QStringList rightFolders;
 };

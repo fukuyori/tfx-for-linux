@@ -442,6 +442,9 @@ MainWindow::MainWindow(const QString &initialPath, const QString &geometryOverri
 
     auto *versionLabel = new QLabel(QString("v%1").arg(TFX_VERSION), this);
     versionLabel->setObjectName("statusVersion");
+    m_fileOperationSummary = new QLabel(this);
+    m_fileOperationSummary->setObjectName("fileOperationSummary");
+    m_fileOperationSummary->hide();
     m_fileOperationProgress = new QProgressBar(this);
     m_fileOperationProgress->setRange(0, 100);
     m_fileOperationProgress->setFixedWidth(180);
@@ -451,6 +454,7 @@ MainWindow::MainWindow(const QString &initialPath, const QString &geometryOverri
     m_fileOperationCancel->setObjectName("fileOperationCancel");
     m_fileOperationCancel->hide();
     connect(m_fileOperationCancel, &QPushButton::clicked, this, &MainWindow::cancelFileOperation);
+    statusBar()->addPermanentWidget(m_fileOperationSummary);
     statusBar()->addPermanentWidget(m_fileOperationProgress);
     statusBar()->addPermanentWidget(m_fileOperationCancel);
     statusBar()->addPermanentWidget(versionLabel);
@@ -464,11 +468,16 @@ MainWindow::MainWindow(const QString &initialPath, const QString &geometryOverri
 void MainWindow::closeEvent(QCloseEvent *event)
 {
     if (m_fileOperationWorker) {
+        const int pendingCount = queuedFileOperationCount();
+        const QString prompt = pendingCount > 0
+            ? UiText::t("A file operation is still running and %1 item(s) are queued. Cancel them and quit?",
+                        "ファイル操作を実行中で、%1 件が待機中です。キャンセルして終了しますか？").arg(pendingCount)
+            : UiText::t("A file operation is still running. Cancel it and quit?",
+                        "ファイル操作を実行中です。キャンセルして終了しますか？");
         const auto result = QMessageBox::question(
             this,
             UiText::t("File Operation Running", "ファイル操作を実行中"),
-            UiText::t("A file operation is still running. Cancel it and quit?",
-                      "ファイル操作を実行中です。キャンセルして終了しますか？"));
+            prompt);
         if (result != QMessageBox::Yes) {
             event->ignore();
             return;
@@ -490,19 +499,27 @@ void MainWindow::startFileOperation(const QVector<FileOperationRequest> &request
     }
     if (m_fileOperationWorker) {
         m_queuedFileOperations += requests;
-        statusBar()->showMessage(UiText::t("File operation queued.", "ファイル操作をキューに追加しました。"), 3000);
+        updateFileOperationSummary();
+        statusBar()->showMessage(
+            UiText::t("File operation queued (%1 pending item(s)).", "ファイル操作をキューに追加しました（%1 件待機中）。")
+                .arg(queuedFileOperationCount()),
+            3000);
         return;
     }
 
     m_fileOperationThread = new QThread(this);
     m_fileOperationWorker = new FileOperationWorker(requests);
     m_fileOperationWorker->moveToThread(m_fileOperationThread);
+    m_lastFileOperationCompleted = 0;
+    m_lastFileOperationTotal = 0;
 
     m_fileOperationProgress->setRange(0, 0);
     m_fileOperationProgress->setValue(0);
+    m_fileOperationSummary->show();
     m_fileOperationProgress->show();
     m_fileOperationCancel->setEnabled(true);
     m_fileOperationCancel->show();
+    updateFileOperationSummary(0, 0);
     statusBar()->showMessage(UiText::t("File operation running...", "ファイル操作を実行中..."));
 
     connect(m_fileOperationThread, &QThread::started, m_fileOperationWorker, &FileOperationWorker::run);
@@ -511,20 +528,20 @@ void MainWindow::startFileOperation(const QVector<FileOperationRequest> &request
             [this](int completed, int total, const QString &path) {
         m_fileOperationProgress->setRange(0, qMax(1, total));
         m_fileOperationProgress->setValue(qMin(completed, total));
-        m_fileOperationProgress->setFormat(QString("%1/%2").arg(completed).arg(total));
+        updateFileOperationSummary(completed, total);
         statusBar()->showMessage(UiText::t("Transferring: %1", "転送中: %1").arg(QFileInfo(path).fileName()));
     });
     connect(m_fileOperationWorker, &FileOperationWorker::finished, this,
             [this](const QStringList &directories) {
-        completeFileOperation(directories, UiText::t("File operation completed.", "ファイル操作が完了しました。"));
+        completeFileOperation(directories, UiText::t("File operation completed.", "ファイル操作が完了しました。"), true);
     });
     connect(m_fileOperationWorker, &FileOperationWorker::failed, this,
             [this](const QString &message, const QStringList &directories) {
-        completeFileOperation(directories, message);
+        completeFileOperation(directories, message, false);
     });
     connect(m_fileOperationWorker, &FileOperationWorker::canceled, this,
             [this](const QStringList &directories) {
-        completeFileOperation(directories, UiText::t("File operation canceled.", "ファイル操作をキャンセルしました。"));
+        completeFileOperation(directories, UiText::t("File operation canceled.", "ファイル操作をキャンセルしました。"), false);
     });
 
     m_fileOperationThread->start();
@@ -535,14 +552,24 @@ void MainWindow::cancelFileOperation()
     if (!m_fileOperationWorker) {
         return;
     }
+    m_queuedFileOperations.clear();
+    updateFileOperationSummary();
     m_fileOperationCancel->setEnabled(false);
-    statusBar()->showMessage(UiText::t("Canceling file operation...", "ファイル操作をキャンセル中..."));
+    statusBar()->showMessage(UiText::t("Canceling file operation and clearing the queue...",
+                                      "ファイル操作をキャンセルし、キューをクリアしています..."));
     m_fileOperationWorker->cancel();
 }
 
-void MainWindow::completeFileOperation(const QStringList &directories, const QString &message)
+void MainWindow::completeFileOperation(const QStringList &directories, const QString &message, bool continueQueued)
 {
     reloadChangedDirectories(directories);
+
+    const int pendingCount = queuedFileOperationCount();
+    QString finalMessage = message;
+    if (!continueQueued && pendingCount > 0) {
+        m_queuedFileOperations.clear();
+        finalMessage += UiText::t(" Queued item(s) cleared: %1.", " 待機中の項目をクリアしました: %1 件。").arg(pendingCount);
+    }
 
     FileOperationWorker *worker = m_fileOperationWorker;
     QThread *thread = m_fileOperationThread;
@@ -564,8 +591,11 @@ void MainWindow::completeFileOperation(const QStringList &directories, const QSt
     }
 
     m_fileOperationProgress->hide();
+    m_fileOperationSummary->hide();
     m_fileOperationCancel->hide();
-    statusBar()->showMessage(message, 4000);
+    m_lastFileOperationCompleted = 0;
+    m_lastFileOperationTotal = 0;
+    statusBar()->showMessage(finalMessage, 5000);
 
     if (closeAfterCancel) {
         if (!thread) {
@@ -574,7 +604,7 @@ void MainWindow::completeFileOperation(const QStringList &directories, const QSt
         return;
     }
 
-    if (!m_queuedFileOperations.isEmpty()) {
+    if (continueQueued && !m_queuedFileOperations.isEmpty()) {
         const QVector<FileOperationRequest> queued = m_queuedFileOperations;
         m_queuedFileOperations.clear();
         QTimer::singleShot(0, this, [this, queued]() {
@@ -590,6 +620,36 @@ void MainWindow::reloadChangedDirectories(const QStringList &directories)
             candidate->reload();
         }
     }
+}
+
+int MainWindow::queuedFileOperationCount() const
+{
+    return m_queuedFileOperations.size();
+}
+
+void MainWindow::updateFileOperationSummary(int completed, int total)
+{
+    if (!m_fileOperationSummary || !m_fileOperationProgress) {
+        return;
+    }
+
+    if (total >= 0) {
+        m_lastFileOperationCompleted = qMax(0, completed);
+        m_lastFileOperationTotal = qMax(0, total);
+    }
+
+    QString text = m_lastFileOperationTotal > 0
+        ? UiText::t("Files %1/%2", "ファイル %1/%2").arg(m_lastFileOperationCompleted).arg(m_lastFileOperationTotal)
+        : UiText::t("Preparing", "準備中");
+
+    const int queuedCount = queuedFileOperationCount();
+    if (queuedCount > 0) {
+        text += UiText::t(" | queued %1", " | 待機 %1").arg(queuedCount);
+    }
+    m_fileOperationSummary->setText(text);
+    m_fileOperationProgress->setFormat(m_lastFileOperationTotal > 0
+        ? QString("%1/%2").arg(m_lastFileOperationCompleted).arg(m_lastFileOperationTotal)
+        : QString());
 }
 
 void MainWindow::buildActions()

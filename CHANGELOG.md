@@ -2,7 +2,7 @@
 
 This file records notable changes to `tfx-for-linux`.
 
-## [0.5.6] - 2026-07-04
+## [0.5.7] - 2026-07-04
 
 Packaging and install support.
 
@@ -13,8 +13,25 @@ Packaging and install support.
 - Copy/move paste and drop operations now run on a background worker with a
   status-bar progress indicator, cancellation, queued follow-up operations, and
   partial destination cleanup on cancel.
+- File-operation progress now keeps a visible status-bar summary with queued
+  item counts, and cancel clears pending queued operations.
+- Queued file operations now continue only after a successful batch; failures
+  stop and clear the pending queue so follow-up operations do not run blindly.
 - Added Qt Test coverage for the file-operation worker, including recursive
   copy, rename and copy-fallback moves, cancellation cleanup, and CTest in CI.
+- Hardened ZIP browsing/extraction by rejecting unsafe entry paths before
+  preview extraction or full archive extraction, with regression coverage.
+- Hardened rendered previews: HTML files render as escaped source, Markdown
+  remote images render as links instead of auto-loaded images, preview links
+  only open `http`/`https`, and local embedded images must stay under the
+  Markdown file's directory.
+- Hardened process launch paths by canonicalizing terminal working directories,
+  using `cd --` for explicit terminal navigation, and rejecting unavailable
+  working directories for user-defined commands.
+- Added top-level `theme = "dark" | "light"` config support; `[colors]`
+  continues to override the selected built-in palette.
+- Added a disk cache for PDF preview images and multi-stage rendering fallback
+  so previews can reuse successful renders and retry at smaller sizes.
 
 ## [0.5.5] - 2026-07-04
 

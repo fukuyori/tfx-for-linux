@@ -2,8 +2,10 @@
 #include "UiText.h"
 #include "platform/Platform.h"
 
+#include <QCryptographicHash>
 #include <QDateTime>
 #include <QDesktopServices>
+#include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QImageReader>
@@ -13,6 +15,7 @@
 #include <QPainterPath>
 #include <QPixmap>
 #include <QRegularExpression>
+#include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTextDocument>
 #include <QTextDocumentFragment>
@@ -103,6 +106,61 @@ QString cleanedMarkdownUrl(QString url)
     }
     return url;
 }
+
+bool isAllowedExternalPreviewUrl(const QUrl &url)
+{
+    return url.isValid() && (url.scheme() == "http" || url.scheme() == "https");
+}
+
+QString htmlPreBlock(const QString &content)
+{
+    QString escaped = content;
+    escaped.replace('&', "&amp;");
+    escaped.replace('<', "&lt;");
+    escaped.replace('>', "&gt;");
+    escaped.replace('"', "&quot;");
+    return QString("<body><pre style='white-space:pre-wrap;'>%1</pre></body>")
+        .arg(escaped);
+}
+
+bool isLocalPathUnderBase(const QString &path, const QDir &baseDir)
+{
+    const QString base = baseDir.canonicalPath();
+    const QString target = QFileInfo(path).canonicalFilePath();
+    if (base.isEmpty() || target.isEmpty()) {
+        return false;
+    }
+    return target == base || target.startsWith(base + QLatin1Char('/'));
+}
+
+QString pdfPreviewCachePath(const QString &path)
+{
+    const QFileInfo info(path);
+    const QString cacheRoot = QDir(QStandardPaths::writableLocation(QStandardPaths::CacheLocation))
+        .filePath("pdf-preview");
+    if (!QDir().mkpath(cacheRoot)) {
+        return QString();
+    }
+
+    const QString identity = QString("%1|%2|%3")
+        .arg(info.canonicalFilePath().isEmpty() ? info.absoluteFilePath() : info.canonicalFilePath())
+        .arg(info.size())
+        .arg(info.lastModified().toMSecsSinceEpoch());
+    const QByteArray digest = QCryptographicHash::hash(identity.toUtf8(), QCryptographicHash::Sha256).toHex();
+    return QDir(cacheRoot).filePath(QString::fromLatin1(digest) + ".png");
+}
+
+bool renderPdfPreviewWithFallback(const QString &path, const QString &outputPng)
+{
+    const QList<int> scales = {900, 720, 480};
+    for (int scale : scales) {
+        QFile::remove(outputPng);
+        if (tfx::platform::renderPdfPreview(path, outputPng, scale) && QFileInfo::exists(outputPng)) {
+            return true;
+        }
+    }
+    return false;
+}
 }
 
 PreviewPane::PreviewPane(QWidget *parent)
@@ -126,7 +184,9 @@ PreviewPane::PreviewPane(QWidget *parent)
     m_text->setLineWrapMode(QPlainTextEdit::NoWrap);
     m_text->setObjectName("previewCode");
     m_rendered->setObjectName("previewRendered");
-    m_rendered->setOpenExternalLinks(true);
+    m_rendered->setOpenExternalLinks(false);
+    m_rendered->setOpenLinks(false);
+    connect(m_rendered, &QTextBrowser::anchorClicked, this, &PreviewPane::openPreviewLink);
 
     m_sourceToggle->setObjectName("previewSourceToggle");
     m_sourceToggle->setIcon(previewSourceIcon());
@@ -229,6 +289,14 @@ void PreviewPane::previewSelection(const QStringList &paths)
     m_stack->setCurrentWidget(m_text);
 }
 
+void PreviewPane::openPreviewLink(const QUrl &url)
+{
+    if (!isAllowedExternalPreviewUrl(url)) {
+        return;
+    }
+    QDesktopServices::openUrl(url);
+}
+
 QString PreviewPane::metadataText(const QFileInfo &info) const
 {
     return UiText::t("%1\n%2\nSize: %3 bytes\nModified: %4\nPath: %5",
@@ -247,13 +315,13 @@ QString PreviewPane::renderHtmlForTextFile(const QString &path, const QString &c
         return renderMarkdown(path, content);
     }
     if (suffix == "html" || suffix == "htm") {
-        return content;
+        return htmlPreBlock(content);
     }
     if (suffix == "json") {
         QJsonParseError error;
         const QJsonDocument document = QJsonDocument::fromJson(content.toUtf8(), &error);
         if (error.error == QJsonParseError::NoError) {
-            return QString("<body style='background:#151a1e;color:#d9e1e8;'><pre>%1</pre></body>")
+            return QString("<body><pre>%1</pre></body>")
                 .arg(escapeHtml(QString::fromUtf8(document.toJson(QJsonDocument::Indented))));
         }
     }
@@ -283,10 +351,11 @@ QString PreviewPane::renderMarkdown(const QString &path, const QString &content)
             target = target.left(titleStart).trimmed();
         }
         const QUrl url(target);
-        if (url.scheme() == "http" || url.scheme() == "https") {
+        if (isAllowedExternalPreviewUrl(url)) {
             if (m_externalPreviewUrl.isEmpty()) {
                 m_externalPreviewUrl = target;
             }
+            replacements.prepend({match.captured(0), QString("[%1](%2)").arg(match.captured(1), target)});
             continue;
         }
         if (!url.scheme().isEmpty() && url.scheme() != "file") {
@@ -296,6 +365,9 @@ QString PreviewPane::renderMarkdown(const QString &path, const QString &content)
         const QString localPath = url.isLocalFile()
             ? url.toLocalFile()
             : baseDir.filePath(QUrl::fromPercentEncoding(target.toUtf8()));
+        if (!isLocalPathUnderBase(localPath, baseDir)) {
+            continue;
+        }
         const QString dataUrl = imageDataUrl(localPath);
         if (!dataUrl.isEmpty()) {
             replacements.prepend({match.captured(0), QString("![%1](%2)").arg(match.captured(1), dataUrl)});
@@ -309,13 +381,13 @@ QString PreviewPane::renderMarkdown(const QString &path, const QString &content)
     const QString body = QTextDocumentFragment::fromMarkdown(
         markdown,
         QTextDocument::MarkdownDialectGitHub).toHtml();
-    return QString("<body style='background:#151a1e;color:#d9e1e8;font-family:sans-serif;line-height:1.5;'>%1</body>")
+    return QString("<body style='font-family:sans-serif;line-height:1.5;'>%1</body>")
         .arg(body);
 }
 
 QString PreviewPane::csvToHtmlTable(const QString &content, QChar delimiter) const
 {
-    QString html = "<body style='background:#151a1e;'><table cellspacing='0' cellpadding='6' style='border-collapse:collapse;color:#d9e1e8;font-family:monospace;'>";
+    QString html = "<body><table cellspacing='0' cellpadding='6' style='border-collapse:collapse;font-family:monospace;'>";
     const QStringList lines = content.split(QRegularExpression("[\r\n]+"), Qt::SkipEmptyParts);
     for (const QString &line : lines.mid(0, 200)) {
         html += "<tr>";
@@ -371,19 +443,30 @@ bool PreviewPane::showPdf(const QString &path)
     }
 
     QTemporaryDir tempDir;
-    if (!tempDir.isValid()) {
-        return false;
+    QString outputPng = pdfPreviewCachePath(path);
+    if (outputPng.isEmpty() || !QFileInfo::exists(outputPng)) {
+        if (!tempDir.isValid()) {
+            return false;
+        }
+
+        const QString tempPng = tempDir.filePath("preview.png");
+        if (!renderPdfPreviewWithFallback(path, tempPng)) {
+            m_text->setPlainText(UiText::t("Could not render PDF preview.", "PDF プレビューを作成できませんでした。"));
+            setRenderAvailable(false);
+            m_stack->setCurrentWidget(m_text);
+            return true;
+        }
+        if (outputPng.isEmpty()) {
+            outputPng = tempPng;
+        } else {
+            QFile::remove(outputPng);
+            if (!QFile::copy(tempPng, outputPng)) {
+                outputPng = tempPng;
+            }
+        }
     }
 
-    const QString outputPng = tempDir.filePath("preview.png");
-    if (!tfx::platform::renderPdfPreview(path, outputPng, 900)) {
-        m_text->setPlainText(UiText::t("Could not render PDF preview.", "PDF プレビューを作成できませんでした。"));
-        setRenderAvailable(false);
-        m_stack->setCurrentWidget(m_text);
-        return true;
-    }
-
-    QPixmap pixmap(outputPng);
+    const QPixmap pixmap(outputPng);
     if (pixmap.isNull()) {
         return false;
     }
@@ -466,7 +549,10 @@ void PreviewPane::toggleSourceRendered()
 void PreviewPane::openCurrentPreviewExternally()
 {
     if (!m_externalPreviewUrl.isEmpty()) {
-        QDesktopServices::openUrl(QUrl(m_externalPreviewUrl));
+        const QUrl url(m_externalPreviewUrl);
+        if (isAllowedExternalPreviewUrl(url)) {
+            QDesktopServices::openUrl(url);
+        }
         return;
     }
     if (m_currentImagePath.isEmpty()) {

@@ -1,7 +1,7 @@
 # tfx for Linux
 
 **Terminal-inspired interface File eXplorer for Linux**  
-Version: **0.5.6**
+Version: **0.5.7**
 
 English | [Japanese](README.ja.md)
 
@@ -101,7 +101,7 @@ On startup, tfx creates `config.toml` when it does not already exist. Existing f
 
 Currently supported sections are:
 
-- Top-level `version = 1`
+- Top-level `version = 1` and `theme = "dark" | "light"`
 - `[font]`
 - `[colors]`
 - `[opacity]` (`background`, `inactivePane`, `disabledItem`)

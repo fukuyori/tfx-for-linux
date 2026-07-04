@@ -22,6 +22,7 @@ public slots:
     void openCurrentPreviewExternally();
 
 private:
+    void openPreviewLink(const QUrl &url);
     QString metadataText(const QFileInfo &info) const;
     QString renderHtmlForTextFile(const QString &path, const QString &content);
     QString renderMarkdown(const QString &path, const QString &content);

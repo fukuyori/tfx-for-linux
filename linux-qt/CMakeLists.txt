@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(tfx-for-linux VERSION 0.5.6 LANGUAGES CXX)
+project(tfx-for-linux VERSION 0.5.7 LANGUAGES CXX)
 
 include(GNUInstallDirs)
 include(CTest)
@@ -107,6 +107,30 @@ if(BUILD_TESTING AND Qt6Test_FOUND)
     target_include_directories(tfx_file_operation_worker_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(tfx_file_operation_worker_test PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME file_operation_worker COMMAND tfx_file_operation_worker_test)
+
+    qt_add_executable(tfx_platform_security_test
+        tests/PlatformSecurityTest.cpp
+        ${TFX_PLATFORM_SOURCES}
+        src/platform/Platform.h
+    )
+    target_include_directories(tfx_platform_security_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(tfx_platform_security_test PRIVATE Qt6::Core Qt6::DBus Qt6::Gui Qt6::Test)
+    add_test(NAME platform_security COMMAND tfx_platform_security_test)
+    set_tests_properties(platform_security PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+    qt_add_executable(tfx_preview_security_test
+        tests/PreviewSecurityTest.cpp
+        src/PreviewPane.cpp
+        src/PreviewPane.h
+        src/UiText.cpp
+        src/UiText.h
+        ${TFX_PLATFORM_SOURCES}
+        src/platform/Platform.h
+    )
+    target_include_directories(tfx_preview_security_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(tfx_preview_security_test PRIVATE Qt6::Core Qt6::DBus Qt6::Gui Qt6::Widgets Qt6::Test)
+    add_test(NAME preview_security COMMAND tfx_preview_security_test)
+    set_tests_properties(preview_security PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 elseif(BUILD_TESTING)
     message(STATUS "tfx: Qt Test not found — file operation worker tests disabled")
 endif()

@@ -20,6 +20,7 @@
 class QProgressBar;
 class QPushButton;
 class QThread;
+class QLabel;
 
 class MainWindow : public QMainWindow
 {
@@ -34,8 +35,10 @@ private:
     void closeEvent(QCloseEvent *event) override;
     void startFileOperation(const QVector<FileOperationRequest> &requests);
     void cancelFileOperation();
-    void completeFileOperation(const QStringList &directories, const QString &message);
+    void completeFileOperation(const QStringList &directories, const QString &message, bool continueQueued);
     void reloadChangedDirectories(const QStringList &directories);
+    int queuedFileOperationCount() const;
+    void updateFileOperationSummary(int completed = -1, int total = -1);
     void buildActions();
     void buildTopToolbar();
     void buildFolderSidebar(const QString &initialPath);
@@ -85,11 +88,14 @@ private:
     PreviewPane *m_previewPane;
     TerminalPane *m_terminalPane;
     CommandOutputPane *m_commandOutputPane;
+    QLabel *m_fileOperationSummary = nullptr;
     QProgressBar *m_fileOperationProgress = nullptr;
     QPushButton *m_fileOperationCancel = nullptr;
     QThread *m_fileOperationThread = nullptr;
     FileOperationWorker *m_fileOperationWorker = nullptr;
     QVector<FileOperationRequest> m_queuedFileOperations;
+    int m_lastFileOperationCompleted = 0;
+    int m_lastFileOperationTotal = 0;
     bool m_closeAfterFileOperationCancel = false;
     QDockWidget *m_dockSidebar = nullptr;
     QDockWidget *m_dockLeftPane = nullptr;

@@ -7,6 +7,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QProcess>
+#include <QRegularExpression>
 #include <QStandardPaths>
 #include <QUrl>
 #include <QVariantMap>
@@ -82,8 +83,40 @@ QStringList listZipEntries(const QString &zipPath)
     return output.split('\n', Qt::SkipEmptyParts);
 }
 
+bool zipEntryPathIsSafe(const QString &entry)
+{
+    QString normalized = entry.trimmed();
+    if (normalized.isEmpty()) {
+        return false;
+    }
+    normalized.replace('\\', '/');
+    if (normalized != entry || normalized.startsWith('/')) {
+        return false;
+    }
+    static const QRegularExpression drivePattern(QStringLiteral("^[A-Za-z]:"));
+    if (drivePattern.match(normalized).hasMatch()) {
+        return false;
+    }
+
+    const QStringList parts = normalized.split('/', Qt::KeepEmptyParts);
+    for (int index = 0; index < parts.size(); ++index) {
+        const QString &part = parts.at(index);
+        const bool trailingDirectorySlash = index == parts.size() - 1 && part.isEmpty();
+        if (trailingDirectorySlash) {
+            continue;
+        }
+        if (part.isEmpty() || part == "." || part == "..") {
+            return false;
+        }
+    }
+    return true;
+}
+
 bool extractZipEntry(const QString &zipPath, const QString &entry, const QString &destDir)
 {
+    if (!zipEntryPathIsSafe(entry)) {
+        return false;
+    }
     const QString unzip = QStandardPaths::findExecutable("unzip");
     if (unzip.isEmpty()) {
         return false;

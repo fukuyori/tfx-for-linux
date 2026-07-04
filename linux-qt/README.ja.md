@@ -1,6 +1,6 @@
 # tfx for Linux Qt
 
-Version: **0.5.6**
+Version: **0.5.7**
 
 このディレクトリは、`tfx-for-linux` の C++/Qt 6 Widgets 実装です。
 
@@ -29,7 +29,7 @@ cmake --install build --prefix /usr/local
 - GitHub 形式のテーブルとローカル画像埋め込みに対応した Markdown プレビュー
 - 内蔵コマンドペイン
 - ウインドウサイズ、表示状態、splitter 幅、タブ、ファイル一覧表示項目の復元
-- ウインドウ/ペインの透過（`[opacity]`）を含む `config.toml` 設定
+- light/dark テーマプリセットとウインドウ/ペインの透過（`[opacity]`）を含む `config.toml` 設定
 - `[[commands]]` によるユーザー定義コマンド
 - ペースト/ドロップ時の名前衝突処理
 - ドラッグ&ドロップ時のターゲットハイライトと影響ペインの即時更新

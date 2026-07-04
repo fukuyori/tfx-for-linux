@@ -165,6 +165,7 @@ QString AppConfig::defaultConfigText()
 {
     return QStringLiteral(
         "version = 1\n"
+        "theme = \"dark\"   # dark or light\n"
         "\n"
         "[font]\n"
         "ui = \"system\"\n"
@@ -317,12 +318,59 @@ bool AppConfig::isColor(const QString &value)
     return colorPattern.match(value).hasMatch();
 }
 
+void AppConfig::applyThemePreset(const QString &name)
+{
+    if (name == "dark") {
+        colors = AppColors();
+        theme.name = "dark";
+        return;
+    }
+    if (name != "light") {
+        return;
+    }
+
+    theme.name = "light";
+    colors.appBackground = "#EEF2F5";
+    colors.panelBackground = "#F8FAFC";
+    colors.sidebarBackground = "#EDF2F7";
+    colors.inputBackground = "#FFFFFF";
+    colors.terminalBackground = "#F7F9FB";
+    colors.foreground = "#1F2933";
+    colors.directoryForeground = "#123D66";
+    colors.secondaryForeground = "#52616D";
+    colors.headerForeground = "#33414C";
+    colors.selectedBackground = "#CDE7F5";
+    colors.selectedForeground = "#10212B";
+    colors.border = "#C8D3DC";
+    colors.activeBorder = "#0B8F55";
+    colors.activeAccent = "#12865A";
+    colors.hoverBackground = "#E7EEF4";
+    colors.disabledForeground = "#9AA8B3";
+    colors.scrollbarThumb = "#A9B8C3";
+    colors.scrollbarThumbHovered = "#8FA2AF";
+    colors.scrollbarThumbDragging = "#728A99";
+    if (terminalColorScheme.isEmpty()) {
+        terminalColorScheme = "BlackOnLightYellow";
+    }
+}
+
 void AppConfig::applyValue(const QString &section, const QString &key, const QString &value, int lineNumber)
 {
     if (section.isEmpty() && key == "version") {
         if (value != "1") {
             addWarning(lineNumber, "Unsupported config version");
         }
+        return;
+    }
+
+    if (section.isEmpty() && key == "theme") {
+        bool ok = false;
+        const QString text = unquote(value, &ok);
+        if (!ok || (text != "dark" && text != "light")) {
+            addWarning(lineNumber, "Invalid theme value");
+            return;
+        }
+        applyThemePreset(text);
         return;
     }
 

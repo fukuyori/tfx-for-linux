@@ -122,6 +122,16 @@ bool removeExistingPath(const QString &path)
     return info.isDir() ? QDir(path).removeRecursively() : QFile::remove(path);
 }
 
+QString firstUnsafeZipEntry(const QStringList &entries)
+{
+    for (const QString &entry : entries) {
+        if (!tfx::platform::zipEntryPathIsSafe(entry)) {
+            return entry;
+        }
+    }
+    return QString();
+}
+
 ConflictChoice askConflict(QWidget *parent, const QString &fileName)
 {
     QMessageBox box(parent);
@@ -223,6 +233,16 @@ QString shellQuote(const QString &text)
 QString scriptsDirectory()
 {
     return QDir(QStandardPaths::writableLocation(QStandardPaths::ConfigLocation)).filePath("tfx/scripts");
+}
+
+QString canonicalDirectoryPath(const QString &path)
+{
+    const QFileInfo info(path);
+    if (!info.exists() || !info.isDir()) {
+        return QString();
+    }
+    const QString canonical = info.canonicalFilePath();
+    return canonical.isEmpty() ? info.absoluteFilePath() : canonical;
 }
 
 QString expandCommandTokens(QString text,
@@ -768,7 +788,15 @@ void FilePane::runUserCommand(int index)
     const QString workingDirectory = expandCommandTokens(command.workingDirectory, paths, m_currentPath, false);
     const QString expanded = expandCommandTokens(command.command, paths, m_currentPath, true);
     auto *process = new QProcess(this);
-    const QString effectiveWorkingDirectory = workingDirectory.isEmpty() ? m_currentPath : workingDirectory;
+    const QString requestedWorkingDirectory = workingDirectory.isEmpty() ? m_currentPath : workingDirectory;
+    const QString effectiveWorkingDirectory = canonicalDirectoryPath(requestedWorkingDirectory);
+    if (effectiveWorkingDirectory.isEmpty()) {
+        emit statusMessageRequested(UiText::t("Command working directory is not available: %1",
+                                              "コマンドの作業ディレクトリを利用できません: %1")
+            .arg(requestedWorkingDirectory));
+        process->deleteLater();
+        return;
+    }
     process->setWorkingDirectory(effectiveWorkingDirectory);
     connect(process, &QProcess::finished, this,
             [this, process, command, expanded, effectiveWorkingDirectory](int exitCode, QProcess::ExitStatus exitStatus) {
@@ -794,7 +822,7 @@ void FilePane::runUserCommand(int index)
                                               "コマンドを実行できませんでした %1: %2")
             .arg(command.name, process->errorString()));
     });
-    process->start("/bin/sh", {"-c", expanded});
+    process->start(tfx::platform::terminalShellProgram(), tfx::platform::terminalRunArguments(expanded));
 }
 
 void FilePane::setShowHiddenFiles(bool show)
@@ -906,6 +934,14 @@ void FilePane::openZip(const QString &path)
     m_zipEntries = tfx::platform::listZipEntries(path);
     if (m_zipEntries.isEmpty()) {
         emit statusMessageRequested(UiText::t("Could not read archive.", "アーカイブを読み込めませんでした。"));
+        return;
+    }
+    const QString unsafeEntry = firstUnsafeZipEntry(m_zipEntries);
+    if (!unsafeEntry.isEmpty()) {
+        m_zipEntries.clear();
+        emit statusMessageRequested(
+            UiText::t("Archive contains an unsafe path: %1", "アーカイブに安全でないパスが含まれています: %1")
+                .arg(unsafeEntry));
         return;
     }
     populateZipView();
@@ -1874,6 +1910,22 @@ void FilePane::extractSelectedZip()
     }
 
     const QString destinationPath = uniquePathInDirectory(m_currentPath, archiveInfo.completeBaseName());
+    const QStringList entries = tfx::platform::listZipEntries(archiveInfo.absoluteFilePath());
+    if (entries.isEmpty()) {
+        QMessageBox::warning(this, "tfx", UiText::t("Could not read archive.", "アーカイブを読み込めませんでした。"));
+        return;
+    }
+    const QString unsafeEntry = firstUnsafeZipEntry(entries);
+    if (!unsafeEntry.isEmpty()) {
+        QMessageBox::warning(
+            this,
+            "tfx",
+            UiText::t("Archive contains an unsafe path and was not extracted:\n%1",
+                      "アーカイブに安全でないパスが含まれているため展開しませんでした:\n%1")
+                .arg(unsafeEntry));
+        return;
+    }
+
     if (!QDir().mkpath(destinationPath)) {
         QMessageBox::warning(this, "tfx", UiText::t("Could not create extraction folder.", "展開先フォルダを作成できませんでした。"));
         return;

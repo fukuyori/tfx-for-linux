@@ -38,6 +38,11 @@ struct AppColors
     QString scrollbarThumbDragging = "#5C7484";
 };
 
+struct AppThemeConfig
+{
+    QString name = "dark";
+};
+
 struct AppFontConfig
 {
     QString ui = "system";
@@ -90,6 +95,7 @@ public:
     QString warningText() const;
 
     AppColors colors;
+    AppThemeConfig theme;
     AppFontConfig font;
     AppStartupConfig startup;
     AppNamingConfig naming;
@@ -111,6 +117,7 @@ private:
     static QStringList parseStringArray(const QString &value, bool *ok);
     static QString expandPath(QString path);
     static bool isColor(const QString &value);
+    void applyThemePreset(const QString &name);
     void applyValue(const QString &section, const QString &key, const QString &value, int lineNumber);
     void validateShortcutConflicts();
     void addWarning(int lineNumber, const QString &message);

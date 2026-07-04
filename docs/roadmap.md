@@ -1,6 +1,6 @@
 # tfx for Linux Roadmap
 
-Current version: **0.5.6**
+Current version: **0.5.7**
 
 This roadmap tracks the practical development steps for the Linux Qt port as it
 moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
@@ -50,6 +50,8 @@ moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
   the UI stays responsive. (initial done)
 - Quit-safety prompt while file operations are in flight; partial-file cleanup
   on cancel. (initial done)
+- Visible queue status and queue clearing when canceling file operations. (done)
+- Stop and clear queued file operations after a failed batch. (done)
 - Unit coverage for the background file-operation worker, including fallback
   moves and cancellation cleanup. (done)
 - Conflict handling for paste/drop (overwrite / skip / rename). (done)
@@ -74,10 +76,15 @@ moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
 
 ## Phase 7: Theme, hardening, and packaging
 
-- Light/dark theme switching driven by `config.toml`.
-- PDF preview disk cache and multi-stage fallback rendering.
+- Light/dark theme switching driven by `config.toml`. (done)
+- PDF preview disk cache and multi-stage fallback rendering. (done)
 - Security hardening for Markdown/HTML preview, ZIP extraction, Git, and the
   terminal launcher.
+  - HTML previews render escaped source, Markdown remote images are link-only,
+    and preview links are restricted to `http`/`https`. (done)
+  - ZIP entry path validation before browsing/extracting archives. (done)
+  - Terminal and user-command working directories are canonicalized and
+    validated before process launch. (done)
 - Packaging: install/uninstall targets, desktop entry and icon, distribution
   notes, and CI build checks. (done)
 

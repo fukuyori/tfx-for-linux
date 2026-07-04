@@ -17,6 +17,7 @@ Session state such as window placement, last-opened paths, pinned folders, colum
 `config.toml` supports these sections:
 
 - Top-level `version = 1`
+- Top-level `theme = "dark"` or `theme = "light"`
 - `[font]`
 - `[colors]`
 - `[opacity]`
@@ -47,6 +48,7 @@ New installations create a Linux-native file like this:
 
 ```toml
 version = 1
+theme = "dark"
 
 [font]
 ui = "system"
@@ -196,6 +198,9 @@ disabledItem = 0.45
 ```
 
 ## Colors
+
+Set `theme = "dark"` or `theme = "light"` at the top level to choose the built-in
+palette. `[colors]` values override the selected theme.
 
 The Linux port accepts the same semantic color names used by tfx for Windows where practical:
 

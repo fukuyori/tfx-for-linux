@@ -1,7 +1,7 @@
 # tfx for Linux
 
 **Linux 向け Terminal-inspired interface File eXplorer**  
-Version: **0.5.6**
+Version: **0.5.7**
 
 [English](README.md) | 日本語
 
@@ -100,7 +100,7 @@ Linux 版も tfx for Windows と同じ考え方に合わせています。
 
 現在対応しているセクション:
 
-- トップレベル `version = 1`
+- トップレベル `version = 1` と `theme = "dark" | "light"`
 - `[font]`
 - `[colors]`
 - `[opacity]`（`background` / `inactivePane` / `disabledItem`）

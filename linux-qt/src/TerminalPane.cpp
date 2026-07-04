@@ -19,6 +19,18 @@
 #include <QProcess>
 #endif
 
+namespace {
+QString canonicalDirectoryPath(const QString &path)
+{
+    const QFileInfo info(path);
+    if (!info.exists() || !info.isDir()) {
+        return QString();
+    }
+    const QString canonical = info.canonicalFilePath();
+    return canonical.isEmpty() ? info.absoluteFilePath() : canonical;
+}
+}
+
 QFont TerminalPane::resolveFont(const QString &family, int size)
 {
     QFont font;
@@ -161,23 +173,25 @@ void TerminalPane::setWorkingDirectory(const QString &path)
 {
     // Only remember the directory for the next shell start; a running shell is
     // never moved automatically (it stays where the user left it).
-    if (QFileInfo(path).isDir()) {
-        m_workingDirectory = path;
+    const QString directory = canonicalDirectoryPath(path);
+    if (!directory.isEmpty()) {
+        m_workingDirectory = directory;
     }
 }
 
 void TerminalPane::openAt(const QString &path)
 {
-    if (!QFileInfo(path).isDir()) {
+    const QString directory = canonicalDirectoryPath(path);
+    if (directory.isEmpty()) {
         return;
     }
-    m_workingDirectory = path;
+    m_workingDirectory = directory;
 #ifdef TFX_HAVE_QTERMWIDGET
     // Explicit "open terminal here": cd a running shell to the folder.
     if (m_started && m_term) {
-        QString quoted = path;
+        QString quoted = directory;
         quoted.replace('\'', "'\\''");
-        m_term->sendText("cd '" + quoted + "'\n");
+        m_term->sendText("cd -- '" + quoted + "'\n");
     }
 #endif
 }

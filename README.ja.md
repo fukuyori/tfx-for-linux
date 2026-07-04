@@ -19,20 +19,20 @@ Version: **0.6.6**
 ## ビルド
 
 ```sh
-./build.sh
+scripts/build.sh
 ./build/tfx
 ```
 
 クリーンビルドする場合:
 
 ```sh
-./build.sh --clean
+scripts/build.sh --clean
 ```
 
 ビルド後にそのまま起動する場合:
 
 ```sh
-./build.sh --run
+scripts/build.sh --run
 ```
 
 フォルダを指定して起動する場合:
@@ -52,8 +52,11 @@ Version: **0.6.6**
 ## テスト
 
 ```sh
+scripts/build.sh --tests
 ctest --test-dir build --output-on-failure
 ```
+
+`scripts/build.sh` はデフォルトではテスト実行ファイルをビルドしません。`--tests` を付けてビルドしてください。
 
 GitHub Actions では Linux Qt target の configure、build、tests、install
 smoke test を実行します。
@@ -132,7 +135,7 @@ Linux 版の詳細は [docs/configuration.md](docs/configuration.md) を参照�
 
 ## パッケージング
 
-CMake の install target は実行ファイル、desktop entry、SVG icon、ドキュメントをインストールします。詳細は [docs/packaging.md](docs/packaging.md) を参照してください。
+CMake の install target は実行ファイル、desktop entry、SVG icon、ドキュメントをインストールします。`scripts/build_package.sh` で DEB/RPM/tar.gz パッケージを `dist/` に作成できます。詳細は [docs/packaging.md](docs/packaging.md) を参照してください。
 
 ## リポジトリ
 

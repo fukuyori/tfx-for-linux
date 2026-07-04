@@ -1,5 +1,33 @@
 # Packaging
 
+## Distributable packages
+
+`scripts/build_package.sh` produces installable packages under `dist/`:
+
+```sh
+scripts/build_package.sh            # DEB + RPM + tar.gz (auto-detected tools)
+scripts/build_package.sh --deb      # only the Debian package
+scripts/build_package.sh --clean    # wipe build-package/ and dist/ first
+scripts/build_package.sh --skip-tests
+```
+
+The script configures a Release build in `build-package/`, runs the test
+suite, validates the desktop entry when `desktop-file-validate` is available,
+and invokes CPack. Each package ships with a `.sha256` checksum file.
+Generators are selected automatically: `DEB` when `dpkg-deb` exists, `RPM`
+when `rpmbuild` exists, and a `tar.gz` archive always.
+
+The Debian package resolves shared-library dependencies from the built binary
+(`dpkg-shlibdeps`) and recommends the optional runtime tools `zip`, `unzip`,
+and `poppler-utils` (PDF preview). Install and remove with:
+
+```sh
+sudo apt install ./dist/tfx_<version>_amd64.deb
+sudo apt remove tfx
+```
+
+## Manual install from source
+
 The Linux Qt build installs a freedesktop desktop entry, scalable SVG icon, and
 project documentation in addition to the `tfx` executable.
 

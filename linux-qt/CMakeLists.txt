@@ -91,6 +91,17 @@ qt_add_executable(tfx
     src/main.cpp
 )
 
+qt_add_resources(tfx "tfx_icons"
+    PREFIX "/icons"
+    BASE packaging/icons
+    FILES
+        packaging/icons/tfx-32.png
+        packaging/icons/tfx-48.png
+        packaging/icons/tfx-64.png
+        packaging/icons/tfx-128.png
+        packaging/icons/tfx-256.png
+)
+
 target_include_directories(tfx PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(tfx PRIVATE Qt6::Widgets Qt6::DBus)
 
@@ -109,6 +120,11 @@ install(FILES packaging/tfx.desktop
         DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
 install(FILES packaging/tfx.svg
         DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
+foreach(tfx_icon_size 32 48 64 128 256)
+    install(FILES packaging/icons/tfx-${tfx_icon_size}.png
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/${tfx_icon_size}x${tfx_icon_size}/apps
+            RENAME tfx.png)
+endforeach()
 install(FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/../README.md
         ${CMAKE_CURRENT_SOURCE_DIR}/../README.ja.md
@@ -130,6 +146,26 @@ configure_file(
     @ONLY)
 add_custom_target(uninstall
     COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake)
+
+# Packaging (CPack). scripts/build_package.sh drives DEB/RPM/tar.gz creation.
+set(CPACK_PACKAGE_NAME "tfx")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Terminal-inspired file explorer for Linux")
+set(CPACK_PACKAGE_DESCRIPTION "tfx for Linux is a C++/Qt port of the tfx file manager, focused on a terminal-like two-pane file management experience for Linux desktops.")
+set(CPACK_PACKAGE_VENDOR "fukuyori")
+set(CPACK_PACKAGE_CONTACT "fukuyori <fukuyori.n@gmail.com>")
+set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/fukuyori/tfx")
+set(CPACK_PACKAGE_CHECKSUM SHA256)
+set(CPACK_STRIP_FILES ON)
+# Debian: resolve shared-library dependencies from the built binary; the
+# archive/preview helper tools are runtime-optional, so they are Recommends.
+set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+set(CPACK_DEBIAN_PACKAGE_SECTION "utils")
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+set(CPACK_DEBIAN_PACKAGE_RECOMMENDS "zip, unzip, poppler-utils")
+set(CPACK_RPM_FILE_NAME RPM-DEFAULT)
+set(CPACK_RPM_PACKAGE_GROUP "Applications/File")
+include(CPack)
 
 if(BUILD_TESTING AND Qt6Test_FOUND)
     qt_add_executable(tfx_file_operation_worker_test

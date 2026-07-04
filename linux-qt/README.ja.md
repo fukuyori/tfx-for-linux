@@ -7,7 +7,7 @@ Version: **0.6.2**
 ## ビルド
 
 ```sh
-./build.sh
+scripts/build.sh
 ./build/tfx
 ```
 

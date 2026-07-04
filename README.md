@@ -19,20 +19,20 @@ This repository contains only the Linux Qt implementation. The original macOS Sw
 ## Build
 
 ```sh
-./build.sh
+scripts/build.sh
 ./build/tfx
 ```
 
 For a clean build:
 
 ```sh
-./build.sh --clean
+scripts/build.sh --clean
 ```
 
 To build and run in one step:
 
 ```sh
-./build.sh --run
+scripts/build.sh --run
 ```
 
 To open a specific folder:
@@ -52,8 +52,12 @@ When no folder is specified, the application opens the current working directory
 ## Tests
 
 ```sh
+scripts/build.sh --tests
 ctest --test-dir build --output-on-failure
 ```
+
+The default `scripts/build.sh` run skips the test executables; pass `--tests`
+to build them.
 
 The GitHub Actions build runs configure, build, tests, and an install smoke
 test for the Linux Qt target.
@@ -134,7 +138,8 @@ See [docs/roadmap.md](docs/roadmap.md).
 ## Packaging
 
 The CMake install target installs the executable, desktop entry, SVG icon, and
-documentation. See [docs/packaging.md](docs/packaging.md).
+documentation. `scripts/build_package.sh` builds DEB/RPM/tar.gz packages into
+`dist/`. See [docs/packaging.md](docs/packaging.md).
 
 ## Repository
 

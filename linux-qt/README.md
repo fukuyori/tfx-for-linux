@@ -7,7 +7,7 @@ This directory contains the C++/Qt 6 Widgets implementation of `tfx-for-linux`.
 ## Build
 
 ```sh
-./build.sh
+scripts/build.sh
 ./build/tfx
 ```
 

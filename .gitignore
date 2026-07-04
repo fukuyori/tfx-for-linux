@@ -1,5 +1,7 @@
 # Build output
 /build/
+/build-package/
+/dist/
 /tfx-qt-build/
 /cmake-build-*/
 /.cache/
@@ -43,3 +45,5 @@ Makefile
 !/.github/workflows/
 !/docs/
 !/docs/configuration.md
+!/scripts/
+!/scripts/build_package.sh

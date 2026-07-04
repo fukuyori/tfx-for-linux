@@ -23,6 +23,12 @@ using namespace tfx::core;
 using namespace tfx::filepane;
 using namespace tfx::platform;
 
+namespace {
+// Bound the descent so symlink or bind-mount loops and pathological trees
+// cannot make a search run forever.
+constexpr int SearchMaxDepth = 128;
+}
+
 void FilePane::startSearch(const QString &term)
 {
     cancelSearch();
@@ -32,13 +38,15 @@ void FilePane::startSearch(const QString &term)
     }
     m_searchTerm = trimmed;
     m_searchMatches = 0;
+    m_searchTruncated = false;
     m_searchModel->removeRows(0, m_searchModel->rowCount());
 
-    QDir::Filters filters = QDir::AllEntries | QDir::NoDotAndDotDot;
+    m_searchFilters = QDir::AllEntries | QDir::NoDotAndDotDot;
     if (m_showHiddenFiles) {
-        filters |= QDir::Hidden | QDir::System;
+        m_searchFilters |= QDir::Hidden | QDir::System;
     }
-    m_searchIterator = new QDirIterator(m_currentPath, filters, QDirIterator::Subdirectories);
+    m_searchPendingDirs.clear();
+    m_searchPendingDirs.append({m_currentPath, 0});
     m_viewStack->setCurrentWidget(m_searchView);
     updateStatusLine();
     emit statusMessageRequested(UiText::t("Searching: %1...", "検索中: %1...").arg(m_searchTerm));
@@ -47,18 +55,36 @@ void FilePane::startSearch(const QString &term)
 
 void FilePane::searchStep()
 {
-    if (!m_searchIterator) {
-        m_searchTimer->stop();
-        return;
-    }
     const QDir base(m_currentPath);
     int budget = 400;
-    while (budget-- > 0 && m_searchIterator->hasNext()) {
+    while (budget-- > 0) {
+        if (!m_searchIterator) {
+            if (m_searchPendingDirs.isEmpty()) {
+                break;
+            }
+            const QPair<QString, int> next = m_searchPendingDirs.takeFirst();
+            m_searchIterator = new QDirIterator(next.first, m_searchFilters);
+            m_searchIteratorDepth = next.second;
+            continue;
+        }
+        if (!m_searchIterator->hasNext()) {
+            delete m_searchIterator;
+            m_searchIterator = nullptr;
+            continue;
+        }
+
         const QString path = m_searchIterator->next();
+        const QFileInfo info = m_searchIterator->fileInfo();
+        if (info.isDir() && !info.isSymLink()) {
+            if (m_searchIteratorDepth < SearchMaxDepth) {
+                m_searchPendingDirs.append({path, m_searchIteratorDepth + 1});
+            } else {
+                m_searchTruncated = true;
+            }
+        }
         if (!m_searchIterator->fileName().contains(m_searchTerm, Qt::CaseInsensitive)) {
             continue;
         }
-        const QFileInfo info = m_searchIterator->fileInfo();
         const QString relativePath = base.relativeFilePath(path);
         const QString typeName = englishTypeName(info);
         const QString mode = modeString(info);
@@ -79,12 +105,15 @@ void FilePane::searchStep()
         m_searchModel->appendRow({nameItem, typeItem, sizeItem, modifiedItem, modeItem});
         ++m_searchMatches;
     }
-    if (!m_searchIterator->hasNext()) {
+
+    if (!m_searchIterator && m_searchPendingDirs.isEmpty()) {
         m_searchTimer->stop();
-        delete m_searchIterator;
-        m_searchIterator = nullptr;
         updateStatusLine();
-        emit statusMessageRequested(UiText::t("Search complete: %1 matches", "検索完了: %1 件").arg(m_searchMatches));
+        QString message = UiText::t("Search complete: %1 matches", "検索完了: %1 件").arg(m_searchMatches);
+        if (m_searchTruncated) {
+            message += UiText::t(" (depth limit reached)", "（深さ上限に達しました）");
+        }
+        emit statusMessageRequested(message);
     } else {
         updateStatusLine();
         emit statusMessageRequested(UiText::t("Searching: %1 matches", "検索中: %1 件").arg(m_searchMatches));
@@ -100,6 +129,8 @@ void FilePane::cancelSearch()
         delete m_searchIterator;
         m_searchIterator = nullptr;
     }
+    m_searchPendingDirs.clear();
+    m_searchTruncated = false;
     if (m_searchModel) {
         m_searchModel->removeRows(0, m_searchModel->rowCount());
     }

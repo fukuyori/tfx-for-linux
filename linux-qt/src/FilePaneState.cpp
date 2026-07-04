@@ -163,7 +163,8 @@ void FilePane::updateStatusLine()
         const QString selectedText = selected > 0
             ? UiText::t("%1 selected", "%1 件選択").arg(selected)
             : UiText::t("No selection", "選択なし");
-        const QString searchText = m_searchIterator
+        const bool searchRunning = m_searchIterator || !m_searchPendingDirs.isEmpty();
+        const QString searchText = searchRunning
             ? UiText::t("Searching \"%1\"", "\"%1\" を検索中").arg(m_searchTerm)
             : UiText::t("Search \"%1\"", "\"%1\" の検索結果").arg(m_searchTerm);
         m_statusLabel->setText(

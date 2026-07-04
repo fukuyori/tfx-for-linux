@@ -16,4 +16,10 @@ QString porcelainPath(QString path);
 // Returns an empty string when the path is absolute or escapes the directory.
 QString porcelainAbsolutePath(const QString &directory, const QString &relativePath);
 
+// Convert a repository-root-relative porcelain path to one relative to the
+// queried directory, given that directory's prefix inside the repository (as
+// printed by `git rev-parse --show-prefix`, e.g. "sub/dir/" or empty at the
+// root). Returns an empty string when the path lies outside the prefix.
+QString porcelainPathInDirectory(const QString &path, const QString &prefix);
+
 }

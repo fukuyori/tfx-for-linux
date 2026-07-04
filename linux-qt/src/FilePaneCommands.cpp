@@ -11,6 +11,8 @@
 #include <QProcess>
 #include <QStandardPaths>
 
+#include <memory>
+
 namespace {
 
 QString shellQuote(const QString &text)
@@ -91,10 +93,42 @@ void FilePane::runUserCommand(int index)
         return;
     }
     process->setWorkingDirectory(effectiveWorkingDirectory);
+
+    // Read output incrementally with a hard cap so a command that floods
+    // stdout/stderr cannot grow the process buffers without bound.
+    constexpr qint64 OutputCapBytes = 1024 * 1024;
+    auto stdoutBuffer = std::make_shared<QByteArray>();
+    auto stderrBuffer = std::make_shared<QByteArray>();
+    auto truncated = std::make_shared<bool>(false);
+    const auto appendBounded = [truncated](QByteArray &buffer, const QByteArray &chunk) {
+        const qint64 room = OutputCapBytes - buffer.size();
+        if (room <= 0) {
+            *truncated = true;
+            return;
+        }
+        if (chunk.size() > room) {
+            buffer.append(chunk.constData(), room);
+            *truncated = true;
+        } else {
+            buffer.append(chunk);
+        }
+    };
+    connect(process, &QProcess::readyReadStandardOutput, this, [process, stdoutBuffer, appendBounded]() {
+        appendBounded(*stdoutBuffer, process->readAllStandardOutput());
+    });
+    connect(process, &QProcess::readyReadStandardError, this, [process, stderrBuffer, appendBounded]() {
+        appendBounded(*stderrBuffer, process->readAllStandardError());
+    });
     connect(process, &QProcess::finished, this,
-            [this, process, command, expanded, effectiveWorkingDirectory](int exitCode, QProcess::ExitStatus exitStatus) {
-        const QString stdoutText = QString::fromLocal8Bit(process->readAllStandardOutput());
-        const QString stderrText = QString::fromLocal8Bit(process->readAllStandardError());
+            [this, process, command, expanded, effectiveWorkingDirectory,
+             stdoutBuffer, stderrBuffer, truncated, appendBounded](int exitCode, QProcess::ExitStatus exitStatus) {
+        appendBounded(*stdoutBuffer, process->readAllStandardOutput());
+        appendBounded(*stderrBuffer, process->readAllStandardError());
+        QString stdoutText = QString::fromLocal8Bit(*stdoutBuffer);
+        const QString stderrText = QString::fromLocal8Bit(*stderrBuffer);
+        if (*truncated) {
+            stdoutText += UiText::t("\n[output truncated]", "\n[出力を切り詰めました]");
+        }
         const bool failed = exitStatus != QProcess::NormalExit || exitCode != 0;
         emit commandOutputReady(command.name,
                                 expanded,

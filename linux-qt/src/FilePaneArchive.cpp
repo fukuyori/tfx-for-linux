@@ -4,6 +4,7 @@
 #include "platform/Platform.h"
 
 #include <QDir>
+#include <QEventLoop>
 #include <QFileIconProvider>
 #include <QFileInfo>
 #include <QMessageBox>
@@ -25,6 +26,12 @@ bool runProcess(const QString &program, const QStringList &arguments, const QStr
 {
     QProcess process;
     process.setWorkingDirectory(workingDirectory);
+
+    // Wait through a local event loop instead of waitForFinished(-1) so the
+    // window keeps repainting during a long archive run; user input stays
+    // excluded to avoid re-entrancy.
+    QEventLoop loop;
+    QObject::connect(&process, &QProcess::finished, &loop, &QEventLoop::quit);
     process.start(program, arguments);
     if (!process.waitForStarted()) {
         if (errorText) {
@@ -32,7 +39,9 @@ bool runProcess(const QString &program, const QStringList &arguments, const QStr
         }
         return false;
     }
-    process.waitForFinished(-1);
+    while (process.state() != QProcess::NotRunning) {
+        loop.exec(QEventLoop::ExcludeUserInputEvents);
+    }
     if (process.exitStatus() == QProcess::NormalExit && process.exitCode() == 0) {
         return true;
     }

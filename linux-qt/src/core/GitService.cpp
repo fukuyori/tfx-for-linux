@@ -71,4 +71,15 @@ QString porcelainAbsolutePath(const QString &directory, const QString &relativeP
     return QString();
 }
 
+QString porcelainPathInDirectory(const QString &path, const QString &prefix)
+{
+    if (prefix.isEmpty()) {
+        return path;
+    }
+    if (!path.startsWith(prefix)) {
+        return QString();
+    }
+    return path.mid(prefix.size());
+}
+
 }

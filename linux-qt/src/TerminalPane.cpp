@@ -17,7 +17,12 @@
 #ifdef TFX_HAVE_QTERMWIDGET
 #include <qtermwidget.h>
 
+#include <QElapsedTimer>
 #include <QProcess>
+#include <QThread>
+
+#include <csignal>
+#include <sys/wait.h>
 #endif
 
 QFont TerminalPane::resolveFont(const QString &family, int size)
@@ -117,6 +122,40 @@ TerminalPane::TerminalPane(QWidget *parent)
     layout->addLayout(commandLayout);
 #endif
 }
+
+TerminalPane::~TerminalPane()
+{
+#ifdef TFX_HAVE_QTERMWIDGET
+    shutdownShell();
+#endif
+}
+
+#ifdef TFX_HAVE_QTERMWIDGET
+void TerminalPane::shutdownShell()
+{
+    if (!m_term || !m_started) {
+        return;
+    }
+    const int pid = m_term->getShellPID();
+    if (pid <= 1) {
+        return;
+    }
+    // QTermWidget's own teardown only sends SIGHUP, which a shell that traps
+    // it survives as an orphan. Ask with SIGTERM, wait briefly, then
+    // force-kill so no shell outlives the application.
+    ::kill(pid, SIGTERM);
+    QElapsedTimer deadline;
+    deadline.start();
+    while (deadline.elapsed() < 500) {
+        if (::waitpid(pid, nullptr, WNOHANG) != 0) {
+            return; // exited and reaped, or already gone
+        }
+        QThread::msleep(10);
+    }
+    ::kill(pid, SIGKILL);
+    ::waitpid(pid, nullptr, WNOHANG);
+}
+#endif
 
 void TerminalPane::showEvent(QShowEvent *event)
 {

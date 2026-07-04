@@ -2,6 +2,45 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.6.4] - 2026-07-04
+
+Stability and process-hygiene release (from tfx macOS 0.9.3).
+
+### Added
+
+- Every git invocation now has a watchdog: terminate after 30 seconds,
+  kill 5 seconds later, with stderr discarded, so a hung `git` (slow network
+  filesystem, stuck hook) can no longer accumulate processes.
+- Git status refreshes for the directory already shown are throttled to at
+  most one per second per pane; navigating to a different directory still
+  refreshes immediately.
+- Subfolder search is bounded to a descent depth of 128 so bind-mount loops
+  or pathological trees cannot make a search run forever; the completion
+  message notes when the limit was hit.
+- The built-in terminal's shell is now reaped on shutdown with SIGTERM
+  followed by SIGKILL escalation, so a shell that ignores SIGHUP cannot
+  outlive the application.
+
+### Changed
+
+- `git status` is now scoped to the current directory with a pathspec instead
+  of scanning the whole repository.
+- User-defined command output is read incrementally with a 1 MiB cap per
+  stream (with a truncation notice) instead of buffering unbounded output in
+  memory.
+- Archive compression/extraction no longer blocks the UI event loop
+  indefinitely; the window keeps repainting while the tool runs (user input
+  stays disabled to avoid re-entrancy).
+
+### Fixed
+
+- Git status badges now appear correctly when the pane shows a subdirectory
+  of a repository: porcelain paths are repository-root relative and are now
+  rebased via `git rev-parse --show-prefix` before being resolved. Previously
+  badges in subdirectories were wrong or missing.
+- The branch lookup process is now tracked and cancelled on refresh like the
+  status process, so rapid navigation cannot pile up git processes.
+
 ## [0.6.3] - 2026-07-04
 
 File-safety release for the copy/move/paste pipeline (from tfx macOS 0.9.2).

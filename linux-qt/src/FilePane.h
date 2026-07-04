@@ -192,13 +192,18 @@ private:
     QListView *m_iconView = nullptr;
     bool m_iconMode = false;
 
-    // Search view
+    // Search view. Directories are walked one non-recursive iterator at a
+    // time with a pending queue so the descent depth can be bounded.
     QTableView *m_searchView = nullptr;
     QStandardItemModel *m_searchModel = nullptr;
     QDirIterator *m_searchIterator = nullptr;
     QTimer *m_searchTimer = nullptr;
     QString m_searchTerm;
     int m_searchMatches = 0;
+    QVector<QPair<QString, int>> m_searchPendingDirs;
+    int m_searchIteratorDepth = 0;
+    bool m_searchTruncated = false;
+    QDir::Filters m_searchFilters;
 
     // Archive view
     QTableView *m_zipView = nullptr;

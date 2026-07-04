@@ -18,6 +18,7 @@ class TerminalPane : public QWidget
 
 public:
     explicit TerminalPane(QWidget *parent = nullptr);
+    ~TerminalPane() override;
     void setWorkingDirectory(const QString &path);
     void openAt(const QString &path);
     void setContentFont(const QFont &font);
@@ -43,6 +44,7 @@ private:
 #ifdef TFX_HAVE_QTERMWIDGET
     void createTermWidget();
     void startTerminal();
+    void shutdownShell();
     QVBoxLayout *m_layout = nullptr;
     QTermWidget *m_term = nullptr;
     QFont m_font;

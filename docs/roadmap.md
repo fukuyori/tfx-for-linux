@@ -1,6 +1,6 @@
 # tfx for Linux Roadmap
 
-Current version: **0.6.3**
+Current version: **0.6.4**
 
 This roadmap tracks the practical development steps for the Linux Qt port as it
 moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
@@ -129,28 +129,40 @@ Qt Test coverage in the file-operation worker suite.
   fails the batch, hidden files copied, moved directory link keeps target
   contents. (done)
 
-## 0.6.4 — Phase 9: Stability and process hygiene (from tfx macOS 0.9.3)
+## 0.6.4 — Phase 9: Stability and process hygiene (from tfx macOS 0.9.3) (done)
 
 External-process and long-run robustness so a hung tool or huge tree cannot
 wedge the UI.
 
-- Git watchdog: give every `git status` invocation a hard timeout
-  (30 s, terminate then kill), drain stderr concurrently, and scope the query
-  to the current directory with a pathspec in addition to the existing
-  debounce; throttle refreshes to at most one per second per pane.
-- Bound subfolder search with an explicit depth limit (128) as a second guard
-  beside the existing no-follow-symlinks iterator flags, and surface "search
-  truncated" in the status line when the bound is hit.
-- Audit every `QProcess` site (`zip`, `unzip`, git, user commands) for output
-  handling that could stall on full pipe buffers; read incrementally instead
-  of relying on `waitForFinished` + `readAll`.
-- Terminal shutdown: confirm QTermWidget teardown reaps the shell (no zombie
-  processes after closing the pane or the window); add explicit
-  SIGTERM-then-SIGKILL escalation if it does not.
-- Move pre-copy byte tallies and free-space checks for progress reporting off
-  the UI thread if any remain there.
-- Crash audit: replace unchecked pointer/optional assumptions on the
-  preview/shortcut/QuickLook-equivalent paths with graceful degradation.
+- Git watchdog: every git invocation (branch, prefix, status) now carries a
+  hard timeout (terminate after 30 s, kill 5 s later), discards stderr, and
+  the status query is scoped to the current directory with a `-- .` pathspec.
+  Same-directory refreshes are throttled to at most one per second per pane;
+  navigation refreshes stay immediate. (done)
+- Porcelain paths are now rebased through `git rev-parse --show-prefix`
+  (shared `porcelainPathInDirectory` helper with tests), fixing status badges
+  that were wrong or missing when the pane showed a repository
+  subdirectory — porcelain output is repository-root relative. (done)
+- Bounded subfolder search with an explicit depth limit (128) by walking one
+  non-recursive iterator at a time over a pending-directory queue, and the
+  completion message notes when the depth limit was hit. (done)
+- `QProcess` audit: Qt drains child pipes into internal buffers, so no
+  OS-level pipe-buffer deadlock exists. Real findings fixed: archive
+  compress/extract waited with `waitForFinished(-1)` freezing the UI
+  indefinitely (now waits in a local event loop with user input excluded, so
+  the window keeps painting), and user-command output was buffered without
+  bound (now read incrementally with a 1 MiB cap per stream and a truncation
+  notice). The bounded `unzip`/`pdftoppm` waits in the platform layer keep
+  their finite timeouts. (done)
+- Terminal shutdown: QTermWidget teardown only sends SIGHUP, which a shell
+  that traps it survives. The pane destructor now sends SIGTERM, reaps with a
+  short deadline, and escalates to SIGKILL so no shell outlives the
+  application. (done)
+- Pre-copy tallies and free-space checks: audited; entry counting already
+  runs on the worker thread and no free-space queries exist. (done)
+- Crash audit: `.first()`/`.last()`/`takeFirst()` call sites are all guarded
+  by emptiness checks; no unchecked-deref pattern equivalent to the macOS
+  force-unwrap fixes was found. (done)
 
 ## 0.6.5 — Phase 10: Security hardening, round 2
 

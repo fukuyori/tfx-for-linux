@@ -13,6 +13,7 @@ class GitServiceTest : public QObject
 private slots:
     void porcelainPathParsesRenameTargets();
     void porcelainAbsolutePathStaysInsideDirectory();
+    void porcelainPathInDirectoryStripsPrefix();
 };
 
 void GitServiceTest::porcelainPathParsesRenameTargets()
@@ -40,6 +41,23 @@ void GitServiceTest::porcelainAbsolutePathStaysInsideDirectory()
     QVERIFY(tfx::core::porcelainAbsolutePath(temp.path(), "/tmp/outside.txt").isEmpty());
     QVERIFY(tfx::core::porcelainAbsolutePath(temp.path(), "../outside.txt").isEmpty());
     QVERIFY(tfx::core::porcelainAbsolutePath(dir.filePath("missing"), "file.txt").isEmpty());
+}
+
+void GitServiceTest::porcelainPathInDirectoryStripsPrefix()
+{
+    // At the repository root the path passes through unchanged.
+    QCOMPARE(tfx::core::porcelainPathInDirectory("sub/file.txt", QString()),
+             QString("sub/file.txt"));
+
+    // Inside a subdirectory, root-relative paths are rebased onto it.
+    QCOMPARE(tfx::core::porcelainPathInDirectory("sub/dir/file.txt", "sub/dir/"),
+             QString("file.txt"));
+    QCOMPARE(tfx::core::porcelainPathInDirectory("sub/dir/nested/file.txt", "sub/dir/"),
+             QString("nested/file.txt"));
+
+    // Entries outside the prefix (e.g. rename targets elsewhere) are dropped.
+    QVERIFY(tfx::core::porcelainPathInDirectory("other/file.txt", "sub/dir/").isEmpty());
+    QVERIFY(tfx::core::porcelainPathInDirectory("sub", "sub/dir/").isEmpty());
 }
 
 QTEST_GUILESS_MAIN(GitServiceTest)

@@ -17,6 +17,10 @@
 #include <QTreeView>
 #include <QWidget>
 
+class QProgressBar;
+class QPushButton;
+class QThread;
+
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -28,6 +32,10 @@ public:
 
 private:
     void closeEvent(QCloseEvent *event) override;
+    void startFileOperation(const QVector<FileOperationRequest> &requests);
+    void cancelFileOperation();
+    void completeFileOperation(const QStringList &directories, const QString &message);
+    void reloadChangedDirectories(const QStringList &directories);
     void buildActions();
     void buildTopToolbar();
     void buildFolderSidebar(const QString &initialPath);
@@ -77,6 +85,12 @@ private:
     PreviewPane *m_previewPane;
     TerminalPane *m_terminalPane;
     CommandOutputPane *m_commandOutputPane;
+    QProgressBar *m_fileOperationProgress = nullptr;
+    QPushButton *m_fileOperationCancel = nullptr;
+    QThread *m_fileOperationThread = nullptr;
+    FileOperationWorker *m_fileOperationWorker = nullptr;
+    QVector<FileOperationRequest> m_queuedFileOperations;
+    bool m_closeAfterFileOperationCancel = false;
     QDockWidget *m_dockSidebar = nullptr;
     QDockWidget *m_dockLeftPane = nullptr;
     QDockWidget *m_dockRightPane = nullptr;

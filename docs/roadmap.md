@@ -1,6 +1,6 @@
 # tfx for Linux Roadmap
 
-Current version: **0.5.5**
+Current version: **0.5.6**
 
 This roadmap tracks the practical development steps for the Linux Qt port as it
 moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
@@ -47,9 +47,11 @@ moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
 ## Phase 5: File-operation robustness and clipboard (from tfx macOS 0.8.0 / 0.8.3)
 
 - Inline progress for copy/move with cancellation, run on a background queue so
-  the UI stays responsive.
+  the UI stays responsive. (initial done)
 - Quit-safety prompt while file operations are in flight; partial-file cleanup
-  on cancel.
+  on cancel. (initial done)
+- Unit coverage for the background file-operation worker, including fallback
+  moves and cancellation cleanup. (done)
 - Conflict handling for paste/drop (overwrite / skip / rename). (done)
 - Clipboard-to-file materialization with format detection (CSV, TSV, RTF, URL,
   PNG, TXT) and a "Paste as Plain Text" action. (done)
@@ -77,7 +79,7 @@ moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
 - Security hardening for Markdown/HTML preview, ZIP extraction, Git, and the
   terminal launcher.
 - Packaging: install/uninstall targets, desktop entry and icon, distribution
-  notes, and CI build checks.
+  notes, and CI build checks. (done)
 
 ## Later
 

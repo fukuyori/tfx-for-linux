@@ -122,21 +122,6 @@ bool removeExistingPath(const QString &path)
     return info.isDir() ? QDir(path).removeRecursively() : QFile::remove(path);
 }
 
-bool transferPath(const QString &source, const QString &destination, bool move)
-{
-    const QFileInfo sourceInfo(source);
-    if (move) {
-        if (QFile::rename(source, destination)) {
-            return true;
-        }
-        if (copyRecursively(source, destination)) {
-            return sourceInfo.isDir() ? QDir(source).removeRecursively() : QFile::remove(source);
-        }
-        return false;
-    }
-    return copyRecursively(source, destination);
-}
-
 ConflictChoice askConflict(QWidget *parent, const QString &fileName)
 {
     QMessageBox box(parent);
@@ -1203,9 +1188,7 @@ void FilePane::performDrop(const QList<QUrl> &urls, Qt::DropAction action, const
     const bool move = (action == Qt::MoveAction);
     const QDir dir(targetDir);
     const QString targetCanonical = QFileInfo(targetDir).absoluteFilePath();
-    bool changed = false;
-    QSet<QString> changedDirectories;
-    changedDirectories.insert(targetCanonical);
+    QVector<FileOperationRequest> requests;
 
     for (const QUrl &url : urls) {
         const QString source = url.toLocalFile();
@@ -1250,19 +1233,11 @@ void FilePane::performDrop(const QList<QUrl> &urls, Qt::DropAction action, const
             }
         }
 
-        const bool ok = transferPath(source, destination, move);
-        if (ok) {
-            changed = true;
-            changedDirectories.insert(sourceInfo.absolutePath());
-            changedDirectories.insert(QFileInfo(destination).absolutePath());
-        } else {
-            emit statusMessageRequested(UiText::t("Could not transfer item: %1", "項目を移動/コピーできませんでした: %1").arg(sourceInfo.fileName()));
-        }
+        requests.append({source, destination, move});
     }
 
-    if (changed) {
-        reload();
-        emit fileOperationPathsChanged(QStringList(changedDirectories.begin(), changedDirectories.end()));
+    if (!requests.isEmpty()) {
+        emit fileOperationRequested(requests);
     }
     updateStatusLine();
 }
@@ -1277,9 +1252,7 @@ void FilePane::pasteIntoCurrentDirectory()
     bool sawLocalUrl = false;
     const bool move = mime->hasFormat("application/x-tfx-cut");
     if (mime->hasUrls()) {
-        bool changed = false;
-        QSet<QString> changedDirectories;
-        changedDirectories.insert(QFileInfo(m_currentPath).absoluteFilePath());
+        QVector<FileOperationRequest> requests;
         for (const QUrl &url : mime->urls()) {
             const QString source = url.toLocalFile();
             if (source.isEmpty()) {
@@ -1319,17 +1292,10 @@ void FilePane::pasteIntoCurrentDirectory()
                 }
             }
 
-            if (transferPath(source, destination, move)) {
-                changed = true;
-                changedDirectories.insert(sourceInfo.absolutePath());
-                changedDirectories.insert(QFileInfo(destination).absolutePath());
-            } else {
-                emit statusMessageRequested(UiText::t("Could not paste item: %1", "項目をペーストできませんでした: %1").arg(source));
-            }
+            requests.append({source, destination, move});
         }
-        if (changed) {
-            reload();
-            emit fileOperationPathsChanged(QStringList(changedDirectories.begin(), changedDirectories.end()));
+        if (!requests.isEmpty()) {
+            emit fileOperationRequested(requests);
         }
         updateStatusLine();
         if (sawLocalUrl) {

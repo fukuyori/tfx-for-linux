@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=tfx
+GenericName=File Manager
+GenericName[ja]=ファイルマネージャ
+Comment=Terminal-inspired two-pane file explorer
+Comment[ja]=ターミナル風の 2 ペインファイルエクスプローラ
+Exec=tfx %F
+Icon=tfx
+Terminal=false
+Categories=System;FileManager;Utility;Qt;
+MimeType=inode/directory;
+StartupNotify=true

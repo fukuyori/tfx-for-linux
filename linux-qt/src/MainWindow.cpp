@@ -21,10 +21,13 @@
 #include <QLineEdit>
 #include <QMenu>
 #include <QMenuBar>
+#include <QMessageBox>
 #include <QFont>
 #include <QPainter>
 #include <QPolygonF>
 #include <QPixmap>
+#include <QProgressBar>
+#include <QPushButton>
 #include <QShortcut>
 #include <QRegularExpression>
 #include <QSettings>
@@ -34,6 +37,7 @@
 #include <QStyle>
 #include <QStyledItemDelegate>
 #include <QStyleOptionViewItem>
+#include <QThread>
 #include <QTimer>
 #include <QToolButton>
 #include <QUrl>
@@ -398,12 +402,9 @@ MainWindow::MainWindow(const QString &initialPath, const QString &geometryOverri
             setTerminalVisible(true);
         });
         connect(pane, &FilePane::fileOperationPathsChanged, this, [this](const QStringList &directories) {
-            for (FilePane *candidate : {m_leftPane, m_rightPane}) {
-                if (directories.contains(candidate->currentPath())) {
-                    candidate->reload();
-                }
-            }
+            reloadChangedDirectories(directories);
         });
+        connect(pane, &FilePane::fileOperationRequested, this, &MainWindow::startFileOperation);
         connect(pane, &FilePane::commandOutputReady, this,
                 [this](const QString &name,
                        const QString &commandLine,
@@ -441,6 +442,17 @@ MainWindow::MainWindow(const QString &initialPath, const QString &geometryOverri
 
     auto *versionLabel = new QLabel(QString("v%1").arg(TFX_VERSION), this);
     versionLabel->setObjectName("statusVersion");
+    m_fileOperationProgress = new QProgressBar(this);
+    m_fileOperationProgress->setRange(0, 100);
+    m_fileOperationProgress->setFixedWidth(180);
+    m_fileOperationProgress->setTextVisible(true);
+    m_fileOperationProgress->hide();
+    m_fileOperationCancel = new QPushButton(UiText::t("Cancel", "キャンセル"), this);
+    m_fileOperationCancel->setObjectName("fileOperationCancel");
+    m_fileOperationCancel->hide();
+    connect(m_fileOperationCancel, &QPushButton::clicked, this, &MainWindow::cancelFileOperation);
+    statusBar()->addPermanentWidget(m_fileOperationProgress);
+    statusBar()->addPermanentWidget(m_fileOperationCancel);
     statusBar()->addPermanentWidget(versionLabel);
 
     QTimer::singleShot(0, this, [this]() {
@@ -451,8 +463,133 @@ MainWindow::MainWindow(const QString &initialPath, const QString &geometryOverri
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
+    if (m_fileOperationWorker) {
+        const auto result = QMessageBox::question(
+            this,
+            UiText::t("File Operation Running", "ファイル操作を実行中"),
+            UiText::t("A file operation is still running. Cancel it and quit?",
+                      "ファイル操作を実行中です。キャンセルして終了しますか？"));
+        if (result != QMessageBox::Yes) {
+            event->ignore();
+            return;
+        }
+        m_queuedFileOperations.clear();
+        m_closeAfterFileOperationCancel = true;
+        cancelFileOperation();
+        event->ignore();
+        return;
+    }
     saveSettings();
     QMainWindow::closeEvent(event);
+}
+
+void MainWindow::startFileOperation(const QVector<FileOperationRequest> &requests)
+{
+    if (requests.isEmpty()) {
+        return;
+    }
+    if (m_fileOperationWorker) {
+        m_queuedFileOperations += requests;
+        statusBar()->showMessage(UiText::t("File operation queued.", "ファイル操作をキューに追加しました。"), 3000);
+        return;
+    }
+
+    m_fileOperationThread = new QThread(this);
+    m_fileOperationWorker = new FileOperationWorker(requests);
+    m_fileOperationWorker->moveToThread(m_fileOperationThread);
+
+    m_fileOperationProgress->setRange(0, 0);
+    m_fileOperationProgress->setValue(0);
+    m_fileOperationProgress->show();
+    m_fileOperationCancel->setEnabled(true);
+    m_fileOperationCancel->show();
+    statusBar()->showMessage(UiText::t("File operation running...", "ファイル操作を実行中..."));
+
+    connect(m_fileOperationThread, &QThread::started, m_fileOperationWorker, &FileOperationWorker::run);
+    connect(m_fileOperationThread, &QThread::finished, m_fileOperationThread, &QObject::deleteLater);
+    connect(m_fileOperationWorker, &FileOperationWorker::progress, this,
+            [this](int completed, int total, const QString &path) {
+        m_fileOperationProgress->setRange(0, qMax(1, total));
+        m_fileOperationProgress->setValue(qMin(completed, total));
+        m_fileOperationProgress->setFormat(QString("%1/%2").arg(completed).arg(total));
+        statusBar()->showMessage(UiText::t("Transferring: %1", "転送中: %1").arg(QFileInfo(path).fileName()));
+    });
+    connect(m_fileOperationWorker, &FileOperationWorker::finished, this,
+            [this](const QStringList &directories) {
+        completeFileOperation(directories, UiText::t("File operation completed.", "ファイル操作が完了しました。"));
+    });
+    connect(m_fileOperationWorker, &FileOperationWorker::failed, this,
+            [this](const QString &message, const QStringList &directories) {
+        completeFileOperation(directories, message);
+    });
+    connect(m_fileOperationWorker, &FileOperationWorker::canceled, this,
+            [this](const QStringList &directories) {
+        completeFileOperation(directories, UiText::t("File operation canceled.", "ファイル操作をキャンセルしました。"));
+    });
+
+    m_fileOperationThread->start();
+}
+
+void MainWindow::cancelFileOperation()
+{
+    if (!m_fileOperationWorker) {
+        return;
+    }
+    m_fileOperationCancel->setEnabled(false);
+    statusBar()->showMessage(UiText::t("Canceling file operation...", "ファイル操作をキャンセル中..."));
+    m_fileOperationWorker->cancel();
+}
+
+void MainWindow::completeFileOperation(const QStringList &directories, const QString &message)
+{
+    reloadChangedDirectories(directories);
+
+    FileOperationWorker *worker = m_fileOperationWorker;
+    QThread *thread = m_fileOperationThread;
+    const bool closeAfterCancel = m_closeAfterFileOperationCancel;
+    m_fileOperationWorker = nullptr;
+    m_fileOperationThread = nullptr;
+    m_closeAfterFileOperationCancel = false;
+
+    if (thread && closeAfterCancel) {
+        connect(thread, &QThread::finished, this, [this]() {
+            QTimer::singleShot(0, this, &QWidget::close);
+        });
+    }
+    if (worker) {
+        worker->deleteLater();
+    }
+    if (thread) {
+        thread->quit();
+    }
+
+    m_fileOperationProgress->hide();
+    m_fileOperationCancel->hide();
+    statusBar()->showMessage(message, 4000);
+
+    if (closeAfterCancel) {
+        if (!thread) {
+            QTimer::singleShot(0, this, &QWidget::close);
+        }
+        return;
+    }
+
+    if (!m_queuedFileOperations.isEmpty()) {
+        const QVector<FileOperationRequest> queued = m_queuedFileOperations;
+        m_queuedFileOperations.clear();
+        QTimer::singleShot(0, this, [this, queued]() {
+            startFileOperation(queued);
+        });
+    }
+}
+
+void MainWindow::reloadChangedDirectories(const QStringList &directories)
+{
+    for (FilePane *candidate : {m_leftPane, m_rightPane}) {
+        if (directories.contains(candidate->currentPath())) {
+            candidate->reload();
+        }
+    }
 }
 
 void MainWindow::buildActions()

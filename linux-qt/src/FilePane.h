@@ -10,6 +10,7 @@ class GitStatusController;
 class QMenu;
 
 #include "AppConfig.h"
+#include "core/FileOperationWorker.h"
 #include "models/FileSystemProxyModel.h"
 
 #include <QFileIconProvider>
@@ -61,6 +62,7 @@ signals:
     void pinFolderRequested(const QString &path);
     void openTerminalHereRequested(const QString &path);
     void fileOperationPathsChanged(const QStringList &directories);
+    void fileOperationRequested(const QVector<FileOperationRequest> &requests);
     void commandOutputReady(const QString &name,
                             const QString &commandLine,
                             const QString &workingDirectory,

@@ -1,6 +1,6 @@
 # tfx for Linux Qt
 
-Version: **0.5.5**
+Version: **0.5.6**
 
 This directory contains the C++/Qt 6 Widgets implementation of `tfx-for-linux`.
 
@@ -9,6 +9,12 @@ This directory contains the C++/Qt 6 Widgets implementation of `tfx-for-linux`.
 ```sh
 ./build.sh
 ./build/tfx
+```
+
+Install:
+
+```sh
+cmake --install build --prefix /usr/local
 ```
 
 ## Scope

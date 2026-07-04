@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(tfx-for-linux VERSION 0.5.5 LANGUAGES CXX)
+project(tfx-for-linux VERSION 0.5.6 LANGUAGES CXX)
+
+include(GNUInstallDirs)
+include(CTest)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -8,6 +11,9 @@ set(CMAKE_AUTOMOC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets DBus)
 find_package(qtermwidget6 QUIET)
+if(BUILD_TESTING)
+    find_package(Qt6 QUIET COMPONENTS Test)
+endif()
 
 if(APPLE)
     set(TFX_PLATFORM_SOURCES src/platform/macos/PlatformMacOS.cpp)
@@ -20,6 +26,8 @@ endif()
 qt_add_executable(tfx
     src/core/FileOperations.cpp
     src/core/FileOperations.h
+    src/core/FileOperationWorker.cpp
+    src/core/FileOperationWorker.h
     src/core/FileTypeInfo.cpp
     src/core/FileTypeInfo.h
     src/core/GitService.cpp
@@ -63,4 +71,42 @@ else()
 endif()
 target_compile_definitions(tfx PRIVATE TFX_VERSION="${PROJECT_VERSION}")
 
-install(TARGETS tfx RUNTIME DESTINATION bin)
+install(TARGETS tfx RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(FILES packaging/tfx.desktop
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+install(FILES packaging/tfx.svg
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
+install(FILES
+        ${CMAKE_CURRENT_SOURCE_DIR}/../README.md
+        ${CMAKE_CURRENT_SOURCE_DIR}/../README.ja.md
+        ${CMAKE_CURRENT_SOURCE_DIR}/../CHANGELOG.md
+        ${CMAKE_CURRENT_SOURCE_DIR}/../docs/configuration.md
+        ${CMAKE_CURRENT_SOURCE_DIR}/../docs/roadmap.md
+        ${CMAKE_CURRENT_SOURCE_DIR}/../docs/packaging.md
+        DESTINATION ${CMAKE_INSTALL_DOCDIR})
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/README.md
+        DESTINATION ${CMAKE_INSTALL_DOCDIR}
+        RENAME README.linux-qt.md)
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/README.ja.md
+        DESTINATION ${CMAKE_INSTALL_DOCDIR}
+        RENAME README.linux-qt.ja.md)
+
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cmake_uninstall.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake
+    @ONLY)
+add_custom_target(uninstall
+    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake)
+
+if(BUILD_TESTING AND Qt6Test_FOUND)
+    qt_add_executable(tfx_file_operation_worker_test
+        tests/FileOperationWorkerTest.cpp
+        src/core/FileOperationWorker.cpp
+        src/core/FileOperationWorker.h
+    )
+    target_include_directories(tfx_file_operation_worker_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(tfx_file_operation_worker_test PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME file_operation_worker COMMAND tfx_file_operation_worker_test)
+elseif(BUILD_TESTING)
+    message(STATUS "tfx: Qt Test not found — file operation worker tests disabled")
+endif()

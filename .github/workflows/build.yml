@@ -31,3 +31,9 @@ jobs:
 
       - name: Build
         run: cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Install smoke test
+        run: cmake --install build --prefix "$RUNNER_TEMP/tfx-install"

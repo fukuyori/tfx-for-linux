@@ -2,6 +2,20 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.5.6] - 2026-07-04
+
+Packaging and install support.
+
+### Added
+
+- Packaging installs the executable, desktop entry, SVG icon, documentation,
+  and provides an uninstall target; CI now runs an install smoke test.
+- Copy/move paste and drop operations now run on a background worker with a
+  status-bar progress indicator, cancellation, queued follow-up operations, and
+  partial destination cleanup on cancel.
+- Added Qt Test coverage for the file-operation worker, including recursive
+  copy, rename and copy-fallback moves, cancellation cleanup, and CTest in CI.
+
 ## [0.5.5] - 2026-07-04
 
 View polish, naming control, and documentation closure.

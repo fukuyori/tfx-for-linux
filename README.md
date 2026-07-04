@@ -1,7 +1,7 @@
 # tfx for Linux
 
 **Terminal-inspired interface File eXplorer for Linux**  
-Version: **0.5.5**
+Version: **0.5.6**
 
 English | [Japanese](README.ja.md)
 
@@ -67,7 +67,7 @@ When no folder is specified, the application opens the current working directory
 - User-editable `config.toml` created under `~/.config/tfx/`, including window/pane transparency, per-pane fonts, and the terminal colour scheme
 - User-defined `[[commands]]` for the context menu/menu bar, token expansion, shortcut conflict warnings, and the Command Output dock
 - Window, dock layout, pane visibility, tab, and column setting restoration
-- File operations: open, open with (native chooser), rename, link, new file/folder, trash, copy/cut/paste, copy path
+- File operations: open, open with (native chooser), rename, link, new file/folder, trash, background copy/cut/paste with progress/cancel, copy path
 - Drag-and-drop of files and folders between panes and to/from external file managers (drop onto a folder to move, or hold Ctrl to copy)
 - Drag-and-drop target highlighting and immediate refresh of affected panes
 - Conflict handling for paste/drop operations with overwrite, skip, and rename choices
@@ -117,6 +117,11 @@ See [docs/configuration.md](docs/configuration.md) for the Linux-specific notes.
 ## Roadmap
 
 See [docs/roadmap.md](docs/roadmap.md).
+
+## Packaging
+
+The CMake install target installs the executable, desktop entry, SVG icon, and
+documentation. See [docs/packaging.md](docs/packaging.md).
 
 ## Repository
 

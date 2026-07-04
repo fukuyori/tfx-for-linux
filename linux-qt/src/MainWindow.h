@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AppConfig.h"
+#include "CommandOutputPane.h"
 #include "FilePane.h"
 #include "PreviewPane.h"
 #include "TerminalPane.h"
@@ -37,6 +38,7 @@ private:
     void setSplitVisible(bool visible);
     void setPreviewVisible(bool visible);
     void setTerminalVisible(bool visible);
+    void setCommandOutputVisible(bool visible);
     void setHiddenFilesVisible(bool visible);
     void setIconViewEnabled(bool enabled);
     void syncIconViewToggle();
@@ -61,6 +63,7 @@ private:
     QAction *m_splitAction = nullptr;
     QAction *m_previewAction = nullptr;
     QAction *m_terminalAction = nullptr;
+    QAction *m_commandOutputAction = nullptr;
     QAction *m_hiddenAction = nullptr;
     QAction *m_iconViewAction = nullptr;
     FilePane *m_leftPane;
@@ -68,11 +71,13 @@ private:
     FilePane *m_activePane;
     PreviewPane *m_previewPane;
     TerminalPane *m_terminalPane;
+    CommandOutputPane *m_commandOutputPane;
     QDockWidget *m_dockSidebar = nullptr;
     QDockWidget *m_dockLeftPane = nullptr;
     QDockWidget *m_dockRightPane = nullptr;
     QDockWidget *m_dockPreview = nullptr;
     QDockWidget *m_dockTerminal = nullptr;
+    QDockWidget *m_dockCommandOutput = nullptr;
     AppConfig m_config;
     QString m_initialPath;
     bool m_showHiddenFiles = false;

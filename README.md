@@ -1,7 +1,7 @@
 # tfx for Linux
 
 **Terminal-inspired interface File eXplorer for Linux**  
-Version: **0.5.1**
+Version: **0.5.2**
 
 English | [Japanese](README.ja.md)
 
@@ -54,6 +54,7 @@ When no folder is specified, the application opens the current working directory
 - Browse ZIP archives as folders (navigate in, open/extract entries)
 - Interactive terminal pane (QTermWidget) whose working directory follows the active pane; falls back to a simple command pane when unavailable
 - User-editable `config.toml` created under `~/.config/tfx/`, including window/pane transparency, per-pane fonts, and the terminal colour scheme
+- User-defined `[[commands]]` for the context menu/menu bar, token expansion, shortcut conflict warnings, and the Command Output dock
 - Window, dock layout, pane visibility, tab, and column setting restoration
 - File operations: open, open with (native chooser), rename, link, new file/folder, trash, copy/cut/paste, copy path
 - Drag-and-drop of files and folders between panes and to/from external file managers (drop onto a folder to move, or hold Ctrl to copy)
@@ -90,7 +91,9 @@ Currently supported sections are:
 - `[opacity]` (`background`, `inactivePane`, `disabledItem`)
 - `[startup]`
 - `[shortcuts]`
-- `[terminal]` and `[openWith]` are parsed for compatibility; detailed behavior is still being wired in.
+- `[terminal]`
+- `[openWith]` is parsed for compatibility; detailed behavior is still being wired in.
+- `[[commands]]`
 
 See [docs/configuration.md](docs/configuration.md) for the Linux-specific notes.
 

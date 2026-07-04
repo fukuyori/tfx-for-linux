@@ -7,7 +7,9 @@ class QDirIterator;
 class QStandardItemModel;
 class QListView;
 class GitStatusController;
+class QMenu;
 
+#include "AppConfig.h"
 #include "models/FileSystemProxyModel.h"
 
 #include <QFileIconProvider>
@@ -46,6 +48,8 @@ public:
     void navigateTo(const QString &path, bool recordHistory = true);
     void focusFileList();
     void applySharedColumnLayout();
+    void setUserCommands(const QList<UserCommand> &commands);
+    void runUserCommand(int index);
 
 signals:
     void activated(FilePane *pane);
@@ -55,6 +59,14 @@ signals:
     void statusMessageRequested(const QString &message);
     void pinFolderRequested(const QString &path);
     void openTerminalHereRequested(const QString &path);
+    void commandOutputReady(const QString &name,
+                            const QString &commandLine,
+                            const QString &workingDirectory,
+                            int exitCode,
+                            QProcess::ExitStatus exitStatus,
+                            const QString &stdoutText,
+                            const QString &stderrText,
+                            bool reveal);
 
 public slots:
     void goUp();
@@ -103,6 +115,8 @@ private:
     void refreshGitStatuses();
     void createLinkForSelection();
     void openWithCustomApplication();
+    void addUserCommandActions(QMenu *menu, bool hasSelection);
+    QStringList selectedLocalPaths() const;
     void performDrop(const QList<QUrl> &urls, Qt::DropAction action, const QString &targetDir);
     void updatePreviewFromSelection();
     void updateStatusLine();
@@ -151,4 +165,5 @@ private:
     bool m_isActive = false;
     bool m_suppressColumnSave = false;
     bool m_isSwitchingTabs = false;
+    QList<UserCommand> m_userCommands;
 };

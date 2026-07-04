@@ -24,6 +24,7 @@ Session state such as window placement, last-opened paths, pinned folders, colum
 - `[shortcuts]`
 - `[terminal]`
 - `[openWith]`
+- `[[commands]]`
 
 The loader intentionally accepts a small TOML subset:
 
@@ -31,6 +32,7 @@ The loader intentionally accepts a small TOML subset:
 - Assignments with `key = value`
 - Double-quoted strings
 - Arrays of double-quoted strings for `rightFolders`
+- Array tables with `[[commands]]`
 - Numeric font sizes
 - Quoted `#RRGGBB` colors
 - Decimal opacity values between `0.0` and `1.0`
@@ -106,6 +108,13 @@ quit = "ctrl+q"
 
 # [openWith]
 # md = "code"
+
+# [[commands]]
+# name = "Open in VS Code"
+# command = "code {paths}"
+# shortcut = "ctrl+shift+o"
+# requiresSelection = true
+# showOutput = false
 ```
 
 ## Fonts
@@ -193,6 +202,49 @@ colorScheme = "DarkPastels"
 ```
 
 The terminal font is set with `[font] terminal` / `terminalSize` (see Fonts).
+
+## User Commands
+
+`[[commands]]` adds custom commands to the menu bar and file-list context menu.
+Commands run through `/bin/sh -c` with the current pane directory as the default
+working directory. Runs are recorded in the Command Output dock; commands with
+`showOutput = true` and failed commands automatically reveal that dock.
+
+```toml
+[[commands]]
+name = "Count Lines"
+command = "wc -l {paths}"
+shortcut = "ctrl+shift+l"
+requiresSelection = true
+showOutput = true
+
+[[commands]]
+name = "Open Config Scripts"
+command = "xdg-open {scripts}"
+requiresSelection = false
+showOutput = false
+```
+
+Supported fields:
+
+- `name` — menu label.
+- `command` — shell command to run.
+- `shortcut` — optional keyboard shortcut. Conflicts with built-in shortcuts or
+  other commands are reported as configuration warnings.
+- `workingDirectory` — optional directory, defaulting to `{cwd}`.
+- `requiresSelection` — `true` by default. Set `false` for folder-level commands.
+- `showOutput` — `true` by default. Failures always show output.
+
+Supported tokens:
+
+- `{path}` — first selected item, shell-quoted.
+- `{paths}` — all selected items, shell-quoted and space-separated.
+- `{dir}` — directory of the first selected item, shell-quoted.
+- `{name}` — file name of the first selected item, shell-quoted.
+- `{stem}` — file name without extension, shell-quoted.
+- `{ext}` — extension of the first selected item, shell-quoted.
+- `{cwd}` — current pane directory, shell-quoted.
+- `{scripts}` — `~/.config/tfx/scripts`, shell-quoted.
 
 ## Notes
 

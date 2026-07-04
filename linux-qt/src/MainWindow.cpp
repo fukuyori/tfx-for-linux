@@ -271,6 +271,7 @@ MainWindow::MainWindow(const QString &initialPath, QWidget *parent)
       m_activePane(m_leftPane),
       m_previewPane(new PreviewPane(this)),
       m_terminalPane(new TerminalPane(this)),
+      m_commandOutputPane(new CommandOutputPane(this)),
       m_config(AppConfig::loadOrCreate()),
       m_initialPath(initialPath)
 {
@@ -280,6 +281,8 @@ MainWindow::MainWindow(const QString &initialPath, QWidget *parent)
     if (m_config.opacity.background < 1.0) {
         setAttribute(Qt::WA_TranslucentBackground);
     }
+    m_leftPane->setUserCommands(m_config.commands);
+    m_rightPane->setUserCommands(m_config.commands);
     applyTerminalTheme();
     buildTopToolbar();
     buildFolderSidebar(initialPath);
@@ -318,9 +321,11 @@ MainWindow::MainWindow(const QString &initialPath, QWidget *parent)
     m_dockRightPane = makeDock("dockRightPane", QString(), m_rightPane);
     m_dockPreview = makeDock("dockPreview", UiText::t("Preview", "プレビュー"), m_previewPane);
     m_dockTerminal = makeDock("dockTerminal", UiText::t("Terminal", "ターミナル"), m_terminalPane);
+    m_dockCommandOutput = makeDock("dockCommandOutput", UiText::t("Command Output", "コマンド出力"), m_commandOutputPane);
 
     applyDefaultDockLayout();
     m_dockTerminal->hide();
+    m_dockCommandOutput->hide();
 
     const auto wirePane = [this](FilePane *pane) {
         connect(pane, &FilePane::activated, this, [this](FilePane *activatedPane) {
@@ -345,6 +350,21 @@ MainWindow::MainWindow(const QString &initialPath, QWidget *parent)
         connect(pane, &FilePane::openTerminalHereRequested, this, [this](const QString &path) {
             m_terminalPane->openAt(path);
             setTerminalVisible(true);
+        });
+        connect(pane, &FilePane::commandOutputReady, this,
+                [this](const QString &name,
+                       const QString &commandLine,
+                       const QString &workingDirectory,
+                       int exitCode,
+                       QProcess::ExitStatus exitStatus,
+                       const QString &stdoutText,
+                       const QString &stderrText,
+                       bool reveal) {
+            m_commandOutputPane->appendOutput(name, commandLine, workingDirectory,
+                                              exitCode, exitStatus, stdoutText, stderrText);
+            if (reveal) {
+                setCommandOutputVisible(true);
+            }
         });
     };
     wirePane(m_leftPane);
@@ -412,6 +432,10 @@ void MainWindow::buildActions()
     m_terminalAction->setShortcut(QKeySequence(m_config.shortcut("toggleTerminal", "Ctrl+J")));
     connect(m_terminalAction, &QAction::toggled, this, &MainWindow::setTerminalVisible);
 
+    m_commandOutputAction = viewMenu->addAction(UiText::t("Command Output", "コマンド出力"));
+    m_commandOutputAction->setCheckable(true);
+    connect(m_commandOutputAction, &QAction::toggled, this, &MainWindow::setCommandOutputVisible);
+
     m_hiddenAction = viewMenu->addAction(UiText::t("Show Hidden Files", "隠しファイルを表示"));
     m_hiddenAction->setCheckable(true);
     m_hiddenAction->setShortcut(QKeySequence(m_config.shortcut("toggleHidden", "Ctrl+Shift+.")));
@@ -440,6 +464,22 @@ void MainWindow::buildActions()
     addMenuAction(navMenu, UiText::t("Back", "戻る"), this, [this]() { activePane()->goBack(); }, QKeySequence(m_config.shortcut("goBack", "Alt+Left")));
     addMenuAction(navMenu, UiText::t("Forward", "進む"), this, [this]() { activePane()->goForward(); }, QKeySequence(m_config.shortcut("goForward", "Alt+Right")));
     addMenuAction(navMenu, UiText::t("Reload", "再読み込み"), this, [this]() { activePane()->reload(); }, QKeySequence(m_config.shortcut("reload", "F5")));
+
+    bool hasCommandMenu = false;
+    QMenu *commandMenu = nullptr;
+    for (int i = 0; i < m_config.commands.size(); ++i) {
+        const UserCommand &command = m_config.commands.at(i);
+        if (command.name.trimmed().isEmpty() || command.command.trimmed().isEmpty()) {
+            continue;
+        }
+        if (!hasCommandMenu) {
+            commandMenu = menuBar()->addMenu(UiText::t("Commands", "コマンド"));
+            hasCommandMenu = true;
+        }
+        addMenuAction(commandMenu, command.name, this, [this, i]() {
+            activePane()->runUserCommand(i);
+        }, QKeySequence(command.shortcut));
+    }
 }
 
 void MainWindow::buildTopToolbar()
@@ -1012,6 +1052,7 @@ void MainWindow::restoreSettings()
     bool splitVisible = settings.value("View/splitVisible", true).toBool();
     bool previewVisible = settings.value("View/previewVisible", true).toBool();
     const bool terminalVisible = settings.value("View/terminalVisible", false).toBool();
+    const bool commandOutputVisible = settings.value("View/commandOutputVisible", false).toBool();
     m_leftPane->setViewMode(settings.value("View/leftIconMode", false).toBool());
     m_rightPane->setViewMode(settings.value("View/rightIconMode", false).toBool());
     if (m_config.startup.layout == "single") {
@@ -1043,6 +1084,7 @@ void MainWindow::restoreSettings()
     m_dockRightPane->setVisible(splitVisible);
     m_dockPreview->setVisible(previewVisible);
     m_dockTerminal->setVisible(terminalVisible);
+    m_dockCommandOutput->setVisible(commandOutputVisible);
 
     QString rightDirectory = settings.value("Panes/rightDirectory", m_rightPane->currentPath()).toString();
     if (!m_config.startup.rightFolder.isEmpty()) {
@@ -1101,6 +1143,10 @@ void MainWindow::restoreSettings()
         const QSignalBlocker terminalButtonBlocker(m_terminalButton);
         m_terminalButton->setChecked(terminalVisible);
     }
+    if (m_commandOutputAction) {
+        const QSignalBlocker outputActionBlocker(m_commandOutputAction);
+        m_commandOutputAction->setChecked(commandOutputVisible);
+    }
 
     const QString activePaneName = settings.value("Panes/activePane", "LEFT").toString();
     setActivePane(activePaneName == "RIGHT" ? m_rightPane : m_leftPane);
@@ -1120,6 +1166,7 @@ void MainWindow::saveSettings()
     settings.setValue("View/splitVisible", m_dockRightPane->isVisible());
     settings.setValue("View/previewVisible", m_dockPreview->isVisible());
     settings.setValue("View/terminalVisible", m_dockTerminal->isVisible());
+    settings.setValue("View/commandOutputVisible", m_dockCommandOutput->isVisible());
     settings.setValue("View/showHiddenFiles", m_showHiddenFiles);
     settings.setValue("View/leftIconMode", m_leftPane->isIconMode());
     settings.setValue("View/rightIconMode", m_rightPane->isIconMode());
@@ -1178,11 +1225,12 @@ void MainWindow::applyDefaultDockLayout()
     // terminal in first makes it the bottom child of the vertical splitter, so
     // it sits below BOTH file panes with a draggable separator.
     for (QDockWidget *dock : {m_dockSidebar, m_dockLeftPane, m_dockRightPane,
-                              m_dockPreview, m_dockTerminal}) {
+                              m_dockPreview, m_dockTerminal, m_dockCommandOutput}) {
         dock->setFloating(false);
     }
     addDockWidget(Qt::LeftDockWidgetArea, m_dockSidebar);
     splitDockWidget(m_dockSidebar, m_dockTerminal, Qt::Vertical);
+    splitDockWidget(m_dockTerminal, m_dockCommandOutput, Qt::Horizontal);
     splitDockWidget(m_dockSidebar, m_dockLeftPane, Qt::Horizontal);
     splitDockWidget(m_dockLeftPane, m_dockRightPane, Qt::Horizontal);
     splitDockWidget(m_dockRightPane, m_dockPreview, Qt::Horizontal);
@@ -1196,6 +1244,7 @@ void MainWindow::resetDockLayout()
     const bool rightVisible = m_dockRightPane->isVisible();
     const bool previewVisible = m_dockPreview->isVisible();
     const bool terminalVisible = m_dockTerminal->isVisible();
+    const bool commandOutputVisible = m_dockCommandOutput->isVisible();
 
     applyDefaultDockLayout();
 
@@ -1204,6 +1253,7 @@ void MainWindow::resetDockLayout()
     m_dockRightPane->setVisible(rightVisible);
     m_dockPreview->setVisible(previewVisible);
     m_dockTerminal->setVisible(terminalVisible);
+    m_dockCommandOutput->setVisible(commandOutputVisible);
 
     if (!m_isRestoringSettings) {
         saveSettings();
@@ -1270,6 +1320,18 @@ void MainWindow::setTerminalVisible(bool visible)
     if (m_terminalAction && m_terminalAction->isChecked() != visible) {
         const QSignalBlocker blocker(m_terminalAction);
         m_terminalAction->setChecked(visible);
+    }
+    if (!m_isRestoringSettings) {
+        saveSettings();
+    }
+}
+
+void MainWindow::setCommandOutputVisible(bool visible)
+{
+    m_dockCommandOutput->setVisible(visible);
+    if (m_commandOutputAction && m_commandOutputAction->isChecked() != visible) {
+        const QSignalBlocker blocker(m_commandOutputAction);
+        m_commandOutputAction->setChecked(visible);
     }
     if (!m_isRestoringSettings) {
         saveSettings();

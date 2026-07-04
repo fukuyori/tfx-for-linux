@@ -2,6 +2,20 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.5.2] - 2026-07-04
+
+User-defined command support.
+
+### Added
+
+- `[[commands]]` entries in `config.toml` add custom commands to the menu bar
+  and file-list context menu.
+- Command token expansion for selected paths, current directory, file name
+  parts, and the user scripts directory.
+- User-defined command shortcuts with conflict warnings.
+- Command Output dock with run history, stdout/stderr, working directory, and
+  exit status.
+
 ## [0.5.1] - 2026-06-14
 
 Terminal and dock-layout fixes.

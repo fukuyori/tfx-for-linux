@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(tfx-for-linux VERSION 0.5.1 LANGUAGES CXX)
+project(tfx-for-linux VERSION 0.5.2 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -26,6 +26,8 @@ qt_add_executable(tfx
     src/core/GitService.h
     src/controllers/GitStatusController.cpp
     src/controllers/GitStatusController.h
+    src/CommandOutputPane.cpp
+    src/CommandOutputPane.h
     src/models/FileColumns.h
     src/models/FileSystemProxyModel.cpp
     src/models/FileSystemProxyModel.h

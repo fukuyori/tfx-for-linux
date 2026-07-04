@@ -1,6 +1,6 @@
 # tfx for Linux Qt
 
-Version: **0.5.1**
+Version: **0.5.2**
 
 This directory contains the C++/Qt 6 Widgets implementation of `tfx-for-linux`.
 
@@ -20,6 +20,7 @@ This directory contains the C++/Qt 6 Widgets implementation of `tfx-for-linux`.
 - Built-in command pane
 - Restored window size, pane visibility, splitter sizes, tabs, and file-list columns
 - `config.toml` settings including window/pane transparency (`[opacity]`)
+- User-defined commands with `[[commands]]`
 - Per-pane status line with item counts, selection, and current Git branch
 - Auto-refresh of the file list and Git status on directory changes
 - Mouse and keyboard selection with persistent row highlight

@@ -1,8 +1,19 @@
 #pragma once
 
 #include <QHash>
+#include <QList>
 #include <QString>
 #include <QStringList>
+
+struct UserCommand
+{
+    QString name;
+    QString command;
+    QString shortcut;
+    QString workingDirectory = "{cwd}";
+    bool requiresSelection = true;
+    bool showOutput = true;
+};
 
 struct AppColors
 {
@@ -76,6 +87,7 @@ public:
     AppOpacityConfig opacity;
     QHash<QString, QString> shortcuts;
     QHash<QString, QString> openWith;
+    QList<UserCommand> commands;
     QString terminalApp;
     QString terminalArguments;
     QString terminalShell;
@@ -91,6 +103,7 @@ private:
     static QString expandPath(QString path);
     static bool isColor(const QString &value);
     void applyValue(const QString &section, const QString &key, const QString &value, int lineNumber);
+    void validateShortcutConflicts();
     void addWarning(int lineNumber, const QString &message);
 
     QStringList m_warnings;

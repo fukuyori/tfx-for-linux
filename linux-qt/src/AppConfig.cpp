@@ -44,6 +44,34 @@ QString normalizedShortcut(QString value)
     }
     return normalized.join('+');
 }
+
+QHash<QString, QString> defaultShortcuts()
+{
+    return {
+        {"reload", normalizedShortcut("f5")},
+        {"openTerminal", normalizedShortcut("ctrl+shift+t")},
+        {"togglePreview", normalizedShortcut("ctrl+shift+p")},
+        {"toggleSplit", normalizedShortcut("ctrl+backslash")},
+        {"focusSearch", normalizedShortcut("ctrl+f")},
+        {"toggleHidden", normalizedShortcut("ctrl+shift+.")},
+        {"goBack", normalizedShortcut("alt+left")},
+        {"goForward", normalizedShortcut("alt+right")},
+        {"goUp", normalizedShortcut("alt+up")},
+        {"newFolder", normalizedShortcut("ctrl+shift+n")},
+        {"newFile", normalizedShortcut("ctrl+n")},
+        {"rename", normalizedShortcut("f2")},
+        {"moveToTrash", normalizedShortcut("delete")},
+        {"copyItems", normalizedShortcut("ctrl+c")},
+        {"cutItems", normalizedShortcut("ctrl+x")},
+        {"pasteItems", normalizedShortcut("ctrl+v")},
+        {"newTab", normalizedShortcut("ctrl+t")},
+        {"closeTab", normalizedShortcut("ctrl+w")},
+        {"prevTab", normalizedShortcut("ctrl+shift+[")},
+        {"nextTab", normalizedShortcut("ctrl+shift+]")},
+        {"toggleTerminal", normalizedShortcut("ctrl+j")},
+        {"quit", normalizedShortcut("ctrl+q")},
+    };
+}
 }
 
 AppConfig AppConfig::loadOrCreate()
@@ -74,6 +102,11 @@ AppConfig AppConfig::loadOrCreate()
         if (line.isEmpty()) {
             continue;
         }
+        if (line == "[[commands]]") {
+            config.commands.append(UserCommand());
+            section = "commands";
+            continue;
+        }
         if (line.startsWith('[') && line.endsWith(']')) {
             section = line.mid(1, line.size() - 2).trimmed();
             continue;
@@ -86,6 +119,7 @@ AppConfig AppConfig::loadOrCreate()
         }
         config.applyValue(section, line.left(equals).trimmed(), line.mid(equals + 1).trimmed(), lineNumber);
     }
+    config.validateShortcutConflicts();
     return config;
 }
 
@@ -191,7 +225,14 @@ QString AppConfig::defaultConfigText()
         "# arguments = \"--working-directory={path}\"\n"
         "\n"
         "# [openWith]\n"
-        "# md = \"code\"\n");
+        "# md = \"code\"\n"
+        "\n"
+        "# [[commands]]\n"
+        "# name = \"Open in VS Code\"\n"
+        "# command = \"code {paths}\"\n"
+        "# shortcut = \"ctrl+shift+o\"\n"
+        "# requiresSelection = true\n"
+        "# showOutput = false\n");
 }
 
 QString AppConfig::stripComment(const QString &line)
@@ -406,6 +447,75 @@ void AppConfig::applyValue(const QString &section, const QString &key, const QSt
         const QString text = unquote(value, &ok);
         if (ok) {
             openWith.insert(key, text);
+        }
+        return;
+    }
+
+    if (section == "commands") {
+        if (commands.isEmpty()) {
+            addWarning(lineNumber, "Command value outside [[commands]]");
+            return;
+        }
+
+        UserCommand &command = commands.last();
+        if (key == "requiresSelection" || key == "showOutput") {
+            if (value == "true") {
+                if (key == "requiresSelection") command.requiresSelection = true;
+                else command.showOutput = true;
+            } else if (value == "false") {
+                if (key == "requiresSelection") command.requiresSelection = false;
+                else command.showOutput = false;
+            } else {
+                addWarning(lineNumber, QString("Invalid boolean value for command %1").arg(key));
+            }
+            return;
+        }
+
+        bool ok = false;
+        const QString text = unquote(value, &ok);
+        if (!ok) {
+            addWarning(lineNumber, QString("Invalid command value for %1").arg(key));
+            return;
+        }
+        if (key == "name") command.name = text;
+        else if (key == "command") command.command = text;
+        else if (key == "shortcut") command.shortcut = normalizedShortcut(text);
+        else if (key == "workingDirectory") command.workingDirectory = text;
+        else addWarning(lineNumber, QString("Unknown command key: %1").arg(key));
+    }
+}
+
+void AppConfig::validateShortcutConflicts()
+{
+    QHash<QString, QString> ownerByShortcut;
+    QHash<QString, QString> effectiveShortcuts = defaultShortcuts();
+    for (auto it = shortcuts.constBegin(); it != shortcuts.constEnd(); ++it) {
+        effectiveShortcuts.insert(it.key(), it.value());
+    }
+
+    for (auto it = effectiveShortcuts.constBegin(); it != effectiveShortcuts.constEnd(); ++it) {
+        if (it.value().isEmpty()) {
+            continue;
+        }
+        const QString owner = QString("shortcut.%1").arg(it.key());
+        if (ownerByShortcut.contains(it.value())) {
+            addWarning(0, QString("Shortcut conflict: %1 is used by %2 and %3")
+                .arg(it.value(), ownerByShortcut.value(it.value()), owner));
+        } else {
+            ownerByShortcut.insert(it.value(), owner);
+        }
+    }
+
+    for (const UserCommand &command : commands) {
+        if (command.shortcut.isEmpty() || command.name.trimmed().isEmpty()) {
+            continue;
+        }
+        const QString owner = QString("command.%1").arg(command.name);
+        if (ownerByShortcut.contains(command.shortcut)) {
+            addWarning(0, QString("Shortcut conflict: %1 is used by %2 and %3")
+                .arg(command.shortcut, ownerByShortcut.value(command.shortcut), owner));
+        } else {
+            ownerByShortcut.insert(command.shortcut, owner);
         }
     }
 }

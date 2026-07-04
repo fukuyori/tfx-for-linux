@@ -1,6 +1,6 @@
 # tfx for Linux Roadmap
 
-Current version: **0.5.1**
+Current version: **0.5.2**
 
 This roadmap tracks the practical development steps for the Linux Qt port as it
 moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
@@ -37,12 +37,12 @@ moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
 
 ## Phase 4: User-defined commands (from tfx macOS 0.7.0)
 
-- `[[commands]]` section in `config.toml` for custom context-menu commands.
+- `[[commands]]` section in `config.toml` for custom context-menu commands. (done)
 - Token expansion: `{path}`, `{paths}`, `{dir}`, `{name}`, `{stem}`, `{ext}`,
-  `{cwd}`, `{scripts}`.
-- User-defined keyboard shortcuts with conflict detection.
-- A command Output tab/area showing the result of a run.
-- English and Japanese documentation for command configuration.
+  `{cwd}`, `{scripts}`. (done)
+- User-defined keyboard shortcuts with conflict detection. (done)
+- A command Output dock showing the result and history of runs. (done)
+- English and Japanese documentation for command configuration. (Japanese done)
 
 ## Phase 5: File-operation robustness and clipboard (from tfx macOS 0.8.0 / 0.8.3)
 

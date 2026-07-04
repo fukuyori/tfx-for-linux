@@ -1,7 +1,7 @@
 # tfx for Linux
 
 **Linux 向け Terminal-inspired interface File eXplorer**  
-Version: **0.5.1**
+Version: **0.5.2**
 
 [English](README.md) | 日本語
 
@@ -54,6 +54,7 @@ Version: **0.5.1**
 - ZIP をフォルダのように閲覧（中へナビゲート、エントリを開く/展開）
 - 対話型ターミナルペイン（QTermWidget。作業ディレクトリはアクティブペインに追従。利用不可時は簡易コマンドペインにフォールバック）
 - `~/.config/tfx/` に作成されるユーザー編集用 `config.toml`（ウインドウ/ペインの透過、ペイン別フォント、ターミナルのカラースキームを含む）
+- `[[commands]]` によるユーザー定義コマンド（コンテキストメニュー/メニューバー、トークン展開、ショートカット衝突警告、コマンド出力ドック）
 - ウインドウ、ドックレイアウト、表示状態、タブ、表示項目設定の復元
 - ファイル操作: 開く、このアプリケーションで開く(ネイティブ選択)、名前変更、リンク作成、新規ファイル/フォルダ、ゴミ箱、コピー/カット/ペースト、パスコピー
 - ファイル/フォルダのドラッグ&ドロップ: ペイン間・外部ファイルマネージャとの間で移動（フォルダ上にドロップ、Ctrl でコピー）
@@ -90,7 +91,9 @@ Linux 版も tfx for Windows と同じ考え方に合わせています。
 - `[opacity]`（`background` / `inactivePane` / `disabledItem`）
 - `[startup]`
 - `[shortcuts]`
-- `[terminal]` と `[openWith]` は互換用に解析します。詳細な動作への反映は今後拡張します。
+- `[terminal]`
+- `[openWith]` は互換用に解析します。詳細な動作への反映は今後拡張します。
+- `[[commands]]`
 
 Linux 版の詳細は [docs/configuration.md](docs/configuration.md) を参照してください。
 

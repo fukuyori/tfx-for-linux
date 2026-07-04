@@ -2,6 +2,16 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.5.3] - 2026-07-04
+
+File-operation and clipboard paste improvements.
+
+### Added
+
+- Paste/drop name-conflict handling with overwrite, skip, and rename choices.
+- Clipboard-to-file paste for images, RTF, HTML, URLs, CSV, TSV, and plain text,
+  including a Paste as Plain Text action.
+
 ## [0.5.2] - 2026-07-04
 
 User-defined command support.

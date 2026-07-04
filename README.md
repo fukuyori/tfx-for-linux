@@ -1,7 +1,7 @@
 # tfx for Linux
 
 **Terminal-inspired interface File eXplorer for Linux**  
-Version: **0.5.2**
+Version: **0.5.3**
 
 English | [Japanese](README.ja.md)
 
@@ -58,6 +58,8 @@ When no folder is specified, the application opens the current working directory
 - Window, dock layout, pane visibility, tab, and column setting restoration
 - File operations: open, open with (native chooser), rename, link, new file/folder, trash, copy/cut/paste, copy path
 - Drag-and-drop of files and folders between panes and to/from external file managers (drop onto a folder to move, or hold Ctrl to copy)
+- Conflict handling for paste/drop operations with overwrite, skip, and rename choices
+- Clipboard-to-file paste for images, rich/plain text, URLs, CSV, and TSV, plus Paste as Plain Text
 - Recursive subfolder search: type a term and press Enter; results stream into a dedicated view and the search is cancelled when the pane changes folder
 - Mouse and keyboard selection in file lists, including persistent row highlight
 - Per-pane status line showing item counts, selection, and the current Git branch

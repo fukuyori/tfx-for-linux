@@ -81,6 +81,7 @@ public slots:
     void copySelected();
     void cutSelected();
     void pasteIntoCurrentDirectory();
+    void pasteClipboardAsPlainText();
     void copySelectedPaths();
     void showColumnSettingsDialog();
     void newTab();
@@ -117,6 +118,7 @@ private:
     void openWithCustomApplication();
     void addUserCommandActions(QMenu *menu, bool hasSelection);
     QStringList selectedLocalPaths() const;
+    bool pasteClipboardAsFile(bool plainTextOnly);
     void performDrop(const QList<QUrl> &urls, Qt::DropAction action, const QString &targetDir);
     void updatePreviewFromSelection();
     void updateStatusLine();

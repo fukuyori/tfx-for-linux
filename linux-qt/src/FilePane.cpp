@@ -25,6 +25,7 @@
 #include <QDebug>
 #include <QKeyEvent>
 #include <QHash>
+#include <QImage>
 #include <QMenu>
 #include <QMessageBox>
 #include <QMimeData>
@@ -61,6 +62,13 @@ using namespace tfx::core;
 using namespace tfx::platform;
 
 namespace {
+enum class ConflictChoice {
+    Overwrite,
+    Skip,
+    Rename,
+    Cancel,
+};
+
 int defaultColumnWidth(int column)
 {
     switch (column) {
@@ -103,6 +111,110 @@ bool runProcess(const QString &program, const QStringList &arguments, const QStr
         *errorText = stderrText.isEmpty() ? process.errorString() : stderrText;
     }
     return false;
+}
+
+bool removeExistingPath(const QString &path)
+{
+    const QFileInfo info(path);
+    if (!info.exists()) {
+        return true;
+    }
+    return info.isDir() ? QDir(path).removeRecursively() : QFile::remove(path);
+}
+
+bool transferPath(const QString &source, const QString &destination, bool move)
+{
+    const QFileInfo sourceInfo(source);
+    if (move) {
+        if (QFile::rename(source, destination)) {
+            return true;
+        }
+        if (copyRecursively(source, destination)) {
+            return sourceInfo.isDir() ? QDir(source).removeRecursively() : QFile::remove(source);
+        }
+        return false;
+    }
+    return copyRecursively(source, destination);
+}
+
+ConflictChoice askConflict(QWidget *parent, const QString &fileName)
+{
+    QMessageBox box(parent);
+    box.setWindowTitle(UiText::t("Name Conflict", "名前の衝突"));
+    box.setText(UiText::t("An item named \"%1\" already exists.", "\"%1\" はすでに存在します。").arg(fileName));
+    auto *overwrite = box.addButton(UiText::t("Overwrite", "上書き"), QMessageBox::DestructiveRole);
+    auto *skip = box.addButton(UiText::t("Skip", "スキップ"), QMessageBox::RejectRole);
+    auto *rename = box.addButton(UiText::t("Rename", "名前を変更"), QMessageBox::AcceptRole);
+    auto *cancel = box.addButton(QMessageBox::Cancel);
+    box.setDefaultButton(rename);
+    box.exec();
+
+    if (box.clickedButton() == overwrite) return ConflictChoice::Overwrite;
+    if (box.clickedButton() == rename) return ConflictChoice::Rename;
+    if (box.clickedButton() == cancel) return ConflictChoice::Cancel;
+    if (box.clickedButton() == skip) return ConflictChoice::Skip;
+    return ConflictChoice::Cancel;
+}
+
+bool clipboardCanPaste(const QMimeData *mime)
+{
+    return mime
+        && (mime->hasUrls()
+            || mime->hasImage()
+            || mime->hasHtml()
+            || mime->hasText()
+            || mime->hasFormat("text/rtf"));
+}
+
+bool looksLikeDelimitedText(const QString &text, QChar separator)
+{
+    const QStringList lines = text.split('\n', Qt::SkipEmptyParts);
+    if (lines.size() < 2) {
+        return false;
+    }
+    int expected = -1;
+    for (QString line : lines) {
+        line = line.trimmed();
+        if (line.isEmpty()) {
+            continue;
+        }
+        const int count = line.count(separator);
+        if (count <= 0) {
+            return false;
+        }
+        if (expected < 0) {
+            expected = count;
+        } else if (count != expected) {
+            return false;
+        }
+    }
+    return expected > 0;
+}
+
+QString plainTextClipboardBaseName(const QString &text)
+{
+    const QString trimmed = text.trimmed();
+    const QUrl url(trimmed);
+    if (url.isValid() && !url.scheme().isEmpty()
+        && (url.scheme() == "http" || url.scheme() == "https" || url.scheme() == "ftp")) {
+        return "Clipboard URL.url";
+    }
+    if (looksLikeDelimitedText(text, '\t')) {
+        return "Clipboard.tsv";
+    }
+    if (looksLikeDelimitedText(text, ',')) {
+        return "Clipboard.csv";
+    }
+    return "Clipboard.txt";
+}
+
+bool writeBytesToFile(const QString &path, const QByteArray &data)
+{
+    QFile file(path);
+    if (!file.open(QIODevice::NewOnly | QIODevice::WriteOnly)) {
+        return false;
+    }
+    return file.write(data) == data.size();
 }
 
 QString shellQuote(const QString &text)
@@ -1080,32 +1192,41 @@ void FilePane::performDrop(const QList<QUrl> &urls, Qt::DropAction action, const
         if (!sourceInfo.exists()) {
             continue;
         }
-        // Dropping into the same directory is a no-op.
-        if (sourceInfo.absolutePath() == targetCanonical) {
+        // Moving into the same directory is a no-op; copying continues below
+        // and is renamed automatically.
+        if (move && sourceInfo.absolutePath() == targetCanonical) {
             continue;
         }
         // Never move/copy a folder into itself or one of its descendants.
         if (sourceInfo.isDir()
             && (targetCanonical + "/").startsWith(sourceInfo.absoluteFilePath() + "/")) {
-            emit statusMessageRequested(UiText::t("Cannot move a folder into itself.", "フォルダを自身の中へは移動できません。"));
+            emit statusMessageRequested(UiText::t("Cannot transfer a folder into itself.", "フォルダを自身の中へは移動/コピーできません。"));
             continue;
         }
-        const QString destination = dir.filePath(sourceInfo.fileName());
-        if (QFileInfo::exists(destination)) {
-            emit statusMessageRequested(UiText::t("Skipped existing item: %1", "既存項目をスキップしました: %1").arg(sourceInfo.fileName()));
+        QString destination = dir.filePath(sourceInfo.fileName());
+        const bool samePath = QFileInfo(destination).absoluteFilePath() == sourceInfo.absoluteFilePath();
+        if (samePath && move) {
             continue;
+        }
+        if (samePath && !move) {
+            destination = uniquePathInDirectory(targetDir, sourceInfo.fileName());
+        } else if (QFileInfo::exists(destination)) {
+            const ConflictChoice choice = askConflict(this, sourceInfo.fileName());
+            if (choice == ConflictChoice::Cancel) {
+                break;
+            }
+            if (choice == ConflictChoice::Skip) {
+                continue;
+            }
+            if (choice == ConflictChoice::Rename) {
+                destination = uniquePathInDirectory(targetDir, sourceInfo.fileName());
+            } else if (!removeExistingPath(destination)) {
+                emit statusMessageRequested(UiText::t("Could not overwrite item: %1", "項目を上書きできませんでした: %1").arg(sourceInfo.fileName()));
+                continue;
+            }
         }
 
-        bool ok = false;
-        if (move) {
-            ok = QFile::rename(source, destination);
-            if (!ok && copyRecursively(source, destination)) {
-                // Cross-device move: copy succeeded, remove the source.
-                ok = sourceInfo.isDir() ? QDir(source).removeRecursively() : QFile::remove(source);
-            }
-        } else {
-            ok = copyRecursively(source, destination);
-        }
+        const bool ok = transferPath(source, destination, move);
         if (ok) {
             changed = true;
         } else {
@@ -1122,28 +1243,123 @@ void FilePane::performDrop(const QList<QUrl> &urls, Qt::DropAction action, const
 void FilePane::pasteIntoCurrentDirectory()
 {
     const QMimeData *mime = QApplication::clipboard()->mimeData();
-    if (!mime->hasUrls()) {
+    if (!clipboardCanPaste(mime)) {
         return;
     }
 
+    bool sawLocalUrl = false;
     const bool move = mime->hasFormat("application/x-tfx-cut");
-    for (const QUrl &url : mime->urls()) {
-        const QString source = url.toLocalFile();
-        if (source.isEmpty()) {
-            continue;
+    if (mime->hasUrls()) {
+        bool changed = false;
+        for (const QUrl &url : mime->urls()) {
+            const QString source = url.toLocalFile();
+            if (source.isEmpty()) {
+                continue;
+            }
+            sawLocalUrl = true;
+            const QFileInfo sourceInfo(source);
+            if (!sourceInfo.exists()) {
+                continue;
+            }
+            if (sourceInfo.isDir()
+                && (QFileInfo(m_currentPath).absoluteFilePath() + "/").startsWith(sourceInfo.absoluteFilePath() + "/")) {
+                emit statusMessageRequested(UiText::t("Cannot transfer a folder into itself.", "フォルダを自身の中へは移動/コピーできません。"));
+                continue;
+            }
+
+            QString destination = QDir(m_currentPath).filePath(sourceInfo.fileName());
+            const bool samePath = QFileInfo(destination).absoluteFilePath() == sourceInfo.absoluteFilePath();
+            if (samePath && move) {
+                continue;
+            }
+            if (samePath && !move) {
+                destination = uniquePathInDirectory(m_currentPath, sourceInfo.fileName());
+            } else if (QFileInfo::exists(destination)) {
+                const ConflictChoice choice = askConflict(this, sourceInfo.fileName());
+                if (choice == ConflictChoice::Cancel) {
+                    break;
+                }
+                if (choice == ConflictChoice::Skip) {
+                    continue;
+                }
+                if (choice == ConflictChoice::Rename) {
+                    destination = uniquePathInDirectory(m_currentPath, sourceInfo.fileName());
+                } else if (!removeExistingPath(destination)) {
+                    emit statusMessageRequested(UiText::t("Could not overwrite item: %1", "項目を上書きできませんでした: %1").arg(sourceInfo.fileName()));
+                    continue;
+                }
+            }
+
+            if (transferPath(source, destination, move)) {
+                changed = true;
+            } else {
+                emit statusMessageRequested(UiText::t("Could not paste item: %1", "項目をペーストできませんでした: %1").arg(source));
+            }
         }
-        const QString destination = QDir(m_currentPath).filePath(QFileInfo(source).fileName());
-        if (QFileInfo::exists(destination)) {
-            emit statusMessageRequested(UiText::t("Skipped existing item: %1", "既存項目をスキップしました: %1").arg(destination));
-            continue;
+        if (changed) {
+            reload();
         }
-        if (move) {
-            QFile::rename(source, destination);
-        } else if (!copyRecursively(source, destination)) {
-            emit statusMessageRequested(UiText::t("Could not paste item: %1", "項目をペーストできませんでした: %1").arg(source));
+        updateStatusLine();
+        if (sawLocalUrl) {
+            return;
         }
     }
+
+    pasteClipboardAsFile(false);
+}
+
+void FilePane::pasteClipboardAsPlainText()
+{
+    pasteClipboardAsFile(true);
+}
+
+bool FilePane::pasteClipboardAsFile(bool plainTextOnly)
+{
+    const QMimeData *mime = QApplication::clipboard()->mimeData();
+    if (!mime) {
+        return false;
+    }
+
+    QString baseName;
+    QByteArray data;
+    bool image = false;
+    QImage clipboardImage;
+
+    if (!plainTextOnly && mime->hasImage()) {
+        clipboardImage = qvariant_cast<QImage>(mime->imageData());
+        baseName = "Clipboard Image.png";
+        image = !clipboardImage.isNull();
+    } else if (!plainTextOnly && mime->hasFormat("text/rtf")) {
+        baseName = "Clipboard.rtf";
+        data = mime->data("text/rtf");
+    } else if (!plainTextOnly && mime->hasHtml()) {
+        baseName = "Clipboard.html";
+        data = mime->html().toUtf8();
+    } else if (mime->hasText()) {
+        baseName = plainTextOnly ? "Clipboard.txt" : plainTextClipboardBaseName(mime->text());
+        data = mime->text().toUtf8();
+    } else if (!plainTextOnly && mime->hasUrls() && !mime->urls().isEmpty()) {
+        baseName = "Clipboard URL.url";
+        data = mime->urls().first().toString().toUtf8();
+    } else {
+        return false;
+    }
+
+    if (baseName.isEmpty() || (!image && data.isEmpty())) {
+        return false;
+    }
+
+    const QString path = uniquePathInDirectory(m_currentPath, baseName);
+    const bool ok = image ? clipboardImage.save(path, "PNG") : writeBytesToFile(path, data);
+    if (!ok) {
+        emit statusMessageRequested(UiText::t("Could not create clipboard file.", "クリップボードからファイルを作成できませんでした。"));
+        return false;
+    }
+    reload();
+    setCurrentIndexForPath(path);
+    emit statusMessageRequested(UiText::t("Created file from clipboard.", "クリップボードからファイルを作成しました。"));
     updateStatusLine();
+    return true;
 }
 
 void FilePane::copySelectedPaths()
@@ -1319,7 +1535,9 @@ void FilePane::showFileContextMenu(const QPoint &point)
     menu.addAction(UiText::t("Copy Items", "項目をコピー"), this, &FilePane::copySelected)->setEnabled(hasSelection);
     menu.addAction(UiText::t("Cut Items", "項目をカット"), this, &FilePane::cutSelected)->setEnabled(hasSelection);
     menu.addAction(UiText::t("Paste Here", "ここにペースト"), this, &FilePane::pasteIntoCurrentDirectory)
-        ->setEnabled(QApplication::clipboard()->mimeData()->hasUrls());
+        ->setEnabled(clipboardCanPaste(QApplication::clipboard()->mimeData()));
+    menu.addAction(UiText::t("Paste as Plain Text", "プレーンテキストとしてペースト"), this, &FilePane::pasteClipboardAsPlainText)
+        ->setEnabled(QApplication::clipboard()->mimeData()->hasText());
 
     menu.addSeparator();
     menu.addAction(UiText::t("Reveal in File Manager", "ファイルマネージャで表示"), this, &FilePane::revealSelectionInFileManager)->setEnabled(hasSelection);
@@ -1345,7 +1563,9 @@ void FilePane::showEmptyAreaContextMenu(const QPoint &point)
     menu.addAction(UiText::t("New File", "新規ファイル"), this, &FilePane::createFile);
     menu.addSeparator();
     menu.addAction(UiText::t("Paste Here", "ここにペースト"), this, &FilePane::pasteIntoCurrentDirectory)
-        ->setEnabled(QApplication::clipboard()->mimeData()->hasUrls());
+        ->setEnabled(clipboardCanPaste(QApplication::clipboard()->mimeData()));
+    menu.addAction(UiText::t("Paste as Plain Text", "プレーンテキストとしてペースト"), this, &FilePane::pasteClipboardAsPlainText)
+        ->setEnabled(QApplication::clipboard()->mimeData()->hasText());
     menu.addSeparator();
     menu.addAction(UiText::t("Select All", "すべて選択"), this, &FilePane::selectAllVisibleItems)
         ->setEnabled(m_proxyModel->rowCount(m_view->rootIndex()) > 0);

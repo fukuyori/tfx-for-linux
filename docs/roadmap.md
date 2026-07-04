@@ -1,6 +1,6 @@
 # tfx for Linux Roadmap
 
-Current version: **0.5.2**
+Current version: **0.5.3**
 
 This roadmap tracks the practical development steps for the Linux Qt port as it
 moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
@@ -50,9 +50,9 @@ moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
   the UI stays responsive.
 - Quit-safety prompt while file operations are in flight; partial-file cleanup
   on cancel.
-- Conflict handling for paste/extract/drop (overwrite / skip / rename).
+- Conflict handling for paste/drop (overwrite / skip / rename). (done)
 - Clipboard-to-file materialization with format detection (CSV, TSV, RTF, URL,
-  PNG, TXT) and a "Paste as Plain Text" action.
+  PNG, TXT) and a "Paste as Plain Text" action. (done)
 
 ## Phase 6: View and interaction polish (from tfx macOS 0.7.2–0.7.96)
 

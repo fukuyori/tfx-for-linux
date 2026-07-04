@@ -15,12 +15,28 @@ For a staged install:
 cmake --install build --prefix /usr --destdir /tmp/tfx-package
 ```
 
+The staged install should contain the same paths that would be installed under
+the selected prefix, rooted below the `--destdir` directory.
+
 Installed files include:
 
 - `bin/tfx`
 - `share/applications/tfx.desktop`
 - `share/icons/hicolor/scalable/apps/tfx.svg`
 - `share/doc/tfx-for-linux/`
+
+Release verification:
+
+```sh
+ctest --test-dir build --output-on-failure
+cmake --install build --prefix /usr --destdir /tmp/tfx-package
+```
+
+If `desktop-file-validate` is available, the desktop entry can be checked with:
+
+```sh
+desktop-file-validate linux-qt/packaging/tfx.desktop
+```
 
 The build also provides an `uninstall` target after installation:
 

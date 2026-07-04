@@ -1,6 +1,6 @@
 # tfx for Linux Qt
 
-Version: **0.5.10**
+Version: **0.6.0**
 
 This directory contains the C++/Qt 6 Widgets implementation of `tfx-for-linux`.
 
@@ -17,6 +17,12 @@ Install:
 cmake --install build --prefix /usr/local
 ```
 
+Test:
+
+```sh
+ctest --test-dir build --output-on-failure
+```
+
 ## Scope
 
 - Folder tree and pinned folders
@@ -29,11 +35,15 @@ cmake --install build --prefix /usr/local
 - Markdown preview with GitHub-style tables and local image embedding
 - Built-in command pane
 - Restored window size, pane visibility, splitter sizes, tabs, and file-list columns
+- Multi-tab panes with close buttons, duplicate-tab suppression, tab context
+  menu actions, and restored tab cleanup
 - `config.toml` settings including light/dark theme presets and window/pane transparency (`[opacity]`)
 - User-defined commands with `[[commands]]`
 - Paste/drop conflict handling with overwrite, skip, and rename choices
 - Drag-and-drop target highlighting and immediate refresh of affected panes
 - Clipboard-to-file paste for images, rich/plain text, URLs, CSV, and TSV
+- Recursive search with sortable result columns, preview updates, context menu
+  actions, close control, and persistent search history
 - Per-pane status line with item counts, selection, and current Git branch
 - Auto-refresh of the file list and Git status on directory changes
 - Mouse and keyboard selection with persistent row highlight

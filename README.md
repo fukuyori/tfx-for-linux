@@ -1,7 +1,7 @@
 # tfx for Linux
 
 **Terminal-inspired interface File eXplorer for Linux**  
-Version: **0.5.10**
+Version: **0.6.0**
 
 English | [Japanese](README.ja.md)
 
@@ -49,6 +49,15 @@ To set the initial window geometry:
 
 When no folder is specified, the application opens the current working directory.
 
+## Tests
+
+```sh
+ctest --test-dir build --output-on-failure
+```
+
+The GitHub Actions build runs configure, build, tests, and an install smoke
+test for the Linux Qt target.
+
 ## Current Scope
 
 - Folder tree and pinned folders (reorder pins by dragging; drop folders to pin)
@@ -67,12 +76,16 @@ When no folder is specified, the application opens the current working directory
 - User-editable `config.toml` created under `~/.config/tfx/`, including window/pane transparency, per-pane fonts, and the terminal colour scheme
 - User-defined `[[commands]]` for the context menu/menu bar, token expansion, shortcut conflict warnings, and the Command Output dock
 - Window, dock layout, pane visibility, tab, and column setting restoration
+- Multi-tab file panes with close buttons, duplicate-tab suppression, tab
+  context menu actions, and restored tab cleanup
 - File operations: open, open with (native chooser), rename, link, new file/folder, trash, background copy/cut/paste with progress/cancel, copy path
 - Drag-and-drop of files and folders between panes and to/from external file managers (drop onto a folder to move, or hold Ctrl to copy)
 - Drag-and-drop target highlighting and immediate refresh of affected panes
 - Conflict handling for paste/drop operations with overwrite, skip, and rename choices
 - Clipboard-to-file paste for images, rich/plain text, URLs, CSV, and TSV, plus Paste as Plain Text
 - Recursive subfolder search: type a term and press Enter; results stream into a dedicated view and the search is cancelled when the pane changes folder
+- Search-result keyboard navigation, context menu actions, sortable result
+  columns, preview updates, close button, and persistent search history
 - Mouse and keyboard selection in file lists, including persistent row highlight
 - Per-pane status line showing item counts, selection, and the current Git branch
 - Auto-refresh of the file list and Git status when the directory changes

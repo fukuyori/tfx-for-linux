@@ -2,9 +2,10 @@
 
 This file records notable changes to `tfx-for-linux`.
 
-## [0.5.10] - 2026-07-04
+## [0.6.0] - 2026-07-04
 
-Packaging and install support.
+Release cleanup for packaging, file-operation robustness, preview/security
+hardening, search and tab polish, and expanded Qt Test coverage.
 
 ### Added
 

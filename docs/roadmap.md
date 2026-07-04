@@ -1,6 +1,6 @@
 # tfx for Linux Roadmap
 
-Current version: **0.5.10**
+Current version: **0.6.0**
 
 This roadmap tracks the practical development steps for the Linux Qt port as it
 moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
@@ -74,7 +74,7 @@ moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
 - Window geometry option (`-g`/`--geometry` and `config.toml`). (done)
 - `[naming]` config for placeholder language (auto/en/ja). (done)
 
-## Phase 7: Theme, hardening, and packaging
+## Phase 7: Theme, hardening, and packaging (done)
 
 - Light/dark theme switching driven by `config.toml`. (done)
 - PDF preview disk cache and multi-stage fallback rendering. (done)
@@ -90,7 +90,7 @@ moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
 - Packaging: install/uninstall targets, desktop entry and icon, distribution
   notes, and CI build checks. (done)
 
-## Later
+## 0.6.0 Release Closure (done)
 
 - Multi-tab workflow refinements: close buttons/tooltips, duplicate-tab
   suppression, tab context menu, and state save/restore hardening. (done)

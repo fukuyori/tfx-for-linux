@@ -50,6 +50,7 @@ public:
     void focusFileList();
     void applySharedColumnLayout();
     void setUserCommands(const QList<UserCommand> &commands);
+    void setOpenWithApplications(const QHash<QString, QString> &applications);
     void setPlaceholderLanguage(const QString &language);
     void runUserCommand(int index);
 
@@ -61,6 +62,7 @@ signals:
     void statusMessageRequested(const QString &message);
     void pinFolderRequested(const QString &path);
     void openTerminalHereRequested(const QString &path);
+    void tabsChanged();
     void fileOperationPathsChanged(const QStringList &directories);
     void fileOperationRequested(const QVector<FileOperationRequest> &requests);
     void commandOutputReady(const QString &name,
@@ -99,9 +101,13 @@ protected:
 private:
     QModelIndex currentSourceIndex() const;
     QFileInfo currentFileInfo() const;
+    QString searchResultPath(const QModelIndex &index) const;
+    QStringList selectedSearchResultPaths() const;
     QString uniqueChildPath(const QString &baseName) const;
     void showFileContextMenu(const QPoint &point);
     void showEmptyAreaContextMenu(const QPoint &point);
+    void showSearchContextMenu(const QPoint &point);
+    void showTabContextMenu(const QPoint &point);
     void showColumnContextMenu(const QPoint &point);
     QString columnTitle(int column) const;
     void resetColumns();
@@ -119,18 +125,22 @@ private:
     void exitZipMode();
     void refreshGitStatuses();
     void createLinkForSelection();
+    void openWithConfiguredApplication(const QString &program);
     void openWithCustomApplication();
     void addUserCommandActions(QMenu *menu, bool hasSelection);
     QStringList selectedLocalPaths() const;
     bool pasteClipboardAsFile(bool plainTextOnly);
     void performDrop(const QList<QUrl> &urls, Qt::DropAction action, const QString &targetDir);
     void updatePreviewFromSelection();
+    void updatePreviewFromSearchSelection();
     void updateStatusLine();
     void commitPathEditor();
     QString displayPath(const QString &path) const;
     QString placeholderText(const QString &english, const QString &japanese) const;
     QString tabTitleForPath(const QString &path) const;
+    int tabIndexForPath(const QString &path) const;
     void updateCurrentTabPath(const QString &path);
+    void updateTabCloseButtons();
     void pushHistory(const QString &path);
     void selectProxyIndex(const QModelIndex &index);
     bool selectParentEntry();
@@ -173,5 +183,6 @@ private:
     bool m_suppressColumnSave = false;
     bool m_isSwitchingTabs = false;
     QList<UserCommand> m_userCommands;
+    QHash<QString, QString> m_openWithApplications;
     QString m_placeholderLanguage = "auto";
 };

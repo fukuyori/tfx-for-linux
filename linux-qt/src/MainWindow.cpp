@@ -320,6 +320,8 @@ MainWindow::MainWindow(const QString &initialPath, const QString &geometryOverri
     }
     m_leftPane->setUserCommands(m_config.commands);
     m_rightPane->setUserCommands(m_config.commands);
+    m_leftPane->setOpenWithApplications(m_config.openWith);
+    m_rightPane->setOpenWithApplications(m_config.openWith);
     m_leftPane->setPlaceholderLanguage(m_config.naming.placeholderLanguage);
     m_rightPane->setPlaceholderLanguage(m_config.naming.placeholderLanguage);
     applyTerminalTheme();
@@ -401,6 +403,11 @@ MainWindow::MainWindow(const QString &initialPath, const QString &geometryOverri
             m_terminalPane->openAt(path);
             setTerminalVisible(true);
         });
+        connect(pane, &FilePane::tabsChanged, this, [this]() {
+            if (!m_isRestoringSettings) {
+                saveSettings();
+            }
+        });
         connect(pane, &FilePane::fileOperationPathsChanged, this, [this](const QStringList &directories) {
             reloadChangedDirectories(directories);
         });
@@ -425,6 +432,11 @@ MainWindow::MainWindow(const QString &initialPath, const QString &geometryOverri
     wirePane(m_rightPane);
     connect(m_terminalPane, &TerminalPane::closeRequested, this, [this]() {
         setTerminalVisible(false);
+    });
+    connect(m_terminalPane, &TerminalPane::directorySyncRequested, this, [this](const QString &path) {
+        activePane()->navigateTo(path);
+        statusBar()->showMessage(UiText::t("Synced pane to terminal directory.",
+                                           "ペインをターミナルのディレクトリに同期しました。"), 3500);
     });
 
     buildActions();
@@ -524,6 +536,12 @@ void MainWindow::startFileOperation(const QVector<FileOperationRequest> &request
 
     connect(m_fileOperationThread, &QThread::started, m_fileOperationWorker, &FileOperationWorker::run);
     connect(m_fileOperationThread, &QThread::finished, m_fileOperationThread, &QObject::deleteLater);
+    connect(m_fileOperationWorker, &FileOperationWorker::prepared, this,
+            [this](int total) {
+        m_fileOperationProgress->setRange(0, qMax(1, total));
+        m_fileOperationProgress->setValue(0);
+        updateFileOperationSummary(0, total);
+    });
     connect(m_fileOperationWorker, &FileOperationWorker::progress, this,
             [this](int completed, int total, const QString &path) {
         m_fileOperationProgress->setRange(0, qMax(1, total));

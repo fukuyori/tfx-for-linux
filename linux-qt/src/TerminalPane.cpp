@@ -1,4 +1,5 @@
 #include "TerminalPane.h"
+#include "core/FileOperations.h"
 #include "platform/Platform.h"
 
 #include <QDir>
@@ -18,18 +19,6 @@
 
 #include <QProcess>
 #endif
-
-namespace {
-QString canonicalDirectoryPath(const QString &path)
-{
-    const QFileInfo info(path);
-    if (!info.exists() || !info.isDir()) {
-        return QString();
-    }
-    const QString canonical = info.canonicalFilePath();
-    return canonical.isEmpty() ? info.absoluteFilePath() : canonical;
-}
-}
 
 QFont TerminalPane::resolveFont(const QString &family, int size)
 {
@@ -69,6 +58,11 @@ TerminalPane::TerminalPane(QWidget *parent)
 
     auto *title = new QLabel("TERMINAL", this);
     title->setObjectName("terminalTitle");
+    auto *syncButton = new QToolButton(this);
+    syncButton->setObjectName("terminalCloseButton");
+    syncButton->setText("cwd");
+    syncButton->setToolTip("Sync file pane to terminal directory");
+    connect(syncButton, &QToolButton::clicked, this, &TerminalPane::requestDirectorySync);
     auto *closeButton = new QToolButton(this);
     closeButton->setObjectName("terminalCloseButton");
     closeButton->setText("x");
@@ -80,6 +74,7 @@ TerminalPane::TerminalPane(QWidget *parent)
     headerLayout->setSpacing(0);
     headerLayout->addWidget(title);
     headerLayout->addStretch(1);
+    headerLayout->addWidget(syncButton);
     headerLayout->addWidget(closeButton);
 
     auto *layout = new QVBoxLayout(this);
@@ -173,7 +168,7 @@ void TerminalPane::setWorkingDirectory(const QString &path)
 {
     // Only remember the directory for the next shell start; a running shell is
     // never moved automatically (it stays where the user left it).
-    const QString directory = canonicalDirectoryPath(path);
+    const QString directory = tfx::core::canonicalDirectoryPath(path);
     if (!directory.isEmpty()) {
         m_workingDirectory = directory;
     }
@@ -181,7 +176,7 @@ void TerminalPane::setWorkingDirectory(const QString &path)
 
 void TerminalPane::openAt(const QString &path)
 {
-    const QString directory = canonicalDirectoryPath(path);
+    const QString directory = tfx::core::canonicalDirectoryPath(path);
     if (directory.isEmpty()) {
         return;
     }
@@ -194,6 +189,26 @@ void TerminalPane::openAt(const QString &path)
         m_term->sendText("cd -- '" + quoted + "'\n");
     }
 #endif
+}
+
+QString TerminalPane::currentTerminalDirectory() const
+{
+#ifdef TFX_HAVE_QTERMWIDGET
+    const QString terminalDirectory = m_term ? m_term->workingDirectory() : QString();
+    const QString directory = tfx::core::canonicalDirectoryPath(terminalDirectory);
+    if (!directory.isEmpty()) {
+        return directory;
+    }
+#endif
+    return m_workingDirectory;
+}
+
+void TerminalPane::requestDirectorySync()
+{
+    const QString directory = currentTerminalDirectory();
+    if (!directory.isEmpty()) {
+        emit directorySyncRequested(directory);
+    }
 }
 
 #ifdef TFX_HAVE_QTERMWIDGET

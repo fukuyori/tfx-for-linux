@@ -1,5 +1,8 @@
 #include "core/GitService.h"
 
+#include <QDir>
+#include <QFileInfo>
+
 namespace tfx::core {
 
 QString porcelainStatusLabel(const QString &status)
@@ -42,6 +45,30 @@ QString porcelainPath(QString path)
         path = path.mid(1, path.size() - 2);
     }
     return path;
+}
+
+QString porcelainAbsolutePath(const QString &directory, const QString &relativePath)
+{
+    const QString basePath = QFileInfo(directory).canonicalFilePath();
+    if (basePath.isEmpty() || relativePath.isEmpty()) {
+        return QString();
+    }
+
+    const QString normalizedRelative = QDir::fromNativeSeparators(relativePath);
+    if (QDir::isAbsolutePath(normalizedRelative)) {
+        return QString();
+    }
+
+    const QString cleanRelative = QDir::cleanPath(normalizedRelative);
+    if (cleanRelative == "." || cleanRelative == ".." || cleanRelative.startsWith("../")) {
+        return QString();
+    }
+
+    const QString absolutePath = QDir::cleanPath(QDir(basePath).filePath(cleanRelative));
+    if (absolutePath == basePath || absolutePath.startsWith(basePath + "/")) {
+        return absolutePath;
+    }
+    return QString();
 }
 
 }

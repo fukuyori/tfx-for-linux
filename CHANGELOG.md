@@ -2,7 +2,7 @@
 
 This file records notable changes to `tfx-for-linux`.
 
-## [0.5.7] - 2026-07-04
+## [0.5.8] - 2026-07-04
 
 Packaging and install support.
 
@@ -13,6 +13,8 @@ Packaging and install support.
 - Copy/move paste and drop operations now run on a background worker with a
   status-bar progress indicator, cancellation, queued follow-up operations, and
   partial destination cleanup on cancel.
+- File-operation progress now reports the total item count as soon as the
+  worker has prepared the batch, before the first transfer completes.
 - File-operation progress now keeps a visible status-bar summary with queued
   item counts, and cancel clears pending queued operations.
 - Queued file operations now continue only after a successful batch; failures
@@ -28,10 +30,44 @@ Packaging and install support.
 - Hardened process launch paths by canonicalizing terminal working directories,
   using `cd --` for explicit terminal navigation, and rejecting unavailable
   working directories for user-defined commands.
+- Hardened Git status refresh by canonicalizing query directories and ignoring
+  porcelain paths that are absolute or escape the queried directory.
 - Added top-level `theme = "dark" | "light"` config support; `[colors]`
   continues to override the selected built-in palette.
 - Added a disk cache for PDF preview images and multi-stage rendering fallback
   so previews can reuse successful renders and retry at smaller sizes.
+- Added AppConfig test coverage for light theme presets, color overrides,
+  invalid theme warnings, and `[openWith]` mappings.
+- Moved canonical directory resolution into shared file-operation helpers and
+  added path-handling tests for canonical directories and unique-name suffixes.
+- Expanded file-operation helper tests to cover recursive directory copies and
+  destination-exists failures.
+- Added column layout normalization and test coverage for saved column order,
+  widths, and sort state.
+- Added Git service tests for porcelain rename parsing and status path
+  containment.
+- Wired `[openWith]` extension mappings into the file context menu; configured
+  programs now appear in Open With and launch directly with the selected file.
+- Search results now handle keyboard navigation more consistently: Enter opens
+  the current result, Escape returns to the file list, and Backspace goes up.
+- Search-result selections now update the preview pane, including multi-result
+  preview summaries.
+- The pane status line now reflects search-result counts, selection counts, and
+  whether a search is still running.
+- Search results now have a context menu for opening a result, jumping to its
+  containing folder, revealing it in the file manager, and copying paths.
+- Added a terminal header button that syncs the active file pane to the
+  terminal's current working directory.
+- File-pane tabs now show close buttons when multiple tabs are open, keep the
+  final tab protected, and expose each tab's full path as a tooltip.
+- Tab additions, closes, selection changes, and drag reordering now save the
+  restored tab state immediately.
+- Restored file-pane tab paths are canonicalized, so duplicate saved entries
+  that point to the same directory collapse cleanly.
+- File-pane tabs now avoid opening duplicate directories, and the tab bar
+  context menu supports new tab, close tab, close other tabs, and copy tab path.
+- Added tab-state helper coverage for restored tab normalization and active-tab
+  index clamping.
 
 ## [0.5.5] - 2026-07-04
 

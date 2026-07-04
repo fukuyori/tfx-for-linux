@@ -1,7 +1,7 @@
 # tfx for Linux
 
 **Linux 向け Terminal-inspired interface File eXplorer**  
-Version: **0.5.7**
+Version: **0.5.8**
 
 [English](README.md) | 日本語
 
@@ -108,7 +108,7 @@ Linux 版も tfx for Windows と同じ考え方に合わせています。
 - `[naming]`
 - `[shortcuts]`
 - `[terminal]`
-- `[openWith]` は互換用に解析します。詳細な動作への反映は今後拡張します。
+- `[openWith]`
 - `[[commands]]`
 
 Linux 版の詳細は [docs/configuration.md](docs/configuration.md) を参照してください。

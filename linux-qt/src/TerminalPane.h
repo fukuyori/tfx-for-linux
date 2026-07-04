@@ -30,11 +30,14 @@ public:
 
 signals:
     void closeRequested();
+    void directorySyncRequested(const QString &path);
 
 protected:
     void showEvent(QShowEvent *event) override;
 
 private:
+    QString currentTerminalDirectory() const;
+    void requestDirectorySync();
     QString m_workingDirectory;
 
 #ifdef TFX_HAVE_QTERMWIDGET

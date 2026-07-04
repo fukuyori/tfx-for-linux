@@ -1,10 +1,9 @@
 #include "controllers/GitStatusController.h"
 
 #include "UiText.h"
+#include "core/FileOperations.h"
 #include "core/GitService.h"
 
-#include <QDir>
-#include <QFileInfo>
 #include <QProcess>
 #include <QStandardPaths>
 #include <QStringList>
@@ -18,7 +17,8 @@ GitStatusController::GitStatusController(QObject *parent)
 
 void GitStatusController::refresh(const QString &directory)
 {
-    m_directory = directory;
+    const QString gitDirectory = canonicalDirectoryPath(directory);
+    m_directory = gitDirectory;
 
     if (m_statusProcess) {
         disconnect(m_statusProcess, nullptr, this, nullptr);
@@ -32,16 +32,16 @@ void GitStatusController::refresh(const QString &directory)
     emit statusesReady({});
 
     const QString gitProgram = QStandardPaths::findExecutable("git");
-    if (gitProgram.isEmpty() || directory.isEmpty()) {
+    if (gitProgram.isEmpty() || gitDirectory.isEmpty()) {
         emit branchChanged(QString());
         return;
     }
 
     auto *branchProcess = new QProcess(this);
     branchProcess->setProgram(gitProgram);
-    branchProcess->setArguments({"-C", directory, "rev-parse", "--abbrev-ref", "HEAD"});
+    branchProcess->setArguments({"-C", gitDirectory, "rev-parse", "--abbrev-ref", "HEAD"});
     connect(branchProcess, &QProcess::finished, this,
-            [this, branchProcess, directory](int code, QProcess::ExitStatus status) {
+            [this, branchProcess, gitDirectory](int code, QProcess::ExitStatus status) {
         QString branch;
         if (status == QProcess::NormalExit && code == 0) {
             branch = QString::fromLocal8Bit(branchProcess->readAllStandardOutput()).trimmed();
@@ -50,7 +50,7 @@ void GitStatusController::refresh(const QString &directory)
             }
         }
         branchProcess->deleteLater();
-        if (directory == m_directory) {
+        if (gitDirectory == m_directory) {
             emit branchChanged(branch);
         }
     });
@@ -58,9 +58,9 @@ void GitStatusController::refresh(const QString &directory)
 
     m_statusProcess = new QProcess(this);
     m_statusProcess->setProgram(gitProgram);
-    m_statusProcess->setArguments({"-C", directory, "status", "--porcelain=v1", "--untracked-files=all"});
+    m_statusProcess->setArguments({"-C", gitDirectory, "status", "--porcelain=v1", "--untracked-files=all"});
     connect(m_statusProcess, &QProcess::finished, this,
-            [this, directory](int exitCode, QProcess::ExitStatus exitStatus) {
+            [this, gitDirectory](int exitCode, QProcess::ExitStatus exitStatus) {
         QProcess *process = m_statusProcess;
         m_statusProcess = nullptr;
         if (!process) {
@@ -68,8 +68,8 @@ void GitStatusController::refresh(const QString &directory)
         }
         const QString output = QString::fromLocal8Bit(process->readAllStandardOutput());
         process->deleteLater();
-        if (exitStatus == QProcess::NormalExit && exitCode == 0 && directory == m_directory) {
-            applyStatusOutput(directory, output);
+        if (exitStatus == QProcess::NormalExit && exitCode == 0 && gitDirectory == m_directory) {
+            applyStatusOutput(gitDirectory, output);
         }
     });
     m_statusProcess->start();
@@ -78,7 +78,6 @@ void GitStatusController::refresh(const QString &directory)
 void GitStatusController::applyStatusOutput(const QString &directory, const QString &output)
 {
     QHash<QString, QString> statuses;
-    const QDir dir(directory);
     const QStringList lines = output.split('\n', Qt::SkipEmptyParts);
     for (const QString &line : lines) {
         if (line.size() < 4) {
@@ -91,13 +90,16 @@ void GitStatusController::applyStatusOutput(const QString &directory, const QStr
         }
 
         const QString label = porcelainStatusLabel(status);
-        const QString absolutePath = QFileInfo(dir.filePath(relativePath)).absoluteFilePath();
+        const QString absolutePath = porcelainAbsolutePath(directory, relativePath);
+        if (absolutePath.isEmpty()) {
+            continue;
+        }
         statuses.insert(absolutePath, label);
 
         const QString topLevelName = relativePath.section('/', 0, 0);
         if (!topLevelName.isEmpty()) {
-            const QString topLevelPath = QFileInfo(dir.filePath(topLevelName)).absoluteFilePath();
-            if (!statuses.contains(topLevelPath)) {
+            const QString topLevelPath = porcelainAbsolutePath(directory, topLevelName);
+            if (!topLevelPath.isEmpty() && !statuses.contains(topLevelPath)) {
                 statuses.insert(topLevelPath, label);
             }
         }

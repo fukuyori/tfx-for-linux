@@ -32,6 +32,7 @@ void FileOperationWorker::run()
     if (m_total <= 0) {
         m_total = m_requests.size();
     }
+    emit prepared(m_total);
 
     for (const FileOperationRequest &request : m_requests) {
         if (isCanceled()) {

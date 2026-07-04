@@ -1,6 +1,6 @@
 # tfx for Linux Roadmap
 
-Current version: **0.5.7**
+Current version: **0.5.8**
 
 This roadmap tracks the practical development steps for the Linux Qt port as it
 moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
@@ -32,8 +32,8 @@ moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
   cursor, `Ctrl+C`, TUI apps), with the working directory following the active
   pane and font/colour scheme from `config.toml`. Falls back to the simple
   command pane when QTermWidget is unavailable. (done)
-- Remaining terminal follow-ups: a folder-sync button reading the foreground
-  process working directory, and session persistence across show/hide toggles.
+- Terminal follow-ups: a folder-sync button reads the terminal working
+  directory, and sessions persist across show/hide toggles. (done)
 
 ## Phase 4: User-defined commands (from tfx macOS 0.7.0)
 
@@ -47,9 +47,9 @@ moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
 ## Phase 5: File-operation robustness and clipboard (from tfx macOS 0.8.0 / 0.8.3)
 
 - Inline progress for copy/move with cancellation, run on a background queue so
-  the UI stays responsive. (initial done)
+  the UI stays responsive. (done)
 - Quit-safety prompt while file operations are in flight; partial-file cleanup
-  on cancel. (initial done)
+  on cancel. (done)
 - Visible queue status and queue clearing when canceling file operations. (done)
 - Stop and clear queued file operations after a failed batch. (done)
 - Unit coverage for the background file-operation worker, including fallback
@@ -85,12 +85,16 @@ moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
   - ZIP entry path validation before browsing/extracting archives. (done)
   - Terminal and user-command working directories are canonicalized and
     validated before process launch. (done)
+  - Git status refresh canonicalizes query directories and ignores status paths
+    that would escape the queried directory. (done)
 - Packaging: install/uninstall targets, desktop entry and icon, distribution
   notes, and CI build checks. (done)
 
 ## Later
 
-- Multi-tab workflow refinements.
-- Search and filter refinements.
-- Test coverage for path handling, column configuration, and file-operation
-  helpers.
+- Multi-tab workflow refinements: close buttons/tooltips, duplicate-tab
+  suppression, tab context menu, and state save/restore hardening. (done)
+- Search and filter refinements. (search-result keyboard/preview/status/context
+  handling started)
+- Test coverage for path handling, configuration, column configuration, Git
+  helpers, and file-operation helpers. (coverage started)

@@ -119,6 +119,7 @@ quit = "ctrl+q"
 
 # [openWith]
 # md = "code"
+# * = "xdg-open"
 
 # [[commands]]
 # name = "Open in VS Code"
@@ -286,5 +287,7 @@ Supported tokens:
 
 ## Notes
 
-`[openWith]` is parsed for compatibility with the Windows configuration shape.
-Its detailed Linux behavior is still being wired into the file operations.
+`[openWith]` maps file extensions to launch programs shown in the file context
+menu's Open With submenu. Keys are lowercase extensions without the dot; `*`
+adds a fallback program for all files. The configured program is launched
+directly with the selected file path as its only argument.

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(tfx-for-linux VERSION 0.5.7 LANGUAGES CXX)
+project(tfx-for-linux VERSION 0.5.8 LANGUAGES CXX)
 
 include(GNUInstallDirs)
 include(CTest)
@@ -32,10 +32,14 @@ qt_add_executable(tfx
     src/core/FileTypeInfo.h
     src/core/GitService.cpp
     src/core/GitService.h
+    src/core/TabState.cpp
+    src/core/TabState.h
     src/controllers/GitStatusController.cpp
     src/controllers/GitStatusController.h
     src/CommandOutputPane.cpp
     src/CommandOutputPane.h
+    src/models/ColumnLayout.cpp
+    src/models/ColumnLayout.h
     src/models/FileColumns.h
     src/models/FileSystemProxyModel.cpp
     src/models/FileSystemProxyModel.h
@@ -107,6 +111,54 @@ if(BUILD_TESTING AND Qt6Test_FOUND)
     target_include_directories(tfx_file_operation_worker_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(tfx_file_operation_worker_test PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME file_operation_worker COMMAND tfx_file_operation_worker_test)
+
+    qt_add_executable(tfx_app_config_test
+        tests/AppConfigTest.cpp
+        src/AppConfig.cpp
+        src/AppConfig.h
+    )
+    target_include_directories(tfx_app_config_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(tfx_app_config_test PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME app_config COMMAND tfx_app_config_test)
+
+    qt_add_executable(tfx_path_handling_test
+        tests/PathHandlingTest.cpp
+        src/core/FileOperations.cpp
+        src/core/FileOperations.h
+    )
+    target_include_directories(tfx_path_handling_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(tfx_path_handling_test PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME path_handling COMMAND tfx_path_handling_test)
+
+    qt_add_executable(tfx_git_service_test
+        tests/GitServiceTest.cpp
+        src/core/GitService.cpp
+        src/core/GitService.h
+    )
+    target_include_directories(tfx_git_service_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(tfx_git_service_test PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME git_service COMMAND tfx_git_service_test)
+
+    qt_add_executable(tfx_tab_state_test
+        tests/TabStateTest.cpp
+        src/core/TabState.cpp
+        src/core/TabState.h
+        src/core/FileOperations.cpp
+        src/core/FileOperations.h
+    )
+    target_include_directories(tfx_tab_state_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(tfx_tab_state_test PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME tab_state COMMAND tfx_tab_state_test)
+
+    qt_add_executable(tfx_column_layout_test
+        tests/ColumnLayoutTest.cpp
+        src/models/ColumnLayout.cpp
+        src/models/ColumnLayout.h
+        src/models/FileColumns.h
+    )
+    target_include_directories(tfx_column_layout_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(tfx_column_layout_test PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME column_layout COMMAND tfx_column_layout_test)
 
     qt_add_executable(tfx_platform_security_test
         tests/PlatformSecurityTest.cpp

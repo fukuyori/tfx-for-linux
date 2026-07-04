@@ -12,4 +12,8 @@ QString porcelainStatusLabel(const QString &status);
 // "old -> new" rename form and quoted paths.
 QString porcelainPath(QString path);
 
+// Resolve a porcelain relative path under a canonical Git query directory.
+// Returns an empty string when the path is absolute or escapes the directory.
+QString porcelainAbsolutePath(const QString &directory, const QString &relativePath);
+
 }

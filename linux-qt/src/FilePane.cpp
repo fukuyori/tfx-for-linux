@@ -3,7 +3,9 @@
 #include "core/FileOperations.h"
 #include "core/FileTypeInfo.h"
 #include "core/GitService.h"
+#include "core/TabState.h"
 #include "controllers/GitStatusController.h"
+#include "models/ColumnLayout.h"
 #include "platform/Platform.h"
 #include "views/FileViews.h"
 
@@ -59,6 +61,7 @@
 #include <functional>
 
 using namespace tfx::core;
+using namespace tfx::models;
 using namespace tfx::platform;
 
 namespace {
@@ -235,16 +238,6 @@ QString scriptsDirectory()
     return QDir(QStandardPaths::writableLocation(QStandardPaths::ConfigLocation)).filePath("tfx/scripts");
 }
 
-QString canonicalDirectoryPath(const QString &path)
-{
-    const QFileInfo info(path);
-    if (!info.exists() || !info.isDir()) {
-        return QString();
-    }
-    const QString canonical = info.canonicalFilePath();
-    return canonical.isEmpty() ? info.absoluteFilePath() : canonical;
-}
-
 QString expandCommandTokens(QString text,
                             const QStringList &paths,
                             const QString &cwd,
@@ -310,8 +303,12 @@ FilePane::FilePane(const QString &label, const QString &initialPath, QWidget *pa
     m_tabBar->setTabsClosable(false);
     m_tabBar->setExpanding(false);
     m_tabBar->setDrawBase(false);
+    m_tabBar->setContextMenuPolicy(Qt::CustomContextMenu);
+    const QString initialTabPath = normalizedTabPath(initialPath);
     m_tabBar->addTab(tabTitleForPath(initialPath));
-    m_tabBar->setTabData(0, QFileInfo(initialPath).absoluteFilePath());
+    m_tabBar->setTabData(0, initialTabPath);
+    m_tabBar->setTabToolTip(0, initialTabPath);
+    updateTabCloseButtons();
 
     m_view->setModel(m_proxyModel);
     m_view->setObjectName("fileTable");
@@ -445,6 +442,8 @@ FilePane::FilePane(const QString &label, const QString &initialPath, QWidget *pa
     m_searchView->setColumnWidth(1, 120);
     m_searchView->setColumnWidth(2, 96);
     m_searchView->setColumnWidth(3, 160);
+    m_searchView->setContextMenuPolicy(Qt::CustomContextMenu);
+    m_searchView->installEventFilter(this);
 
     m_iconView = new FileIconView(this);
     m_iconView->setObjectName("fileIcons");
@@ -555,6 +554,13 @@ FilePane::FilePane(const QString &label, const QString &initialPath, QWidget *pa
         QTimer::singleShot(0, this, [this, path]() { setCurrentIndexForPath(path); });
     };
     connect(m_searchView, &QTableView::activated, this, openSearchResult);
+    connect(m_searchView->selectionModel(), &QItemSelectionModel::selectionChanged,
+            this, [this](const QItemSelection &, const QItemSelection &) {
+                updatePreviewFromSearchSelection();
+                updateStatusLine();
+            });
+    connect(m_searchView, &QWidget::customContextMenuRequested,
+            this, &FilePane::showSearchContextMenu);
 
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(2, 2, 2, 2);
@@ -656,12 +662,14 @@ FilePane::FilePane(const QString &label, const QString &initialPath, QWidget *pa
             navigateTo(path, false);
             m_isSwitchingTabs = false;
         }
+        emit tabsChanged();
     });
     connect(m_tabBar, &QTabBar::tabCloseRequested, this, [this](int index) {
         if (m_tabBar->count() <= 1) {
             return;
         }
         m_tabBar->removeTab(index);
+        updateTabCloseButtons();
         if (m_tabBar->currentIndex() >= 0) {
             const QString path = m_tabBar->tabData(m_tabBar->currentIndex()).toString();
             if (!path.isEmpty()) {
@@ -670,7 +678,12 @@ FilePane::FilePane(const QString &label, const QString &initialPath, QWidget *pa
                 m_isSwitchingTabs = false;
             }
         }
+        emit tabsChanged();
     });
+    connect(m_tabBar, &QTabBar::tabMoved, this, [this]() {
+        emit tabsChanged();
+    });
+    connect(m_tabBar, &QWidget::customContextMenuRequested, this, &FilePane::showTabContextMenu);
 
     navigateTo(initialPath, false);
     setActive(false);
@@ -699,12 +712,7 @@ int FilePane::activeTabIndex() const
 
 void FilePane::restoreTabs(const QStringList &paths, int activeIndex)
 {
-    QStringList validPaths;
-    for (const QString &path : paths) {
-        if (QFileInfo(path).isDir() && !validPaths.contains(path)) {
-            validPaths.append(path);
-        }
-    }
+    const QStringList validPaths = normalizedTabPaths(paths);
     if (validPaths.isEmpty()) {
         return;
     }
@@ -716,8 +724,10 @@ void FilePane::restoreTabs(const QStringList &paths, int activeIndex)
     for (const QString &path : validPaths) {
         const int index = m_tabBar->addTab(tabTitleForPath(path));
         m_tabBar->setTabData(index, path);
+        m_tabBar->setTabToolTip(index, path);
     }
-    const int clampedIndex = qBound(0, activeIndex, m_tabBar->count() - 1);
+    updateTabCloseButtons();
+    const int clampedIndex = clampedTabIndex(activeIndex, m_tabBar->count());
     m_tabBar->setCurrentIndex(clampedIndex);
     m_tabBar->blockSignals(false);
 
@@ -760,6 +770,11 @@ void FilePane::setUserCommands(const QList<UserCommand> &commands)
     m_userCommands = commands;
 }
 
+void FilePane::setOpenWithApplications(const QHash<QString, QString> &applications)
+{
+    m_openWithApplications = applications;
+}
+
 void FilePane::setPlaceholderLanguage(const QString &language)
 {
     if (language == "en" || language == "ja" || language == "auto") {
@@ -789,7 +804,7 @@ void FilePane::runUserCommand(int index)
     const QString expanded = expandCommandTokens(command.command, paths, m_currentPath, true);
     auto *process = new QProcess(this);
     const QString requestedWorkingDirectory = workingDirectory.isEmpty() ? m_currentPath : workingDirectory;
-    const QString effectiveWorkingDirectory = canonicalDirectoryPath(requestedWorkingDirectory);
+    const QString effectiveWorkingDirectory = tfx::core::canonicalDirectoryPath(requestedWorkingDirectory);
     if (effectiveWorkingDirectory.isEmpty()) {
         emit statusMessageRequested(UiText::t("Command working directory is not available: %1",
                                               "コマンドの作業ディレクトリを利用できません: %1")
@@ -869,6 +884,7 @@ void FilePane::startSearch(const QString &term)
     }
     m_searchIterator = new QDirIterator(m_currentPath, filters, QDirIterator::Subdirectories);
     m_viewStack->setCurrentWidget(m_searchView);
+    updateStatusLine();
     emit statusMessageRequested(UiText::t("Searching: %1...", "検索中: %1...").arg(m_searchTerm));
     m_searchTimer->start();
 }
@@ -903,8 +919,10 @@ void FilePane::searchStep()
         m_searchTimer->stop();
         delete m_searchIterator;
         m_searchIterator = nullptr;
+        updateStatusLine();
         emit statusMessageRequested(UiText::t("Search complete: %1 matches", "検索完了: %1 件").arg(m_searchMatches));
     } else {
+        updateStatusLine();
         emit statusMessageRequested(UiText::t("Searching: %1 matches", "検索中: %1 件").arg(m_searchMatches));
     }
 }
@@ -1410,9 +1428,18 @@ void FilePane::copySelectedPaths()
 
 void FilePane::newTab()
 {
+    const int existing = tabIndexForPath(m_currentPath);
+    if (existing >= 0) {
+        m_tabBar->setCurrentIndex(existing);
+        return;
+    }
+
     const int index = m_tabBar->addTab(tabTitleForPath(m_currentPath));
     m_tabBar->setTabData(index, m_currentPath);
+    m_tabBar->setTabToolTip(index, m_currentPath);
     m_tabBar->setCurrentIndex(index);
+    updateTabCloseButtons();
+    emit tabsChanged();
 }
 
 void FilePane::closeCurrentTab()
@@ -1422,10 +1449,12 @@ void FilePane::closeCurrentTab()
         return;
     }
     m_tabBar->removeTab(index);
+    updateTabCloseButtons();
     const int nextIndex = qMin(index, m_tabBar->count() - 1);
     if (nextIndex >= 0) {
         m_tabBar->setCurrentIndex(nextIndex);
     }
+    emit tabsChanged();
 }
 
 void FilePane::nextTab()
@@ -1464,12 +1493,31 @@ bool FilePane::eventFilter(QObject *watched, QEvent *event)
             }
         }
     }
-    if (watched == m_view || watched == m_iconView) {
+    if (watched == m_view || watched == m_iconView || watched == m_searchView) {
         if (event->type() == QEvent::FocusIn || event->type() == QEvent::MouseButtonPress) {
             emit activated(this);
         }
         if (event->type() == QEvent::KeyPress) {
             auto *keyEvent = static_cast<QKeyEvent *>(event);
+            if (watched == m_searchView) {
+                if (keyEvent->key() == Qt::Key_Escape) {
+                    cancelSearch();
+                    focusFileList();
+                    return true;
+                }
+                if (keyEvent->key() == Qt::Key_Return || keyEvent->key() == Qt::Key_Enter) {
+                    const QModelIndex current = m_searchView->currentIndex();
+                    if (current.isValid()) {
+                        emit m_searchView->activated(current);
+                    }
+                    return true;
+                }
+                if (keyEvent->key() == Qt::Key_Backspace) {
+                    cancelSearch();
+                    goUp();
+                    return true;
+                }
+            }
             if (keyEvent->key() == Qt::Key_Down
                 && !m_view->currentIndex().isValid()
                 && m_view->selectionModel()->selectedIndexes().isEmpty()) {
@@ -1508,6 +1556,36 @@ QFileInfo FilePane::currentFileInfo() const
     return index.isValid() ? m_model->fileInfo(index) : QFileInfo();
 }
 
+QString FilePane::searchResultPath(const QModelIndex &index) const
+{
+    if (!index.isValid() || !m_searchModel) {
+        return QString();
+    }
+    QStandardItem *item = m_searchModel->item(index.row(), 0);
+    return item ? item->data(Qt::UserRole).toString() : QString();
+}
+
+QStringList FilePane::selectedSearchResultPaths() const
+{
+    QStringList paths;
+    QSet<QString> seen;
+    if (!m_searchView) {
+        return paths;
+    }
+    QModelIndexList rows = m_searchView->selectionModel()->selectedRows();
+    if (rows.isEmpty() && m_searchView->currentIndex().isValid()) {
+        rows << m_searchView->currentIndex();
+    }
+    for (const QModelIndex &index : rows) {
+        const QString path = searchResultPath(index);
+        if (!path.isEmpty() && !seen.contains(path)) {
+            paths << path;
+            seen.insert(path);
+        }
+    }
+    return paths;
+}
+
 QString FilePane::uniqueChildPath(const QString &baseName) const
 {
     QString path = QDir(m_currentPath).filePath(baseName);
@@ -1544,6 +1622,26 @@ void FilePane::showFileContextMenu(const QPoint &point)
     if (hasSelection && !isDirectory) {
         auto *openWith = menu.addMenu(UiText::t("Open With", "このアプリケーションで開く"));
         openWith->addAction(UiText::t("Default Application", "既定のアプリケーション"), this, &FilePane::openSelected);
+        const QString suffix = info.suffix().toLower();
+        QStringList configuredPrograms;
+        if (!suffix.isEmpty() && m_openWithApplications.contains(suffix)) {
+            configuredPrograms << m_openWithApplications.value(suffix);
+        }
+        if (m_openWithApplications.contains("*")) {
+            configuredPrograms << m_openWithApplications.value("*");
+        }
+        configuredPrograms.removeDuplicates();
+        for (const QString &program : configuredPrograms) {
+            if (program.trimmed().isEmpty()) {
+                continue;
+            }
+            openWith->addAction(program, this, [this, program]() {
+                openWithConfiguredApplication(program);
+            });
+        }
+        if (!configuredPrograms.isEmpty()) {
+            openWith->addSeparator();
+        }
         openWith->addAction(UiText::t("Other...", "その他..."), this, &FilePane::openWithCustomApplication);
     }
 
@@ -1623,6 +1721,96 @@ void FilePane::showEmptyAreaContextMenu(const QPoint &point)
     addUserCommandActions(&menu, false);
 
     menu.exec(m_view->viewport()->mapToGlobal(point));
+}
+
+void FilePane::showSearchContextMenu(const QPoint &point)
+{
+    const QModelIndex clicked = m_searchView->indexAt(point);
+    if (clicked.isValid() && !m_searchView->selectionModel()->isSelected(clicked)) {
+        m_searchView->selectRow(clicked.row());
+    }
+
+    const QStringList paths = selectedSearchResultPaths();
+    const bool hasSelection = !paths.isEmpty();
+    const QString firstPath = hasSelection ? paths.first() : QString();
+    const QFileInfo firstInfo(firstPath);
+
+    QMenu menu(this);
+    menu.addAction(UiText::t("Open", "開く"), this, [this, clicked]() {
+        QModelIndex index = clicked.isValid() ? clicked : m_searchView->currentIndex();
+        if (index.isValid()) {
+            emit m_searchView->activated(index);
+        }
+    })->setEnabled(hasSelection);
+    menu.addAction(UiText::t("Go to Containing Folder", "含まれるフォルダへ移動"), this, [this, firstInfo]() {
+        if (!firstInfo.exists()) {
+            return;
+        }
+        const QString path = firstInfo.absoluteFilePath();
+        navigateTo(firstInfo.absolutePath());
+        QTimer::singleShot(0, this, [this, path]() { setCurrentIndexForPath(path); });
+    })->setEnabled(hasSelection);
+    menu.addSeparator();
+    menu.addAction(UiText::t("Reveal in File Manager", "ファイルマネージャで表示"), this, [firstPath]() {
+        revealInFileManager(firstPath);
+    })->setEnabled(hasSelection);
+    menu.addAction(UiText::t("Copy Path", "パスをコピー"), this, [paths]() {
+        QApplication::clipboard()->setText(paths.join('\n'));
+    })->setEnabled(hasSelection);
+
+    menu.exec(m_searchView->viewport()->mapToGlobal(point));
+}
+
+void FilePane::showTabContextMenu(const QPoint &point)
+{
+    const int clicked = m_tabBar->tabAt(point);
+    const bool hasTab = clicked >= 0;
+
+    QMenu menu(this);
+    menu.addAction(UiText::t("New Tab", "新規タブ"), this, &FilePane::newTab);
+    auto *closeTab = menu.addAction(UiText::t("Close Tab", "タブを閉じる"), this, [this, clicked]() {
+        if (clicked >= 0) {
+            m_tabBar->setCurrentIndex(clicked);
+        }
+        closeCurrentTab();
+    });
+    closeTab->setEnabled(hasTab && m_tabBar->count() > 1);
+
+    auto *closeOthers = menu.addAction(UiText::t("Close Other Tabs", "他のタブを閉じる"), this, [this, clicked]() {
+        if (clicked < 0 || m_tabBar->count() <= 1) {
+            return;
+        }
+        const QString path = m_tabBar->tabData(clicked).toString();
+        const QString title = m_tabBar->tabText(clicked);
+        const QString tooltip = m_tabBar->tabToolTip(clicked);
+
+        m_tabBar->blockSignals(true);
+        while (m_tabBar->count() > 0) {
+            m_tabBar->removeTab(m_tabBar->count() - 1);
+        }
+        const int index = m_tabBar->addTab(title);
+        m_tabBar->setTabData(index, path);
+        m_tabBar->setTabToolTip(index, tooltip);
+        m_tabBar->setCurrentIndex(index);
+        m_tabBar->blockSignals(false);
+        updateTabCloseButtons();
+        if (!path.isEmpty() && path != m_currentPath) {
+            m_isSwitchingTabs = true;
+            navigateTo(path, false);
+            m_isSwitchingTabs = false;
+        }
+        emit tabsChanged();
+    });
+    closeOthers->setEnabled(hasTab && m_tabBar->count() > 1);
+
+    if (hasTab) {
+        menu.addSeparator();
+        menu.addAction(UiText::t("Copy Tab Path", "タブのパスをコピー"), this, [this, clicked]() {
+            QApplication::clipboard()->setText(m_tabBar->tabData(clicked).toString());
+        });
+    }
+
+    menu.exec(m_tabBar->mapToGlobal(point));
 }
 
 void FilePane::addUserCommandActions(QMenu *menu, bool hasSelection)
@@ -1820,6 +2008,17 @@ void FilePane::createLinkForSelection()
     }
 }
 
+void FilePane::openWithConfiguredApplication(const QString &program)
+{
+    const QFileInfo info = currentFileInfo();
+    if (!info.exists() || info.isDir() || program.trimmed().isEmpty()) {
+        return;
+    }
+    if (!QProcess::startDetached(program, {info.absoluteFilePath()})) {
+        emit statusMessageRequested(UiText::t("Could not launch: %1", "起動できませんでした: %1").arg(program));
+    }
+}
+
 void FilePane::openWithCustomApplication()
 {
     const QFileInfo info = currentFileInfo();
@@ -1981,17 +2180,12 @@ void FilePane::applySharedColumnLayout()
         return;
     }
 
-    const QStringList order = settings.value("order").toStringList();
-    if (order.size() == kColumnCount) {
-        for (int visual = 0; visual < kColumnCount; ++visual) {
-            bool ok = false;
-            const int logical = order.at(visual).toInt(&ok);
-            if (ok && logical >= 0 && logical < kColumnCount) {
-                const int current = header->visualIndex(logical);
-                if (current >= 0 && current != visual) {
-                    header->moveSection(current, visual);
-                }
-            }
+    const QStringList order = normalizedColumnOrder(settings.value("order").toStringList());
+    for (int visual = 0; visual < kColumnCount; ++visual) {
+        const int logical = order.at(visual).toInt();
+        const int current = header->visualIndex(logical);
+        if (current >= 0 && current != visual) {
+            header->moveSection(current, visual);
         }
     }
 
@@ -1999,17 +2193,14 @@ void FilePane::applySharedColumnLayout()
         const bool visible = settings.value(QString("visible%1").arg(column), true).toBool();
         m_view->setColumnHidden(column, column == ColumnName ? false : !visible);
         const int width = settings.value(QString("width%1").arg(column), defaultColumnWidth(column)).toInt();
-        header->resizeSection(column, std::max(24, width));
+        header->resizeSection(column, normalizedColumnWidth(width, defaultColumnWidth(column)));
     }
-    const int sortColumn = settings.value("sortColumn", ColumnName).toInt();
-    const int sortOrder = settings.value("sortOrder", static_cast<int>(Qt::AscendingOrder)).toInt();
+    const int sortColumn = normalizedSortColumn(settings.value("sortColumn", ColumnName).toInt());
+    const Qt::SortOrder sortOrder = normalizedSortOrder(
+        settings.value("sortOrder", static_cast<int>(Qt::AscendingOrder)).toInt());
     settings.endGroup();
 
-    if (sortColumn >= 0 && sortColumn < kColumnCount) {
-        m_view->sortByColumn(sortColumn, sortOrder == static_cast<int>(Qt::DescendingOrder)
-            ? Qt::DescendingOrder
-            : Qt::AscendingOrder);
-    }
+    m_view->sortByColumn(sortColumn, sortOrder);
 }
 
 void FilePane::saveColumnSettings()
@@ -2074,8 +2265,62 @@ void FilePane::updatePreviewFromSelection()
     }
 }
 
+void FilePane::updatePreviewFromSearchSelection()
+{
+    if (!m_searchView || !m_searchModel) {
+        return;
+    }
+
+    const QModelIndexList rows = m_searchView->selectionModel()->selectedRows();
+    if (rows.size() > 1) {
+        QStringList paths;
+        for (const QModelIndex &index : rows) {
+            const QString path = m_searchModel->item(index.row(), 0)->data(Qt::UserRole).toString();
+            if (QFileInfo::exists(path)) {
+                paths << path;
+            }
+        }
+        if (paths.size() > 1) {
+            emit multiSelectionPreviewRequested(paths);
+            return;
+        }
+    }
+
+    QModelIndex index = m_searchView->currentIndex();
+    if (!index.isValid() && !rows.isEmpty()) {
+        index = rows.first();
+    }
+    if (!index.isValid()) {
+        emit selectionPreviewRequested(m_currentPath);
+        return;
+    }
+
+    const QString path = m_searchModel->item(index.row(), 0)->data(Qt::UserRole).toString();
+    emit selectionPreviewRequested(QFileInfo::exists(path) ? path : m_currentPath);
+}
+
 void FilePane::updateStatusLine()
 {
+    if (m_viewStack && m_viewStack->currentWidget() == m_searchView) {
+        const int total = m_searchModel ? m_searchModel->rowCount() : 0;
+        int selected = m_searchView->selectionModel()->selectedRows().size();
+        if (selected == 0 && m_searchView->currentIndex().isValid()) {
+            selected = 1;
+        }
+        const QString selectedText = selected > 0
+            ? UiText::t("%1 selected", "%1 件選択").arg(selected)
+            : UiText::t("No selection", "選択なし");
+        const QString searchText = m_searchIterator
+            ? UiText::t("Searching \"%1\"", "\"%1\" を検索中").arg(m_searchTerm)
+            : UiText::t("Search \"%1\"", "\"%1\" の検索結果").arg(m_searchTerm);
+        m_statusLabel->setText(
+            UiText::t(" %1 matches  |  %2  |  %3 ", " %1 件一致  |  %2  |  %3 ")
+                .arg(total)
+                .arg(selectedText)
+                .arg(searchText));
+        return;
+    }
+
     const QModelIndex root = m_view->rootIndex();
     const int total = m_proxyModel->rowCount(root);
     int selected = m_view->selectionModel()->selectedRows().size();
@@ -2136,15 +2381,55 @@ QString FilePane::tabTitleForPath(const QString &path) const
     return path == "/" ? "/" : path;
 }
 
+int FilePane::tabIndexForPath(const QString &path) const
+{
+    const QString normalized = normalizedTabPath(path);
+    if (normalized.isEmpty()) {
+        return -1;
+    }
+    for (int index = 0; index < m_tabBar->count(); ++index) {
+        if (m_tabBar->tabData(index).toString() == normalized) {
+            return index;
+        }
+    }
+    return -1;
+}
+
 void FilePane::updateCurrentTabPath(const QString &path)
 {
+    const QString normalized = normalizedTabPath(path);
+    if (normalized.isEmpty()) {
+        return;
+    }
+
     int index = m_tabBar->currentIndex();
     if (index < 0) {
         index = m_tabBar->addTab(tabTitleForPath(path));
         m_tabBar->setCurrentIndex(index);
     }
-    m_tabBar->setTabText(index, tabTitleForPath(path));
-    m_tabBar->setTabData(index, path);
+    const int existing = tabIndexForPath(normalized);
+    if (existing >= 0 && existing != index) {
+        const int removed = index;
+        m_tabBar->blockSignals(true);
+        m_tabBar->removeTab(removed);
+        m_tabBar->blockSignals(false);
+        const int adjustedExisting = existing > removed ? existing - 1 : existing;
+        m_tabBar->setCurrentIndex(adjustedExisting);
+        updateTabCloseButtons();
+        emit tabsChanged();
+        return;
+    }
+
+    m_tabBar->setTabText(index, tabTitleForPath(normalized));
+    m_tabBar->setTabData(index, normalized);
+    m_tabBar->setTabToolTip(index, normalized);
+    updateTabCloseButtons();
+    emit tabsChanged();
+}
+
+void FilePane::updateTabCloseButtons()
+{
+    m_tabBar->setTabsClosable(m_tabBar->count() > 1);
 }
 
 void FilePane::pushHistory(const QString &path)

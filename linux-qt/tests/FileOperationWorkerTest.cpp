@@ -59,10 +59,13 @@ void FileOperationWorkerTest::copiesDirectoryTrees()
     QSignalSpy finishedSpy(&worker, &FileOperationWorker::finished);
     QSignalSpy failedSpy(&worker, &FileOperationWorker::failed);
     QSignalSpy canceledSpy(&worker, &FileOperationWorker::canceled);
+    QSignalSpy preparedSpy(&worker, &FileOperationWorker::prepared);
     QSignalSpy progressSpy(&worker, &FileOperationWorker::progress);
 
     worker.run();
 
+    QCOMPARE(preparedSpy.count(), 1);
+    QCOMPARE(preparedSpy.first().at(0).toInt(), 4);
     QCOMPARE(finishedSpy.count(), 1);
     QCOMPARE(failedSpy.count(), 0);
     QCOMPARE(canceledSpy.count(), 0);

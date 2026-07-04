@@ -50,4 +50,14 @@ QString uniquePathInDirectory(const QString &directory, const QString &baseName)
     }
 }
 
+QString canonicalDirectoryPath(const QString &path)
+{
+    const QFileInfo info(path);
+    if (!info.exists() || !info.isDir()) {
+        return QString();
+    }
+    const QString canonical = info.canonicalFilePath();
+    return canonical.isEmpty() ? info.absoluteFilePath() : canonical;
+}
+
 }

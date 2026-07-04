@@ -1,7 +1,7 @@
 # tfx for Linux
 
 **Terminal-inspired interface File eXplorer for Linux**  
-Version: **0.5.7**
+Version: **0.5.8**
 
 English | [Japanese](README.ja.md)
 
@@ -109,7 +109,7 @@ Currently supported sections are:
 - `[naming]`
 - `[shortcuts]`
 - `[terminal]`
-- `[openWith]` is parsed for compatibility; detailed behavior is still being wired in.
+- `[openWith]`
 - `[[commands]]`
 
 See [docs/configuration.md](docs/configuration.md) for the Linux-specific notes.

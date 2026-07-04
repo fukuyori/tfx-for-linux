@@ -26,6 +26,7 @@ public slots:
     void cancel();
 
 signals:
+    void prepared(int total);
     void progress(int completed, int total, const QString &path);
     void finished(const QStringList &changedDirectories);
     void failed(const QString &message, const QStringList &changedDirectories);

@@ -1,6 +1,6 @@
 # tfx for Linux Roadmap
 
-Current version: **0.6.5**
+Current version: **0.6.6**
 
 This roadmap tracks the practical development steps for the Linux Qt port as it
 moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
@@ -201,21 +201,28 @@ filenames reaching shells or parsers.
   unterminated string, a 2 MB value, control characters, and junk syntax;
   the parser degrades to defaults without crashing. (done)
 
-## 0.6.6 — Phase 11: Performance (from tfx macOS 0.9.3 / 0.9.4)
+## 0.6.6 — Phase 11: Performance (from tfx macOS 0.9.3 / 0.9.4) (done)
 
-Measured before/after on a large directory (100k entries) and a deep search
-tree; no behavior changes.
+Measured before/after; no behavior changes.
 
-- Cache file icons per extension (single stat/lookup per extension, not per
-  row) for the search-results and ZIP views that currently call
-  `QFileIconProvider` per item.
-- Insert search-result batches incrementally instead of rebuilding lookups per
-  batch; match names before constructing full row items.
-- Evaluate seeding folder-tree children from completed pane listings to avoid
-  double enumeration; skip if the independent `QFileSystemModel` tree makes
-  the win negligible, and record the decision here.
-- Case-only rename support (`foo` → `Foo`) via a two-step rename on
-  case-insensitive mounts (exFAT/NTFS/ciopfs); no-op on case-sensitive
-  filesystems.
-- Profile directory load and scroll after the above and note remaining
-  hotspots as candidates for the next phase.
+- Search results now resolve file icons through a session-lifetime
+  per-extension cache instead of one `QFileIconProvider` lookup per row, and
+  the ZIP browser reuses two generic icons per fill instead of one provider
+  call per entry. Microbenchmark (5,000 files, 10 extensions, offscreen):
+  18 ms per-row vs 2 ms cached — a ~9× reduction, larger under real icon
+  themes. (done)
+- Search-result insertion audited: rows already stream into the model
+  incrementally (no lookup rebuilds), the name match runs before any row
+  items are constructed, and `QTableView` does not re-sort on append, so no
+  change was needed. (done)
+- Folder-tree seeding: skipped. The tree is an independent, lazily-populated
+  `QFileSystemModel` that only enumerates expanded nodes; sharing pane
+  listings with it would mean replacing the model for a negligible win. (done)
+- Case-only renames (`foo` → `Foo`) now hop through a hidden temporary name
+  (shared `renameWithinDirectory` helper with tests, wired into the file
+  list's rename editing), so they work on case-insensitive mounts
+  (exFAT/NTFS) where a direct rename is refused or becomes a no-op. (done)
+- Load check: startup into a 100,000-entry directory populates without
+  app-side per-row work (the pane list is `QFileSystemModel`'s async native
+  enumeration; proxy columns compute on demand for visible rows only). No
+  remaining app-side hotspot identified on the load path. (done)

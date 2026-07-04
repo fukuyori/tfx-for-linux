@@ -29,6 +29,24 @@ namespace {
 constexpr int SearchMaxDepth = 128;
 }
 
+QIcon FilePane::cachedFileIcon(const QFileInfo &info)
+{
+    if (info.isDir()) {
+        if (m_cachedFolderIcon.isNull()) {
+            m_cachedFolderIcon = m_iconProvider.icon(QFileIconProvider::Folder);
+        }
+        return m_cachedFolderIcon;
+    }
+    const QString key = info.suffix().toLower();
+    const auto cached = m_iconCacheByExtension.constFind(key);
+    if (cached != m_iconCacheByExtension.constEnd()) {
+        return *cached;
+    }
+    const QIcon icon = m_iconProvider.icon(info);
+    m_iconCacheByExtension.insert(key, icon);
+    return icon;
+}
+
 void FilePane::startSearch(const QString &term)
 {
     cancelSearch();
@@ -89,7 +107,7 @@ void FilePane::searchStep()
         const QString typeName = englishTypeName(info);
         const QString mode = modeString(info);
 
-        auto *nameItem = new QStandardItem(m_iconProvider.icon(info), relativePath);
+        auto *nameItem = new QStandardItem(cachedFileIcon(info), relativePath);
         nameItem->setData(path, SearchPathRole);
         nameItem->setData(relativePath.toCaseFolded(), SearchSortRole);
         nameItem->setForeground(QColor(info.isDir() ? m_directoryForeground : m_fileForeground));

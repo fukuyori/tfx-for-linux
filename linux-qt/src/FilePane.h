@@ -204,6 +204,12 @@ private:
     int m_searchIteratorDepth = 0;
     bool m_searchTruncated = false;
     QDir::Filters m_searchFilters;
+    // Session-lifetime icon cache keyed by lowercase extension, so streaming
+    // thousands of search results does one mime/icon lookup per extension
+    // instead of one per row.
+    QHash<QString, QIcon> m_iconCacheByExtension;
+    QIcon m_cachedFolderIcon;
+    QIcon cachedFileIcon(const QFileInfo &info);
 
     // Archive view
     QTableView *m_zipView = nullptr;

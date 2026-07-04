@@ -1,6 +1,7 @@
 #include "models/FileSystemProxyModel.h"
 
 #include "UiText.h"
+#include "core/FileOperations.h"
 #include "core/FileTypeInfo.h"
 
 #include <QColor>
@@ -151,6 +152,25 @@ QVariant FileSystemProxyModel::data(const QModelIndex &index, int role) const
         }
     }
     return {};
+}
+
+bool FileSystemProxyModel::setData(const QModelIndex &index, const QVariant &value, int role)
+{
+    auto *fsModel = qobject_cast<QFileSystemModel *>(sourceModel());
+    if (fsModel && role == Qt::EditRole && index.isValid() && index.column() == ColumnName) {
+        const QModelIndex sourceIndex = mapToSource(index.sibling(index.row(), ColumnName));
+        const QFileInfo info = fsModel->fileInfo(sourceIndex);
+        const QString oldName = info.fileName();
+        const QString newName = value.toString();
+        if (!newName.isEmpty() && newName != oldName && !newName.contains('/')
+            && QString::compare(oldName, newName, Qt::CaseInsensitive) == 0) {
+            // QFileSystemModel refuses a case-only rename on case-insensitive
+            // filesystems (the target "already exists"); hop via a temp name.
+            // The model picks up the change through its directory watcher.
+            return tfx::core::renameWithinDirectory(info.absolutePath(), oldName, newName);
+        }
+    }
+    return QSortFilterProxyModel::setData(index, value, role);
 }
 
 Qt::ItemFlags FileSystemProxyModel::flags(const QModelIndex &index) const

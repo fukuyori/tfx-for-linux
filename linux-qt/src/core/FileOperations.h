@@ -28,4 +28,10 @@ QString uniquePathInDirectory(const QString &directory, const QString &baseName)
 // the input does not name an available directory.
 QString canonicalDirectoryPath(const QString &path);
 
+// Rename `oldName` to `newName` inside `directory`. A case-only rename
+// (foo -> Foo) hops through a hidden temporary name, because a direct rename
+// is refused or silently becomes a no-op on case-insensitive filesystems
+// (exFAT/NTFS mounts). Rolls back on failure.
+bool renameWithinDirectory(const QString &directory, const QString &oldName, const QString &newName);
+
 }

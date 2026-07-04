@@ -2,6 +2,34 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.6.6] - 2026-07-04
+
+Performance release (from tfx macOS 0.9.3 / 0.9.4).
+
+### Added
+
+- Case-only renames (`foo` → `Foo`) in the file list now work on
+  case-insensitive filesystems (exFAT/NTFS mounts) by hopping through a
+  hidden temporary name; a direct rename there is refused or silently does
+  nothing. No behavior change on normal case-sensitive filesystems.
+
+### Changed
+
+- Search results resolve file icons through a per-extension cache instead of
+  one icon-provider lookup per row (~9× faster in a 5,000-file
+  microbenchmark; more under real icon themes), and the ZIP browser reuses
+  two generic icons per fill instead of one provider call per entry.
+
+### Audited (no change needed)
+
+- Search-result insertion already streams rows incrementally, matches names
+  before constructing row items, and does not re-sort on append.
+- Folder-tree seeding from pane listings was evaluated and skipped: the tree
+  is an independent lazily-populated model that only enumerates expanded
+  nodes.
+- Startup into a 100,000-entry directory populates without app-side per-row
+  work on the load path.
+
 ## [0.6.5] - 2026-07-04
 
 Security-hardening release, round 2: untrusted file content and filenames

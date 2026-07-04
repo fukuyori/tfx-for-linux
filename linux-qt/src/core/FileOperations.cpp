@@ -50,6 +50,31 @@ bool copySymbolicLink(const QString &source, const QString &destination)
     return ::symlink(linkText.constData(), QFile::encodeName(destination).constData()) == 0;
 }
 
+bool renameWithinDirectory(const QString &directory, const QString &oldName, const QString &newName)
+{
+    if (oldName.isEmpty() || newName.isEmpty() || newName.contains('/')) {
+        return false;
+    }
+    if (oldName == newName) {
+        return true;
+    }
+    QDir dir(directory);
+    if (QString::compare(oldName, newName, Qt::CaseInsensitive) != 0) {
+        return dir.rename(oldName, newName);
+    }
+
+    const QString tempName = QFileInfo(
+        uniquePathInDirectory(directory, "." + oldName + ".tfx-rename")).fileName();
+    if (!dir.rename(oldName, tempName)) {
+        return false;
+    }
+    if (dir.rename(tempName, newName)) {
+        return true;
+    }
+    dir.rename(tempName, oldName);
+    return false;
+}
+
 bool transferWouldNestInsideSource(const QString &sourcePath, const QString &targetDirectory)
 {
     const QFileInfo sourceInfo(sourcePath);

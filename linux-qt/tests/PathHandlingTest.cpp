@@ -51,6 +51,7 @@ private slots:
     void copyRecursivelyPreservesSymlinksAndHiddenFiles();
     void transferWouldNestInsideSourceDetectsDescendants();
     void transferWouldNestInsideSourceResolvesSymlinkedTargets();
+    void renameWithinDirectoryHandlesCaseOnlyRenames();
 };
 
 void PathHandlingTest::canonicalDirectoryPathAcceptsOnlyExistingDirectories()
@@ -194,6 +195,29 @@ void PathHandlingTest::transferWouldNestInsideSourceResolvesSymlinkedTargets()
     const QString sourceLink = root.filePath("source-link");
     QVERIFY(makeSymlink(source, sourceLink));
     QVERIFY(!tfx::core::transferWouldNestInsideSource(sourceLink, nested));
+}
+
+void PathHandlingTest::renameWithinDirectoryHandlesCaseOnlyRenames()
+{
+    QTemporaryDir temp;
+    QVERIFY(temp.isValid());
+    const QDir root(temp.path());
+
+    // Ordinary rename.
+    QVERIFY(writeTextFile(root.filePath("alpha.txt")));
+    QVERIFY(tfx::core::renameWithinDirectory(temp.path(), "alpha.txt", "beta.txt"));
+    QVERIFY(QFileInfo::exists(root.filePath("beta.txt")));
+    QVERIFY(!QFileInfo::exists(root.filePath("alpha.txt")));
+
+    // Case-only rename hops through a temp name and leaves nothing behind.
+    QVERIFY(tfx::core::renameWithinDirectory(temp.path(), "beta.txt", "Beta.TXT"));
+    const QStringList entries = root.entryList(QDir::AllEntries | QDir::Hidden | QDir::NoDotAndDotDot);
+    QCOMPARE(entries, QStringList{"Beta.TXT"});
+
+    // Same name is a no-op success; renaming a missing file fails.
+    QVERIFY(tfx::core::renameWithinDirectory(temp.path(), "Beta.TXT", "Beta.TXT"));
+    QVERIFY(!tfx::core::renameWithinDirectory(temp.path(), "missing.txt", "other.txt"));
+    QVERIFY(!tfx::core::renameWithinDirectory(temp.path(), "Beta.TXT", "sub/evil.txt"));
 }
 
 QTEST_GUILESS_MAIN(PathHandlingTest)

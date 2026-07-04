@@ -94,7 +94,9 @@ void FilePane::populateZipView()
 {
     m_zipModel->removeRows(0, m_zipModel->rowCount());
 
-    auto *up = new QStandardItem(m_iconProvider.icon(QFileIconProvider::Folder), "..");
+    const QIcon folderIcon = m_iconProvider.icon(QFileIconProvider::Folder);
+    const QIcon fileIcon = m_iconProvider.icon(QFileIconProvider::File);
+    auto *up = new QStandardItem(folderIcon, "..");
     up->setData("..", Qt::UserRole);
     up->setData(true, Qt::UserRole + 1);
     m_zipModel->appendRow({up, new QStandardItem(QString())});
@@ -115,13 +117,13 @@ void FilePane::populateZipView()
             const QString fullDir = m_zipDir + dirName + "/";
             if (!dirsSeen.contains(fullDir)) {
                 dirsSeen.insert(fullDir);
-                auto *item = new QStandardItem(m_iconProvider.icon(QFileIconProvider::Folder), dirName);
+                auto *item = new QStandardItem(folderIcon, dirName);
                 item->setData(fullDir, Qt::UserRole);
                 item->setData(true, Qt::UserRole + 1);
                 m_zipModel->appendRow({item, new QStandardItem(UiText::t("Folder", "フォルダ"))});
             }
         } else {
-            auto *item = new QStandardItem(m_iconProvider.icon(QFileIconProvider::File), rest);
+            auto *item = new QStandardItem(fileIcon, rest);
             item->setData(entry, Qt::UserRole);
             item->setData(false, Qt::UserRole + 1);
             const QString suffix = QFileInfo(rest).suffix();

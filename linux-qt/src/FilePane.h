@@ -8,6 +8,7 @@ class QStandardItemModel;
 class QListView;
 class GitStatusController;
 class QMenu;
+class QHBoxLayout;
 
 #include "AppConfig.h"
 #include "core/FileOperationWorker.h"
@@ -100,88 +101,130 @@ protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
+    // UI setup
+    void setupPaneChrome(const QString &initialPath);
+    QHBoxLayout *createHeaderLayout();
+    void setupFileView();
+    void setupSearchView();
+    void setupIconView();
+    void setupZipView();
+    void setupViewStack();
+
+    // Signal wiring and refresh
+    void setupGitRefresh();
+    void setupSearchConnections();
+    void setupFileViewConnections();
+    void setupTabConnections();
+
+    // State and selection
     QModelIndex currentSourceIndex() const;
     QFileInfo currentFileInfo() const;
-    QString searchResultPath(const QModelIndex &index) const;
-    QStringList selectedSearchResultPaths() const;
-    QString uniqueChildPath(const QString &baseName) const;
-    void showFileContextMenu(const QPoint &point);
-    void showEmptyAreaContextMenu(const QPoint &point);
-    void showSearchContextMenu(const QPoint &point);
-    void showTabContextMenu(const QPoint &point);
-    void showColumnContextMenu(const QPoint &point);
-    QString columnTitle(int column) const;
-    void resetColumns();
-    void revealSelectionInFileManager();
-    void openTerminalHere();
-    void compressSelectedItemsToZip();
-    void extractSelectedZip();
-    void selectAllVisibleItems();
-    void applyDefaultColumns();
-    void saveColumnSettings();
-    void searchStep();
-    void openZip(const QString &path);
-    void populateZipView();
-    void exitZipMode();
-    void refreshGitStatuses();
-    void createLinkForSelection();
-    void openWithConfiguredApplication(const QString &program);
-    void openWithCustomApplication();
-    void addUserCommandActions(QMenu *menu, bool hasSelection);
     QStringList selectedLocalPaths() const;
-    bool pasteClipboardAsFile(bool plainTextOnly);
-    void performDrop(const QList<QUrl> &urls, Qt::DropAction action, const QString &targetDir);
+    void refreshGitStatuses();
     void updatePreviewFromSelection();
     void updatePreviewFromSearchSelection();
     void updateStatusLine();
+
+    // Navigation
     void commitPathEditor();
     QString displayPath(const QString &path) const;
-    QString placeholderText(const QString &english, const QString &japanese) const;
-    QString tabTitleForPath(const QString &path) const;
-    int tabIndexForPath(const QString &path) const;
-    void updateCurrentTabPath(const QString &path);
-    void updateTabCloseButtons();
     void pushHistory(const QString &path);
     void selectProxyIndex(const QModelIndex &index);
     bool selectParentEntry();
     void setCurrentIndexForPath(const QString &path);
 
+    // Search
+    void searchStep();
+    QString searchResultPath(const QModelIndex &index) const;
+    QStringList selectedSearchResultPaths() const;
+    void showSearchContextMenu(const QPoint &point);
+
+    // Tabs
+    void showTabContextMenu(const QPoint &point);
+    QString tabTitleForPath(const QString &path) const;
+    int tabIndexForPath(const QString &path) const;
+    void updateCurrentTabPath(const QString &path);
+    void updateTabCloseButtons();
+
+    // File actions and operations
+    QString uniqueChildPath(const QString &baseName) const;
+    QString placeholderText(const QString &english, const QString &japanese) const;
+    void showFileContextMenu(const QPoint &point);
+    void showEmptyAreaContextMenu(const QPoint &point);
+    void revealSelectionInFileManager();
+    void openTerminalHere();
+    void selectAllVisibleItems();
+    void createLinkForSelection();
+    void openWithConfiguredApplication(const QString &program);
+    void openWithCustomApplication();
+
+    // Clipboard and drag/drop
+    bool pasteClipboardAsFile(bool plainTextOnly);
+    void performDrop(const QList<QUrl> &urls, Qt::DropAction action, const QString &targetDir);
+
+    // Archives
+    void openZip(const QString &path);
+    void populateZipView();
+    void exitZipMode();
+    void compressSelectedItemsToZip();
+    void extractSelectedZip();
+
+    // Columns
+    void showColumnContextMenu(const QPoint &point);
+    QString columnTitle(int column) const;
+    void resetColumns();
+    void applyDefaultColumns();
+    void saveColumnSettings();
+
+    // User commands
+    void addUserCommandActions(QMenu *menu, bool hasSelection);
+
     QFileSystemModel *m_model;
     FileSystemProxyModel *m_proxyModel;
+
+    // Core widgets
     QTabBar *m_tabBar;
     QTableView *m_view;
     QLabel *m_badgeLabel;
     QLineEdit *m_pathEdit;
     QLabel *m_statusLabel;
-    GitStatusController *m_gitController = nullptr;
-    QString m_gitBranch;
-    QFileSystemWatcher *m_dirWatcher = nullptr;
-    QTimer *m_refreshDebounce = nullptr;
     QStackedWidget *m_viewStack = nullptr;
     QListView *m_iconView = nullptr;
     bool m_iconMode = false;
+
+    // Search view
     QTableView *m_searchView = nullptr;
     QStandardItemModel *m_searchModel = nullptr;
-    QFileIconProvider m_iconProvider;
     QDirIterator *m_searchIterator = nullptr;
     QTimer *m_searchTimer = nullptr;
     QString m_searchTerm;
     int m_searchMatches = 0;
+
+    // Archive view
     QTableView *m_zipView = nullptr;
     QStandardItemModel *m_zipModel = nullptr;
+    QFileIconProvider m_iconProvider;
     QString m_zipPath;
     QString m_zipDir;
     QStringList m_zipEntries;
+
+    // Status and appearance
+    GitStatusController *m_gitController = nullptr;
+    QString m_gitBranch;
+    QFileSystemWatcher *m_dirWatcher = nullptr;
+    QTimer *m_refreshDebounce = nullptr;
     QString m_fileForeground = "#D9E1E8";
     QString m_directoryForeground = "#E5EDF3";
     QString m_label;
     QString m_currentPath;
-    QStack<QString> m_backStack;
-    QStack<QString> m_forwardStack;
     bool m_showHiddenFiles = false;
     bool m_isActive = false;
     bool m_suppressColumnSave = false;
     bool m_isSwitchingTabs = false;
+
+    // Navigation and configuration
+    QStack<QString> m_backStack;
+    QStack<QString> m_forwardStack;
     QList<UserCommand> m_userCommands;
     QHash<QString, QString> m_openWithApplications;
     QString m_placeholderLanguage = "auto";

@@ -2,6 +2,20 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.6.1] - 2026-07-04
+
+Maintenance release for FilePane refactoring and documentation cleanup.
+
+### Changed
+
+- Split the remaining `FilePane` implementation into focused translation units
+  for UI setup, signal wiring, navigation, state/selection, search, tabs,
+  actions, file operations, clipboard/drop, archives, columns, and user
+  commands. `FilePane.cpp` now only orchestrates construction and initial
+  navigation; behavior is unchanged.
+- Organized `FilePane.h` private declarations and member fields by subsystem so
+  the split implementation files are easier to navigate.
+
 ## [0.6.0] - 2026-07-04
 
 Release cleanup for packaging, file-operation robustness, preview/security

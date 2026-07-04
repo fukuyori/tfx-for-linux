@@ -1,7 +1,7 @@
 # tfx for Linux
 
 **Linux 向け Terminal-inspired interface File eXplorer**  
-Version: **0.6.0**
+Version: **0.6.1**
 
 [English](README.md) | 日本語
 

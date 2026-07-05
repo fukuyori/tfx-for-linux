@@ -188,6 +188,27 @@ MainWindow::MainWindow(const QString &initialPath, const QString &geometryOverri
     connect(togglePreviewSourceShortcut, &QShortcut::activated, m_previewPane, &PreviewPane::toggleSourceRendered);
     auto *openPreviewExternalShortcut = new QShortcut(QKeySequence(m_config.shortcut("openPreviewExternal", "Ctrl+Shift+I")), this);
     connect(openPreviewExternalShortcut, &QShortcut::activated, m_previewPane, &PreviewPane::openCurrentPreviewExternally);
+
+    // Documented action shortcuts that previously had no key binding.
+    const auto addPaneShortcut = [this](const QString &name, const QString &def, void (FilePane::*slot)()) {
+        auto *sc = new QShortcut(QKeySequence(m_config.shortcut(name, def)), this);
+        connect(sc, &QShortcut::activated, this, [this, slot]() { (activePane()->*slot)(); });
+    };
+    addPaneShortcut("openItem", "Ctrl+O", &FilePane::openSelected);
+    addPaneShortcut("openTerminal", "Ctrl+Shift+T", &FilePane::openTerminalHere);
+    addPaneShortcut("compressToZip", "Ctrl+Alt+Z", &FilePane::compressSelectedItemsToZip);
+    addPaneShortcut("extractZip", "Ctrl+Alt+E", &FilePane::extractSelectedZip);
+    addPaneShortcut("selectAll", "Ctrl+A", &FilePane::selectAllVisibleItems);
+    addPaneShortcut("revealInFinder", "Ctrl+Alt+R", &FilePane::revealSelectionInFileManager);
+    addPaneShortcut("movePasteItems", "Ctrl+Shift+V", &FilePane::movePasteIntoCurrentDirectory);
+
+    auto *swapPanesShortcut = new QShortcut(QKeySequence(m_config.shortcut("swapPanes", "Ctrl+Shift+X")), this);
+    connect(swapPanesShortcut, &QShortcut::activated, this, &MainWindow::swapPanes);
+    auto *focusTerminalShortcut = new QShortcut(QKeySequence(m_config.shortcut("focusTerminalPane", "Ctrl+Alt+J")), this);
+    connect(focusTerminalShortcut, &QShortcut::activated, this, [this]() {
+        setTerminalVisible(true);
+        m_terminalPane->focusTerminal();
+    });
     setActivePane(m_leftPane);
     m_previewPane->previewPath(initialPath);
     restoreSettings();
@@ -277,6 +298,21 @@ void MainWindow::focusOtherPane()
     FilePane *nextPane = activePane() == m_leftPane ? m_rightPane : m_leftPane;
     setActivePane(nextPane);
     nextPane->focusFileList();
+}
+
+void MainWindow::swapPanes()
+{
+    // Exchange the two panes' current folders. Only meaningful in split view.
+    if (!m_rightPane->isVisible()) {
+        return;
+    }
+    const QString leftPath = m_leftPane->currentPath();
+    const QString rightPath = m_rightPane->currentPath();
+    if (leftPath == rightPath) {
+        return;
+    }
+    m_leftPane->navigateTo(rightPath);
+    m_rightPane->navigateTo(leftPath);
 }
 
 FilePane *MainWindow::activePane() const

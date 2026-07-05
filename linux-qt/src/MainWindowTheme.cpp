@@ -1,4 +1,5 @@
 #include "MainWindow.h"
+#include "MainWindowSidebar.h"
 
 #include <QApplication>
 
@@ -338,6 +339,7 @@ void MainWindow::applyTerminalTheme()
     styleSheet.replace("#36E67A", m_config.colors.activeBorder);
     styleSheet.replace("#63F28D", m_config.colors.activeAccent);
     styleSheet.replace("#1F2830", m_config.colors.hoverBackground);
+    styleSheet.replace("#20272D", m_config.colors.splitHandleIdle);
     styleSheet.replace("__MONO_FONT__", m_config.resolvedMonoFontFamily());
     styleSheet.replace("font-size: 12px;", QString("font-size: %1px;").arg(m_config.font.size));
     if (m_config.opacity.disabledItem < 1.0) {
@@ -361,6 +363,29 @@ void MainWindow::applyTerminalTheme()
     styleSheet += paneFontRule("QTreeView#folderTree, QListWidget#pinnedList",
                                m_config.font.folderTreeFamily, m_config.font.folderTreeSize);
 
+    // Folder-tree, section-header, and status-line colours (config [colors]).
+    styleSheet += QString(
+        "\nQTreeView#folderTree { color: %1; }"
+        "\nQTreeView#folderTree::item:selected:active,"
+        " QListWidget#pinnedList::item:selected:active { background: %2; color: %3; }"
+        "\nQTreeView#folderTree::item:selected:!active,"
+        " QListWidget#pinnedList::item:selected:!active { background: %8; color: %3; }"
+        "\nQLabel#sectionLabel { color: %4; }"
+        "\nQLabel#paneStatus { background: %5; color: %6; }"
+        "\nQLabel#paneStatus[activePane=\"true\"] { color: %7; }"
+        "\nQWidget#paneTitleBar { background: %9; }"
+        "\nQWidget#paneTitleBar[activePane=\"true\"] { background: %10; }\n")
+        .arg(m_config.colors.folderTreeForeground,
+             m_config.colors.folderTreeSelectedActive,
+             m_config.colors.folderTreeSelectedForeground,
+             m_config.colors.folderTreeSectionHeader,
+             m_config.colors.statusBackground,
+             m_config.colors.statusForegroundInactive,
+             m_config.colors.statusForegroundActive,
+             m_config.colors.folderTreeSelectedInactive)
+        .arg(m_config.colors.titleBarInactive)
+        .arg(m_config.colors.titleBarActive);
+
     qApp->setStyleSheet(styleSheet);
 
     m_terminalPane->setContentFont(TerminalPane::resolveFont(
@@ -369,4 +394,28 @@ void MainWindow::applyTerminalTheme()
     m_terminalPane->setColorScheme(m_config.terminalColorScheme);
     m_leftPane->setThemeColors(m_config.colors.foreground, m_config.colors.directoryForeground);
     m_rightPane->setThemeColors(m_config.colors.foreground, m_config.colors.directoryForeground);
+
+    // Git status badge colours, keyed by the single-letter porcelain label.
+    const QHash<QString, QString> gitColors = {
+        {"M", m_config.colors.gitModified},
+        {"A", m_config.colors.gitAdded},
+        {"D", m_config.colors.gitDeleted},
+        {"R", m_config.colors.gitRenamed},
+        {"C", m_config.colors.gitRenamed},
+        {"?", m_config.colors.gitUntracked},
+        {"!", m_config.colors.gitIgnored},
+        {"U", m_config.colors.gitConflicted},
+    };
+    m_leftPane->setGitStatusColors(gitColors);
+    m_rightPane->setGitStatusColors(gitColors);
+
+    m_leftPane->setDropTargetColor(m_config.colors.dropTargetBackground);
+    m_rightPane->setDropTargetColor(m_config.colors.dropTargetBackground);
+
+    static_cast<PinnedListWidget *>(m_pinnedList)->dropIndicatorOpacity = m_config.opacity.dropIndicator;
+    m_pinnedList->viewport()->update();
+
+    m_previewPane->setPreviewConfig(m_config.preview.defaultMode,
+                                    m_config.preview.extensionModes,
+                                    m_config.preview.markdownExternalImages);
 }

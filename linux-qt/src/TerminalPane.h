@@ -32,6 +32,9 @@ public:
     void appendCommandOutput(const QString &text);
     void endCommandOutput(const QString &footer);
 
+    // Switch to the interactive Terminal tab and give it keyboard focus.
+    void focusTerminal();
+
     // Resolve a terminal font. With an explicit family, that family is used;
     // otherwise the first candidate that QFontInfo reports as fixed-pitch is
     // chosen (the generic "Monospace" alias is not always reported as fixed).

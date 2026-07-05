@@ -18,6 +18,9 @@ public:
     std::function<void(const QStringList &folders, int row)> onExternalFoldersDropped;
     std::function<void()> onReordered;
 
+    // Opacity of the drop insertion indicator ([opacity] dropIndicator).
+    double dropIndicatorOpacity = 0.85;
+
 protected:
     void startDrag(Qt::DropActions supportedActions) override;
     void dragEnterEvent(QDragEnterEvent *event) override;

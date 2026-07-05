@@ -26,6 +26,7 @@ Session state such as window placement, last-opened paths, pinned folders, colum
 - `[shortcuts]`
 - `[terminal]`
 - `[openWith]`
+- `[preview]`, `[preview.extensions]`, `[preview.markdown]`
 - `[[commands]]`
 
 The loader intentionally accepts a small TOML subset:
@@ -183,49 +184,137 @@ Accepted values:
 placeholderLanguage = "en"
 ```
 
+## Shortcuts
+
+`[shortcuts]` overrides keyboard shortcuts by action name. Values use the Qt key
+sequence grammar (e.g. `"Ctrl+Shift+P"`, `"Alt+Left"`, `"F5"`). Defaults below
+are the Linux defaults; conflicting bindings are reported as configuration
+warnings and fall back to the defaults.
+
+| Action | Default | Description |
+| --- | --- | --- |
+| `reload` | `F5` | Reload the active pane. |
+| `focusSearch` | `Ctrl+F` | Focus the search field. |
+| `togglePreview` | `Ctrl+Shift+P` | Show/hide the preview pane. |
+| `togglePreviewSource` | `Ctrl+Shift+R` | Toggle rendered/source in the preview. |
+| `openPreviewExternal` | `Ctrl+Shift+I` | Open the current preview externally. |
+| `toggleSplit` | `Ctrl+\` | Show/hide split view. |
+| `toggleHidden` | `Ctrl+Shift+.` | Show/hide hidden files. |
+| `toggleTerminalPane` | `Ctrl+J` | Show/hide the built-in terminal pane. (alias: `toggleTerminal`) |
+| `focusTerminalPane` | `Ctrl+Alt+J` | Show and focus the terminal pane. |
+| `openTerminal` | `Ctrl+Shift+T` | Open the external terminal app at the current folder. |
+| `swapPanes` | `Ctrl+Shift+X` | Swap the two panes' current folders. |
+| `goBack` / `goForward` / `goUp` | `Alt+Left` / `Alt+Right` / `Alt+Up` | Navigation. |
+| `openItem` | `Ctrl+O` | Open the selected item. |
+| `newFile` / `newFolder` | `Ctrl+N` / `Ctrl+Shift+N` | Create file / folder. |
+| `rename` | `F2` | Rename the selection. |
+| `moveToTrash` | `Del` | Move the selection to Trash. |
+| `compressToZip` / `extractZip` | `Ctrl+Alt+Z` / `Ctrl+Alt+E` | Zip / unzip the selection. |
+| `copyItems` / `cutItems` | `Ctrl+C` / `Ctrl+X` | Copy / cut the selection. |
+| `pasteItems` / `movePasteItems` | `Ctrl+V` / `Ctrl+Shift+V` | Paste (copy) / paste-move. |
+| `copyPath` | `Ctrl+Shift+C` | Copy the selected path(s). |
+| `selectAll` | `Ctrl+A` | Select all visible items. |
+| `revealInFinder` | `Ctrl+Alt+R` | Reveal the selection in the file manager. |
+| `newTab` / `closeTab` | `Ctrl+T` / `Ctrl+W` | Open / close a tab. |
+| `previousTab` / `nextTab` | `Ctrl+Shift+[` / `Ctrl+Shift+]` | Switch tabs. (alias for previous: `prevTab`) |
+| `quit` | `Ctrl+Q` | Quit tfx. |
+
+```toml
+[shortcuts]
+toggleTerminalPane = "ctrl+j"
+selectAll = "ctrl+a"
+copyPath = "ctrl+shift+c"
+```
+
 ## Opacity
 
-`[opacity]` controls window and pane transparency. Each value is a decimal between `0.0` (fully transparent) and `1.0` (fully opaque). Omitted keys default to `1.0`.
+`[opacity]` controls window and pane transparency. Each value is a decimal between `0.0` (fully transparent) and `1.0` (fully opaque).
+
+Effective on the Linux port:
 
 - `background` — overall window background opacity. Values below `1.0` enable a translucent window surface, so the desktop shows through behind the panes (requires a compositing window manager).
 - `inactivePane` — opacity applied to the file pane that is not currently active.
 - `disabledItem` — opacity applied to disabled controls and menu items.
+- `dropIndicator` — opacity of the pinned-folder drop insertion indicator.
 
 ```toml
 [opacity]
 background = 0.40
 inactivePane = 0.5
 disabledItem = 0.45
+dropIndicator = 0.85
 ```
+
+The following keys are accepted for compatibility with tfx for macOS but have no
+visual effect on the Linux port, because the corresponding affordance does not
+exist here: `headerSecondary`, `selectedParentRow`, `dragPreview`,
+`dragPreviewShadow`, `subtleBackground`.
 
 ## Colors
 
 Set `theme = "dark"` or `theme = "light"` at the top level to choose the built-in
 palette. `[colors]` values override the selected theme.
 
-The Linux port accepts the same semantic color names used by tfx for Windows where practical:
+Values must be quoted `#RRGGBB` strings. Tokens are optional; missing tokens keep
+the selected theme's colour.
+
+File pane / list rows:
 
 - `fileListBackground`
-- `headerBackground`
-- `inputBackground`
 - `fileListRowHovered`
 - `fileListRowSelected`
 - `fileListRowSelectedForeground`
+- `fileListRowDropTarget` — highlight colour for the in-progress drop target.
 - `fileForeground`
 - `directoryForeground`
 - `secondaryForeground`
+
+File pane chrome:
+
 - `headerForeground`
+- `headerBackground`
+- `inputBackground`
+- `titleBarBackgroundActive` / `titleBarBackgroundInactive` — pane title-bar
+  (badge + path row) background, by active state.
+- `statusLineBackground` / `statusLineForegroundActive` /
+  `statusLineForegroundInactive` — pane status line.
+
+Pane borders:
+
 - `paneBorderInactive`
 - `paneBorderActive`
 - `paneBorderKeyboardTarget`
-- `splitHandleActive`
-- `folderTreeBackground`
-- `disabledForeground`
-- `scrollbarThumb`
-- `scrollbarThumbHovered`
-- `scrollbarThumbDragging`
 
-Values must be quoted `#RRGGBB` strings.
+Folder tree:
+
+- `folderTreeBackground`
+- `folderTreeForeground`
+- `folderTreeSelectedForeground`
+- `folderTreeSelectedActive` — selected row while the tree has focus.
+- `folderTreeSelectedInactive` — selected row while the tree is unfocused.
+- `folderTreeSectionHeader` — `PINNED` / `FOLDERS` section headers.
+
+Split handle:
+
+- `splitHandleIdle`
+- `splitHandleActive`
+
+Git status badges (colour of the per-row Git status letter):
+
+- `gitModified` / `gitAdded` / `gitDeleted` / `gitRenamed` / `gitUntracked` /
+  `gitIgnored` / `gitConflicted`
+
+Scrollbars and misc:
+
+- `disabledForeground`
+- `scrollbarThumb` / `scrollbarThumbHovered` / `scrollbarThumbDragging`
+
+Notes:
+
+- `paneBorderActive` and `paneBorderKeyboardTarget` currently map to the same
+  active-border colour.
+- `folderTreeFolderIcon` (a macOS token) has no effect: the Linux folder tree
+  does not draw folder icons.
 
 ## Terminal
 
@@ -241,6 +330,53 @@ colorScheme = "DarkPastels"
 ```
 
 The terminal font is set with `[font] terminal` / `terminalSize` (see Fonts).
+
+## Preview
+
+`[preview]`, `[preview.extensions]`, and `[preview.markdown]` control how the
+preview pane renders files.
+
+`[preview] default` sets the mode for extensions that are not listed in
+`[preview.extensions]`. `[preview.extensions]` overrides the mode per extension
+(keys are extensions without the leading dot).
+
+```toml
+[preview]
+default = "auto"
+
+[preview.extensions]
+md = "rendered"
+json = "text"
+log = "text"
+zip = "none"
+```
+
+Preview modes:
+
+- `auto` — built-in preview selection (keeps the current rendered/source
+  preference).
+- `rendered` — start in the rendered view when a rendered form is available
+  (Markdown, HTML, CSV/TSV, JSON).
+- `text` — start in the raw text/source view.
+- `none` — disable content preview for that extension; file metadata still
+  appears.
+
+`[preview.markdown] externalImages` controls external (`https:`) images in
+Markdown previews:
+
+```toml
+[preview.markdown]
+externalImages = "button"
+```
+
+- `never` — never load external images inline (they become links).
+- `button` — treated like `never` on the Linux port (no inline load); the first
+  external image URL is still reachable via "open externally".
+- `always` — keep the image inline.
+
+Note: the Linux preview pane renders through `QTextBrowser`, not a web engine.
+`always` keeps the inline image markup, but remote `https:` images may not be
+fetched and displayed; `never` reliably blocks inline external images.
 
 ## User Commands
 

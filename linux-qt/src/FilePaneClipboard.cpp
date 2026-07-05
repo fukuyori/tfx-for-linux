@@ -222,13 +222,23 @@ void FilePane::performDrop(const QList<QUrl> &urls, Qt::DropAction action, const
 
 void FilePane::pasteIntoCurrentDirectory()
 {
+    pasteClipboard(false);
+}
+
+void FilePane::movePasteIntoCurrentDirectory()
+{
+    pasteClipboard(true);
+}
+
+void FilePane::pasteClipboard(bool forceMove)
+{
     const QMimeData *mime = QApplication::clipboard()->mimeData();
     if (!clipboardCanPaste(mime)) {
         return;
     }
 
     bool sawLocalUrl = false;
-    const bool move = mime->hasFormat("application/x-tfx-cut");
+    const bool move = forceMove || mime->hasFormat("application/x-tfx-cut");
     if (mime->hasUrls()) {
         QVector<FileOperationRequest> requests;
         for (const QUrl &url : mime->urls()) {

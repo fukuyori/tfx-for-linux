@@ -437,6 +437,26 @@ void AppConfig::applyValue(const QString &section, const QString &key, const QSt
         else if (key == "scrollbarThumb") colors.scrollbarThumb = color;
         else if (key == "scrollbarThumbHovered") colors.scrollbarThumbHovered = color;
         else if (key == "scrollbarThumbDragging") colors.scrollbarThumbDragging = color;
+        else if (key == "fileListRowDropTarget") colors.dropTargetBackground = color;
+        else if (key == "titleBarBackgroundActive") colors.titleBarActive = color;
+        else if (key == "titleBarBackgroundInactive") colors.titleBarInactive = color;
+        else if (key == "statusLineBackground") colors.statusBackground = color;
+        else if (key == "statusLineForegroundActive") colors.statusForegroundActive = color;
+        else if (key == "statusLineForegroundInactive") colors.statusForegroundInactive = color;
+        else if (key == "folderTreeForeground") colors.folderTreeForeground = color;
+        else if (key == "folderTreeSelectedForeground") colors.folderTreeSelectedForeground = color;
+        else if (key == "folderTreeFolderIcon") colors.folderTreeFolderIcon = color;
+        else if (key == "folderTreeSelectedActive") colors.folderTreeSelectedActive = color;
+        else if (key == "folderTreeSelectedInactive") colors.folderTreeSelectedInactive = color;
+        else if (key == "folderTreeSectionHeader") colors.folderTreeSectionHeader = color;
+        else if (key == "splitHandleIdle") colors.splitHandleIdle = color;
+        else if (key == "gitModified") colors.gitModified = color;
+        else if (key == "gitAdded") colors.gitAdded = color;
+        else if (key == "gitDeleted") colors.gitDeleted = color;
+        else if (key == "gitRenamed") colors.gitRenamed = color;
+        else if (key == "gitUntracked") colors.gitUntracked = color;
+        else if (key == "gitIgnored") colors.gitIgnored = color;
+        else if (key == "gitConflicted") colors.gitConflicted = color;
         return;
     }
 
@@ -450,6 +470,12 @@ void AppConfig::applyValue(const QString &section, const QString &key, const QSt
         if (key == "background") opacity.background = level;
         else if (key == "inactivePane") opacity.inactivePane = level;
         else if (key == "disabledItem") opacity.disabledItem = level;
+        else if (key == "headerSecondary") opacity.headerSecondary = level;
+        else if (key == "selectedParentRow") opacity.selectedParentRow = level;
+        else if (key == "dropIndicator") opacity.dropIndicator = level;
+        else if (key == "dragPreview") opacity.dragPreview = level;
+        else if (key == "dragPreviewShadow") opacity.dragPreviewShadow = level;
+        else if (key == "subtleBackground") opacity.subtleBackground = level;
         else addWarning(lineNumber, QString("Unknown opacity key: %1").arg(key));
         return;
     }
@@ -527,6 +553,59 @@ void AppConfig::applyValue(const QString &section, const QString &key, const QSt
         const QString text = unquote(value, &ok);
         if (ok) {
             openWith.insert(key, text);
+        }
+        return;
+    }
+
+    if (section == "preview") {
+        bool ok = false;
+        const QString text = unquote(value, &ok);
+        if (!ok) {
+            addWarning(lineNumber, "Invalid preview value");
+            return;
+        }
+        if (key == "default") {
+            if (text == "auto" || text == "rendered" || text == "text" || text == "none") {
+                preview.defaultMode = text;
+            } else {
+                addWarning(lineNumber, "Invalid preview default (expected auto/rendered/text/none)");
+            }
+        } else {
+            addWarning(lineNumber, QString("Unknown preview key: %1").arg(key));
+        }
+        return;
+    }
+
+    if (section == "preview.extensions") {
+        bool ok = false;
+        const QString text = unquote(value, &ok);
+        if (!ok) {
+            addWarning(lineNumber, "Invalid preview.extensions value");
+            return;
+        }
+        if (text == "auto" || text == "rendered" || text == "text" || text == "none") {
+            preview.extensionModes.insert(key.trimmed().toLower(), text);
+        } else {
+            addWarning(lineNumber, "Invalid preview mode (expected auto/rendered/text/none)");
+        }
+        return;
+    }
+
+    if (section == "preview.markdown") {
+        bool ok = false;
+        const QString text = unquote(value, &ok);
+        if (!ok) {
+            addWarning(lineNumber, "Invalid preview.markdown value");
+            return;
+        }
+        if (key == "externalImages") {
+            if (text == "button" || text == "always" || text == "never") {
+                preview.markdownExternalImages = text;
+            } else {
+                addWarning(lineNumber, "Invalid externalImages (expected button/always/never)");
+            }
+        } else {
+            addWarning(lineNumber, QString("Unknown preview.markdown key: %1").arg(key));
         }
         return;
     }

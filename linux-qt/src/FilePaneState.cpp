@@ -2,6 +2,7 @@
 #include "UiText.h"
 #include "controllers/GitStatusController.h"
 #include "models/FileColumns.h"
+#include "views/FileViews.h"
 
 #include <QDir>
 #include <QFileInfo>
@@ -94,6 +95,14 @@ void FilePane::setActive(bool active)
     m_pathEdit->setProperty("activePane", active);
     m_pathEdit->style()->unpolish(m_pathEdit);
     m_pathEdit->style()->polish(m_pathEdit);
+    m_statusLabel->setProperty("activePane", active);
+    m_statusLabel->style()->unpolish(m_statusLabel);
+    m_statusLabel->style()->polish(m_statusLabel);
+    if (m_titleBar) {
+        m_titleBar->setProperty("activePane", active);
+        m_titleBar->style()->unpolish(m_titleBar);
+        m_titleBar->style()->polish(m_titleBar);
+    }
 }
 
 void FilePane::setThemeColors(const QString &fileForeground, const QString &directoryForeground)
@@ -101,6 +110,23 @@ void FilePane::setThemeColors(const QString &fileForeground, const QString &dire
     m_fileForeground = fileForeground;
     m_directoryForeground = directoryForeground;
     m_proxyModel->setThemeColors(fileForeground, directoryForeground);
+}
+
+void FilePane::setGitStatusColors(const QHash<QString, QString> &labelColors)
+{
+    m_proxyModel->setGitColors(labelColors);
+}
+
+void FilePane::setDropTargetColor(const QString &color)
+{
+    const QColor parsed(color);
+    if (!parsed.isValid()) {
+        return;
+    }
+    static_cast<FileTableView *>(m_view)->dropTargetColor = parsed;
+    if (m_iconView) {
+        static_cast<FileIconView *>(m_iconView)->dropTargetColor = parsed;
+    }
 }
 
 QModelIndex FilePane::currentSourceIndex() const

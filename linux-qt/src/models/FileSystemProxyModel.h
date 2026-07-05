@@ -17,6 +17,9 @@ public:
     explicit FileSystemProxyModel(QObject *parent = nullptr);
     void setGitStatuses(const QHash<QString, QString> &statuses);
     void setThemeColors(const QString &fileForeground, const QString &directoryForeground);
+    // Per-status-letter badge colours (keys are single-letter labels such as
+    // "M", "A", "D", "R", "?", "!", "U").
+    void setGitColors(const QHash<QString, QString> &labelColors);
     int columnCount(const QModelIndex &parent = QModelIndex()) const override;
     QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
@@ -36,6 +39,7 @@ private:
     int sourceColumnCount() const;
 
     QHash<QString, QString> m_gitStatuses;
+    QHash<QString, QString> m_gitColors;
     QString m_fileForeground = "#D9E1E8";
     QString m_directoryForeground = "#E5EDF3";
 };

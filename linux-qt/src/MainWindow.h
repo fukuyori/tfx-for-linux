@@ -61,6 +61,7 @@ private:
     void syncIconViewToggle();
     void setActivePane(FilePane *pane);
     void focusOtherPane();
+    void swapPanes();
     QDockWidget *makeDock(const QString &objectName, const QString &title, QWidget *content);
     void applyDefaultDockLayout();
     void resetDockLayout();

@@ -137,7 +137,9 @@ void PinnedListWidget::paintEvent(QPaintEvent *event)
         y = visualItemRect(item(m_dropRow)).top();
     }
     QPainter painter(viewport());
-    painter.setPen(QPen(QColor("#63F28D"), 2));
+    QColor indicator("#63F28D");
+    indicator.setAlphaF(qBound(0.0, dropIndicatorOpacity, 1.0));
+    painter.setPen(QPen(indicator, 2));
     painter.drawLine(2, y, viewport()->width() - 2, y);
 }
 

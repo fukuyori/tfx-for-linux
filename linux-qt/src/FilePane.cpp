@@ -32,7 +32,7 @@ FilePane::FilePane(const QString &label, const QString &initialPath, QWidget *pa
 
     setupGitRefresh();
 
-    auto *headerLayout = createHeaderLayout();
+    auto *headerBar = createHeaderLayout();
     setupSearchView();
     setupIconView();
     setupZipView();
@@ -44,7 +44,7 @@ FilePane::FilePane(const QString &label, const QString &initialPath, QWidget *pa
     layout->setContentsMargins(2, 2, 2, 2);
     layout->setSpacing(0);
     layout->addWidget(m_tabBar);
-    layout->addLayout(headerLayout);
+    layout->addWidget(headerBar);
     layout->addWidget(m_viewStack, 1);
     layout->addWidget(m_statusLabel);
 

@@ -77,6 +77,9 @@ public:
     // Invoked on a drop of file URLs: (urls, action, target index under cursor).
     std::function<void(const QList<QUrl> &, Qt::DropAction, const QModelIndex &)> dropHandler;
 
+    // Highlight colour for the in-progress drop target ([colors] fileListRowDropTarget).
+    QColor dropTargetColor{QStringLiteral("#63F28D")};
+
 protected:
     void dragEnterEvent(QDragEnterEvent *event) override
     {
@@ -228,12 +231,14 @@ private:
         }
         QPainter painter(viewport());
         painter.setRenderHint(QPainter::Antialiasing);
-        const QColor accent("#63F28D");
+        const QColor accent = dropTargetColor;
         if (m_dropTarget.isValid()) {
             QRect rect = visualRect(m_dropTarget);
             rect.setLeft(0);
             rect.setRight(viewport()->width() - 1);
-            painter.fillRect(rect, QColor(99, 242, 141, 42));
+            QColor fill = accent;
+            fill.setAlpha(42);
+            painter.fillRect(rect, fill);
             QPen pen(accent, 2);
             painter.setPen(pen);
             painter.drawRect(rect.adjusted(1, 1, -2, -2));
@@ -342,6 +347,9 @@ public:
 
     std::function<void(const QList<QUrl> &, Qt::DropAction, const QModelIndex &)> dropHandler;
 
+    // Highlight colour for the in-progress drop target ([colors] fileListRowDropTarget).
+    QColor dropTargetColor{QStringLiteral("#63F28D")};
+
 protected:
     void mousePressEvent(QMouseEvent *event) override
     {
@@ -443,10 +451,12 @@ private:
         }
         QPainter painter(viewport());
         painter.setRenderHint(QPainter::Antialiasing);
-        const QColor accent("#63F28D");
+        const QColor accent = dropTargetColor;
         if (m_dropTarget.isValid()) {
             const QRect rect = visualRect(m_dropTarget).adjusted(2, 2, -3, -3);
-            painter.fillRect(rect, QColor(99, 242, 141, 38));
+            QColor fill = accent;
+            fill.setAlpha(38);
+            painter.fillRect(rect, fill);
             painter.setPen(QPen(accent, 2));
             painter.drawRoundedRect(rect, 5, 5);
             return;

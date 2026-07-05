@@ -225,6 +225,15 @@ PreviewPane::PreviewPane(QWidget *parent)
     layout->addWidget(m_stack, 1);
 }
 
+void PreviewPane::setPreviewConfig(const QString &defaultMode,
+                                   const QHash<QString, QString> &extensionModes,
+                                   const QString &markdownExternalImages)
+{
+    m_previewDefaultMode = defaultMode;
+    m_previewExtensionModes = extensionModes;
+    m_markdownExternalImages = markdownExternalImages;
+}
+
 void PreviewPane::previewPath(const QString &path)
 {
     const QFileInfo info(path);
@@ -243,6 +252,24 @@ void PreviewPane::previewPath(const QString &path)
 
     m_title->setText(metadataText(info));
     setRenderAvailable(false);
+
+    // Preview mode from [preview.extensions] override, else [preview] default.
+    const QString previewMode = m_previewExtensionModes.value(info.suffix().toLower(), m_previewDefaultMode);
+    if (info.isFile() && previewMode == "none") {
+        m_text->setPlainText(UiText::t("Content preview is disabled for this file type.",
+                                       "このファイル形式はコンテンツプレビューが無効です。"));
+        m_stack->setCurrentWidget(m_text);
+        return;
+    }
+    if (info.isFile()) {
+        if (previewMode == "text") {
+            m_prefersRendered = false;
+        } else if (previewMode == "rendered") {
+            m_prefersRendered = true;
+        }
+        // "auto" keeps the current rendered/source preference.
+    }
+
     if (info.isFile() && showImage(path)) {
         return;
     }
@@ -357,7 +384,13 @@ QString PreviewPane::renderMarkdown(const QString &path, const QString &content)
             if (m_externalPreviewUrl.isEmpty()) {
                 m_externalPreviewUrl = target;
             }
-            replacements.prepend({match.captured(0), QString("[%1](%2)").arg(match.captured(1), target)});
+            // externalImages: "always" keeps the inline image; "never"/"button"
+            // downgrade it to a link (blocked inline) with an open-externally
+            // affordance via m_externalPreviewUrl.
+            const QString replacement = m_markdownExternalImages == "always"
+                ? QString("![%1](%2)").arg(match.captured(1), target)
+                : QString("[%1](%2)").arg(match.captured(1), target);
+            replacements.prepend({match.captured(0), replacement});
             continue;
         }
         if (!url.scheme().isEmpty() && url.scheme() != "file") {

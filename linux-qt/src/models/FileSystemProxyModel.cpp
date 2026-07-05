@@ -29,6 +29,12 @@ void FileSystemProxyModel::setThemeColors(const QString &fileForeground, const Q
     invalidate();
 }
 
+void FileSystemProxyModel::setGitColors(const QHash<QString, QString> &labelColors)
+{
+    m_gitColors = labelColors;
+    invalidate();
+}
+
 int FileSystemProxyModel::columnCount(const QModelIndex &parent) const
 {
     Q_UNUSED(parent);
@@ -120,6 +126,13 @@ QVariant FileSystemProxyModel::data(const QModelIndex &index, int role) const
     }
 
     if (role == Qt::ForegroundRole) {
+        if (index.column() == ColumnGit) {
+            const QString label = m_gitStatuses.value(info.absoluteFilePath()).left(1);
+            const QString color = m_gitColors.value(label);
+            if (!color.isEmpty()) {
+                return QColor(color);
+            }
+        }
         return QColor(info.isDir() ? m_directoryForeground : m_fileForeground);
     }
 

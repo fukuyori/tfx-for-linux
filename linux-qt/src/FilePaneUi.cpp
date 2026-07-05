@@ -53,14 +53,21 @@ void FilePane::setupPaneChrome(const QString &initialPath)
     updateTabCloseButtons();
 }
 
-QHBoxLayout *FilePane::createHeaderLayout()
+QWidget *FilePane::createHeaderLayout()
 {
     auto *headerLayout = new QHBoxLayout();
     headerLayout->setContentsMargins(8, 4, 8, 4);
     headerLayout->setSpacing(8);
     headerLayout->addWidget(m_badgeLabel);
     headerLayout->addWidget(m_pathEdit, 1);
-    return headerLayout;
+
+    // Wrap the header row in a styled container so [colors] titleBar* can paint
+    // the pane title bar background and track the active/inactive pane state.
+    m_titleBar = new QWidget(this);
+    m_titleBar->setObjectName("paneTitleBar");
+    m_titleBar->setAttribute(Qt::WA_StyledBackground, true);
+    m_titleBar->setLayout(headerLayout);
+    return m_titleBar;
 }
 
 void FilePane::setupFileView()

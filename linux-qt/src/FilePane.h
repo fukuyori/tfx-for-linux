@@ -44,6 +44,8 @@ public:
     bool isIconMode() const { return m_iconMode; }
     void setActive(bool active);
     void setThemeColors(const QString &fileForeground, const QString &directoryForeground);
+    void setGitStatusColors(const QHash<QString, QString> &labelColors);
+    void setDropTargetColor(const QString &color);
     QStringList tabPaths() const;
     int activeTabIndex() const;
     void restoreTabs(const QStringList &paths, int activeIndex);
@@ -94,6 +96,7 @@ public slots:
     void copySelected();
     void cutSelected();
     void pasteIntoCurrentDirectory();
+    void movePasteIntoCurrentDirectory();
     void pasteClipboardAsPlainText();
     void copySelectedPaths();
     void showColumnSettingsDialog();
@@ -101,6 +104,11 @@ public slots:
     void closeCurrentTab();
     void nextTab();
     void previousTab();
+    void revealSelectionInFileManager();
+    void openTerminalHere();
+    void selectAllVisibleItems();
+    void compressSelectedItemsToZip();
+    void extractSelectedZip();
 
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
@@ -108,7 +116,7 @@ protected:
 private:
     // UI setup
     void setupPaneChrome(const QString &initialPath);
-    QHBoxLayout *createHeaderLayout();
+    QWidget *createHeaderLayout();
     void setupFileView();
     void setupSearchView();
     void setupIconView();
@@ -156,9 +164,6 @@ private:
     QString placeholderText(const QString &english, const QString &japanese) const;
     void showFileContextMenu(const QPoint &point);
     void showEmptyAreaContextMenu(const QPoint &point);
-    void revealSelectionInFileManager();
-    void openTerminalHere();
-    void selectAllVisibleItems();
     void createLinkForSelection();
     void openWithConfiguredApplication(const QString &program);
     void openWithCustomApplication();
@@ -168,13 +173,12 @@ private:
     // Clipboard and drag/drop
     bool pasteClipboardAsFile(bool plainTextOnly);
     void performDrop(const QList<QUrl> &urls, Qt::DropAction action, const QString &targetDir);
+    void pasteClipboard(bool forceMove);
 
     // Archives
     void openZip(const QString &path);
     void populateZipView();
     void exitZipMode();
-    void compressSelectedItemsToZip();
-    void extractSelectedZip();
 
     // Columns
     void showColumnContextMenu(const QPoint &point);
@@ -195,6 +199,7 @@ private:
     QLabel *m_badgeLabel;
     QLineEdit *m_pathEdit;
     QLabel *m_statusLabel;
+    QWidget *m_titleBar = nullptr;
     QStackedWidget *m_viewStack = nullptr;
     QListView *m_iconView = nullptr;
     bool m_iconMode = false;

@@ -2,6 +2,27 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.7.2] - 2026-07-05
+
+### Added
+
+- Config parity with the tfx `config.toml` spec: `[colors]` gains drop-target,
+  title-bar, status-line, folder-tree, split-handle-idle, and Git-status-badge
+  tokens; `[opacity]` gains `dropIndicator` (plus accepted-but-inert macOS
+  tokens); new `[preview]` / `[preview.extensions]` / `[preview.markdown]`
+  sections control preview mode per extension and Markdown external images.
+- Previously unbound documented shortcuts are now wired: `openItem`,
+  `openTerminal`, `swapPanes`, `compressToZip`, `extractZip`, `movePasteItems`,
+  `selectAll`, `revealInFinder`, `focusTerminalPane`. Shortcut names align with
+  the spec (`toggleTerminalPane`, `previousTab`, `copyPath`), keeping the old
+  names as aliases.
+
+### Changed
+
+- Toolbar icons follow the configured foreground colour instead of a fixed grey.
+- `docs/configuration.md` updated to document the full supported schema,
+  including a shortcuts reference and the new colour/opacity/preview keys.
+
 ## [0.7.1] - 2026-07-05
 
 ### Added

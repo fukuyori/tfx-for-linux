@@ -44,6 +44,38 @@ struct AppColors
     QString scrollbarThumb = "#3A454E";
     QString scrollbarThumbHovered = "#4A5963";
     QString scrollbarThumbDragging = "#5C7484";
+
+    // Drop target
+    QString dropTargetBackground = "#63F28D";
+
+    // Pane title bar
+    QString titleBarActive = "#1C2329";
+    QString titleBarInactive = "#151A1E";
+
+    // Status line
+    QString statusBackground = "#151A1E";
+    QString statusForegroundActive = "#B9C4CC";
+    QString statusForegroundInactive = "#6D7881";
+
+    // Folder tree
+    QString folderTreeForeground = "#C3CDD5";
+    QString folderTreeSelectedForeground = "#FFFFFF";
+    QString folderTreeFolderIcon = "#E5B769";
+    QString folderTreeSelectedActive = "#31576B";
+    QString folderTreeSelectedInactive = "#232C33";
+    QString folderTreeSectionHeader = "#8892A0";
+
+    // Split handle
+    QString splitHandleIdle = "#20272D";
+
+    // Git status badges
+    QString gitModified = "#E2C08D";
+    QString gitAdded = "#7FB37F";
+    QString gitDeleted = "#D48A8A";
+    QString gitRenamed = "#8DB0E2";
+    QString gitUntracked = "#8AC7A0";
+    QString gitIgnored = "#6D7881";
+    QString gitConflicted = "#E28D8D";
 };
 
 struct AppThemeConfig
@@ -90,6 +122,19 @@ struct AppOpacityConfig
     double background = 1.0;
     double inactivePane = 1.0;
     double disabledItem = 1.0;
+    double headerSecondary = 0.75;
+    double selectedParentRow = 0.8;
+    double dropIndicator = 0.85;
+    double dragPreview = 0.96;
+    double dragPreviewShadow = 0.18;
+    double subtleBackground = 0.07;
+};
+
+struct AppPreviewConfig
+{
+    QString defaultMode = "auto";                 // auto | rendered | text | none
+    QHash<QString, QString> extensionModes;       // lowercase ext -> mode
+    QString markdownExternalImages = "button";    // button | always | never
 };
 
 class AppConfig
@@ -108,6 +153,7 @@ public:
     AppStartupConfig startup;
     AppNamingConfig naming;
     AppOpacityConfig opacity;
+    AppPreviewConfig preview;
     QHash<QString, QString> shortcuts;
     QHash<QString, QString> openWith;
     QList<UserCommand> commands;

@@ -30,31 +30,31 @@ QAction *addMenuAction(QMenu *menu,
     return action;
 }
 
-QIcon toolbarIcon(const QString &kind)
+QIcon toolbarIcon(const QString &kind, const QColor &color)
 {
     QPixmap pixmap(32, 32);
     pixmap.fill(Qt::transparent);
 
     QPainter painter(&pixmap);
     painter.setRenderHint(QPainter::Antialiasing);
-    QPen pen(QColor("#D9E1E8"), 1.7);
+    QPen pen(color, 1.7);
     painter.setPen(pen);
     painter.setBrush(Qt::NoBrush);
 
     if (kind == "back") {
-        QPen arrow(QColor("#D9E1E8"), 2);
+        QPen arrow(color, 2);
         arrow.setCapStyle(Qt::RoundCap);
         arrow.setJoinStyle(Qt::RoundJoin);
         painter.setPen(arrow);
         painter.drawPolyline(QPolygonF({QPointF(19, 9), QPointF(12, 16), QPointF(19, 23)}));
     } else if (kind == "forward") {
-        QPen arrow(QColor("#D9E1E8"), 2);
+        QPen arrow(color, 2);
         arrow.setCapStyle(Qt::RoundCap);
         arrow.setJoinStyle(Qt::RoundJoin);
         painter.setPen(arrow);
         painter.drawPolyline(QPolygonF({QPointF(13, 9), QPointF(20, 16), QPointF(13, 23)}));
     } else if (kind == "up") {
-        QPen arrow(QColor("#D9E1E8"), 2);
+        QPen arrow(color, 2);
         arrow.setCapStyle(Qt::RoundCap);
         arrow.setJoinStyle(Qt::RoundJoin);
         painter.setPen(arrow);
@@ -62,13 +62,13 @@ QIcon toolbarIcon(const QString &kind)
         painter.drawPolyline(QPolygonF({QPointF(9, 15), QPointF(16, 8), QPointF(23, 15)}));
     } else if (kind == "hidden") {
         painter.drawEllipse(QRectF(9, 12, 14, 8));
-        painter.setBrush(QColor("#D9E1E8"));
+        painter.setBrush(color);
         painter.drawEllipse(QRectF(13.5, 13.5, 5, 5));
         painter.setBrush(Qt::NoBrush);
     } else if (kind == "sidebar") {
         QRectF rect(7, 8, 18, 16);
         painter.drawRoundedRect(rect, 2, 2);
-        painter.fillRect(QRectF(8, 9, 6, 14), QColor("#D9E1E8"));
+        painter.fillRect(QRectF(8, 9, 6, 14), color);
         painter.drawLine(QPointF(14, 8), QPointF(14, 24));
     } else if (kind == "split") {
         QRectF rect(7, 8, 18, 16);
@@ -77,7 +77,7 @@ QIcon toolbarIcon(const QString &kind)
     } else if (kind == "preview") {
         QRectF rect(7, 8, 18, 16);
         painter.drawRoundedRect(rect, 2, 2);
-        painter.fillRect(QRectF(18, 9, 6, 14), QColor("#D9E1E8"));
+        painter.fillRect(QRectF(18, 9, 6, 14), color);
         painter.drawLine(QPointF(18, 8), QPointF(18, 24));
     } else if (kind == "search") {
         painter.drawEllipse(QRectF(9, 9, 10, 10));
@@ -90,7 +90,7 @@ QIcon toolbarIcon(const QString &kind)
         }
     } else if (kind == "output") {
         painter.drawRoundedRect(QRectF(6, 8, 20, 16), 2, 2);
-        QPen line(QColor("#D9E1E8"), 1.6);
+        QPen line(color, 1.6);
         line.setCapStyle(Qt::RoundCap);
         painter.setPen(line);
         painter.drawLine(QPointF(10, 13), QPointF(22, 13));
@@ -124,7 +124,7 @@ void MainWindow::buildActions()
     addMenuAction(editMenu, UiText::t("Copy", "コピー"), this, [this]() { activePane()->copySelected(); }, QKeySequence(m_config.shortcut("copyItems", "Ctrl+C")));
     addMenuAction(editMenu, UiText::t("Cut", "カット"), this, [this]() { activePane()->cutSelected(); }, QKeySequence(m_config.shortcut("cutItems", "Ctrl+X")));
     addMenuAction(editMenu, UiText::t("Paste", "ペースト"), this, [this]() { activePane()->pasteIntoCurrentDirectory(); }, QKeySequence(m_config.shortcut("pasteItems", "Ctrl+V")));
-    addMenuAction(editMenu, UiText::t("Copy Path", "パスをコピー"), this, [this]() { activePane()->copySelectedPaths(); }, QKeySequence("Ctrl+Shift+C"));
+    addMenuAction(editMenu, UiText::t("Copy Path", "パスをコピー"), this, [this]() { activePane()->copySelectedPaths(); }, QKeySequence(m_config.shortcut("copyPath", "Ctrl+Shift+C")));
 
     auto *viewMenu = menuBar()->addMenu(UiText::t("View", "表示"));
     m_sidebarAction = viewMenu->addAction(UiText::t("Folder Sidebar", "フォルダーサイドバー"));
@@ -146,7 +146,7 @@ void MainWindow::buildActions()
 
     m_terminalAction = viewMenu->addAction(UiText::t("Terminal Pane", "ターミナルペイン"));
     m_terminalAction->setCheckable(true);
-    m_terminalAction->setShortcut(QKeySequence(m_config.shortcut("toggleTerminal", "Ctrl+J")));
+    m_terminalAction->setShortcut(QKeySequence(m_config.shortcut("toggleTerminalPane", m_config.shortcut("toggleTerminal", "Ctrl+J"))));
     connect(m_terminalAction, &QAction::toggled, this, &MainWindow::setTerminalVisible);
 
     m_commandOutputAction = viewMenu->addAction(UiText::t("Command Output", "コマンド出力"));
@@ -173,7 +173,7 @@ void MainWindow::buildActions()
     auto *tabMenu = menuBar()->addMenu(UiText::t("Tabs", "タブ"));
     addMenuAction(tabMenu, UiText::t("New Tab", "新規タブ"), this, [this]() { activePane()->newTab(); }, QKeySequence(m_config.shortcut("newTab", "Ctrl+T")));
     addMenuAction(tabMenu, UiText::t("Close Tab", "タブを閉じる"), this, [this]() { activePane()->closeCurrentTab(); }, QKeySequence(m_config.shortcut("closeTab", "Ctrl+W")));
-    addMenuAction(tabMenu, UiText::t("Previous Tab", "前のタブ"), this, [this]() { activePane()->previousTab(); }, QKeySequence(m_config.shortcut("prevTab", "Ctrl+Shift+[")));
+    addMenuAction(tabMenu, UiText::t("Previous Tab", "前のタブ"), this, [this]() { activePane()->previousTab(); }, QKeySequence(m_config.shortcut("previousTab", m_config.shortcut("prevTab", "Ctrl+Shift+["))));
     addMenuAction(tabMenu, UiText::t("Next Tab", "次のタブ"), this, [this]() { activePane()->nextTab(); }, QKeySequence(m_config.shortcut("nextTab", "Ctrl+Shift+]")));
 
     auto *navMenu = menuBar()->addMenu(UiText::t("Navigate", "移動"));
@@ -201,6 +201,7 @@ void MainWindow::buildActions()
 
 void MainWindow::buildTopToolbar()
 {
+    const QColor iconColor(m_config.colors.foreground);
     m_topToolbar->setObjectName("topToolbar");
     m_topToolbar->setMovable(false);
     m_topToolbar->setFloatable(false);
@@ -209,7 +210,7 @@ void MainWindow::buildTopToolbar()
 
     auto *backButton = new QToolButton(this);
     backButton->setObjectName("toolbarIconButton");
-    backButton->setIcon(toolbarIcon("back"));
+    backButton->setIcon(toolbarIcon("back", iconColor));
     backButton->setIconSize(QSize(24, 24));
     backButton->setToolButtonStyle(Qt::ToolButtonIconOnly);
     backButton->setToolTip(UiText::t("Back", "戻る"));
@@ -218,7 +219,7 @@ void MainWindow::buildTopToolbar()
 
     auto *forwardButton = new QToolButton(this);
     forwardButton->setObjectName("toolbarIconButton");
-    forwardButton->setIcon(toolbarIcon("forward"));
+    forwardButton->setIcon(toolbarIcon("forward", iconColor));
     forwardButton->setIconSize(QSize(24, 24));
     forwardButton->setToolButtonStyle(Qt::ToolButtonIconOnly);
     forwardButton->setToolTip(UiText::t("Forward", "進む"));
@@ -227,7 +228,7 @@ void MainWindow::buildTopToolbar()
 
     auto *upButton = new QToolButton(this);
     upButton->setObjectName("toolbarIconButton");
-    upButton->setIcon(toolbarIcon("up"));
+    upButton->setIcon(toolbarIcon("up", iconColor));
     upButton->setIconSize(QSize(24, 24));
     upButton->setToolButtonStyle(Qt::ToolButtonIconOnly);
     upButton->setToolTip(UiText::t("Parent Folder", "上の階層へ"));
@@ -272,7 +273,7 @@ void MainWindow::buildTopToolbar()
 
     m_hiddenButton = new QToolButton(this);
     m_hiddenButton->setObjectName("toolbarIconButton");
-    m_hiddenButton->setIcon(toolbarIcon("hidden"));
+    m_hiddenButton->setIcon(toolbarIcon("hidden", iconColor));
     m_hiddenButton->setIconSize(QSize(24, 24));
     m_hiddenButton->setCheckable(true);
     m_hiddenButton->setChecked(m_showHiddenFiles);
@@ -283,7 +284,7 @@ void MainWindow::buildTopToolbar()
 
     m_sidebarButton = new QToolButton(this);
     m_sidebarButton->setObjectName("toolbarIconButton");
-    m_sidebarButton->setIcon(toolbarIcon("sidebar"));
+    m_sidebarButton->setIcon(toolbarIcon("sidebar", iconColor));
     m_sidebarButton->setIconSize(QSize(24, 24));
     m_sidebarButton->setCheckable(true);
     m_sidebarButton->setChecked(true);
@@ -293,7 +294,7 @@ void MainWindow::buildTopToolbar()
     m_topToolbar->addWidget(m_sidebarButton);
 
     m_splitButton->setObjectName("toolbarIconButton");
-    m_splitButton->setIcon(toolbarIcon("split"));
+    m_splitButton->setIcon(toolbarIcon("split", iconColor));
     m_splitButton->setIconSize(QSize(24, 24));
     m_splitButton->setCheckable(true);
     m_splitButton->setChecked(true);
@@ -303,7 +304,7 @@ void MainWindow::buildTopToolbar()
     m_topToolbar->addWidget(m_splitButton);
 
     m_previewButton->setObjectName("toolbarIconButton");
-    m_previewButton->setIcon(toolbarIcon("preview"));
+    m_previewButton->setIcon(toolbarIcon("preview", iconColor));
     m_previewButton->setIconSize(QSize(24, 24));
     m_previewButton->setCheckable(true);
     m_previewButton->setChecked(true);
@@ -314,7 +315,7 @@ void MainWindow::buildTopToolbar()
 
     m_iconViewButton = new QToolButton(this);
     m_iconViewButton->setObjectName("toolbarIconButton");
-    m_iconViewButton->setIcon(toolbarIcon("icons"));
+    m_iconViewButton->setIcon(toolbarIcon("icons", iconColor));
     m_iconViewButton->setIconSize(QSize(24, 24));
     m_iconViewButton->setCheckable(true);
     m_iconViewButton->setToolButtonStyle(Qt::ToolButtonIconOnly);
@@ -324,7 +325,7 @@ void MainWindow::buildTopToolbar()
 
     m_terminalButton = new QToolButton(this);
     m_terminalButton->setObjectName("toolbarIconButton");
-    m_terminalButton->setIcon(toolbarIcon("terminal"));
+    m_terminalButton->setIcon(toolbarIcon("terminal", iconColor));
     m_terminalButton->setIconSize(QSize(24, 24));
     m_terminalButton->setCheckable(true);
     m_terminalButton->setToolButtonStyle(Qt::ToolButtonIconOnly);
@@ -334,7 +335,7 @@ void MainWindow::buildTopToolbar()
 
     m_commandOutputButton = new QToolButton(this);
     m_commandOutputButton->setObjectName("toolbarIconButton");
-    m_commandOutputButton->setIcon(toolbarIcon("output"));
+    m_commandOutputButton->setIcon(toolbarIcon("output", iconColor));
     m_commandOutputButton->setIconSize(QSize(24, 24));
     m_commandOutputButton->setCheckable(true);
     m_commandOutputButton->setToolButtonStyle(Qt::ToolButtonIconOnly);

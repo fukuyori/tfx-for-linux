@@ -181,6 +181,22 @@ void TerminalPane::showOutputTab()
     }
 }
 
+void TerminalPane::focusTerminal()
+{
+#ifdef TFX_HAVE_QTERMWIDGET
+    if (m_tabs && m_terminalTab) {
+        m_tabs->setCurrentWidget(m_terminalTab);
+    }
+    if (m_term) {
+        m_term->setFocus();
+    }
+#else
+    if (m_command) {
+        m_command->setFocus();
+    }
+#endif
+}
+
 void TerminalPane::beginCommandOutput(const QString &header)
 {
     if (!m_outputView) {

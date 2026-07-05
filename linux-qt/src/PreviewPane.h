@@ -2,6 +2,7 @@
 
 #include <QLabel>
 #include <QFileInfo>
+#include <QHash>
 #include <QPlainTextEdit>
 #include <QStackedWidget>
 #include <QTextBrowser>
@@ -14,6 +15,12 @@ class PreviewPane : public QWidget
 
 public:
     explicit PreviewPane(QWidget *parent = nullptr);
+
+public:
+    // Preview behaviour from [preview] / [preview.extensions] / [preview.markdown].
+    void setPreviewConfig(const QString &defaultMode,
+                          const QHash<QString, QString> &extensionModes,
+                          const QString &markdownExternalImages);
 
 public slots:
     void previewPath(const QString &path);
@@ -45,4 +52,8 @@ private:
     QString m_externalPreviewUrl;
     bool m_renderAvailable = false;
     bool m_prefersRendered = true;
+
+    QString m_previewDefaultMode = "auto";
+    QHash<QString, QString> m_previewExtensionModes;
+    QString m_markdownExternalImages = "button";
 };

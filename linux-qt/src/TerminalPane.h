@@ -1,15 +1,16 @@
 #pragma once
 
 #include <QFont>
+#include <QPlainTextEdit>
 #include <QWidget>
 
 #ifndef TFX_HAVE_QTERMWIDGET
 #include <QLineEdit>
-#include <QPlainTextEdit>
 #include <QProcess>
 #endif
 
 class QTermWidget;
+class QTabWidget;
 class QVBoxLayout;
 
 class TerminalPane : public QWidget
@@ -23,6 +24,13 @@ public:
     void openAt(const QString &path);
     void setContentFont(const QFont &font);
     void setColorScheme(const QString &name);
+
+    // Stream user-command output into the "Output" tab. beginCommandOutput
+    // switches to the tab and prints a header; appendCommandOutput adds a chunk
+    // as it arrives; endCommandOutput prints a trailing footer.
+    void beginCommandOutput(const QString &header);
+    void appendCommandOutput(const QString &text);
+    void endCommandOutput(const QString &footer);
 
     // Resolve a terminal font. With an explicit family, that family is used;
     // otherwise the first candidate that QFontInfo reports as fixed-pitch is
@@ -39,13 +47,19 @@ protected:
 private:
     QString currentTerminalDirectory() const;
     void requestDirectorySync();
+    void sendControlCharacter(char code);
+    void showOutputTab();
     QString m_workingDirectory;
+
+    QTabWidget *m_tabs = nullptr;
+    QPlainTextEdit *m_outputView = nullptr;
 
 #ifdef TFX_HAVE_QTERMWIDGET
     void createTermWidget();
     void startTerminal();
     void shutdownShell();
-    QVBoxLayout *m_layout = nullptr;
+    QWidget *m_terminalTab = nullptr;
+    QVBoxLayout *m_terminalTabLayout = nullptr;
     QTermWidget *m_term = nullptr;
     QFont m_font;
     QString m_colorScheme;

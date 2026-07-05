@@ -76,6 +76,8 @@ private:
     QToolButton *m_previewButton;
     QToolButton *m_iconViewButton = nullptr;
     QToolButton *m_terminalButton = nullptr;
+    QToolButton *m_hiddenButton = nullptr;
+    QToolButton *m_sidebarButton = nullptr;
     QWidget *m_sidebar;
     QAction *m_splitAction = nullptr;
     QAction *m_sidebarAction = nullptr;

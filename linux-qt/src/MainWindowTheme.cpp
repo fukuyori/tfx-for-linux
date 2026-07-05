@@ -242,6 +242,42 @@ void MainWindow::applyTerminalTheme()
             padding: 4px 6px;
             font-weight: 500;
         }
+        QTabWidget#terminalTabs::pane {
+            border: 0;
+            border-top: 1px solid #2A333A;
+        }
+        QTabWidget#terminalTabs > QTabBar::tab {
+            background: #10161A;
+            color: #9EABB6;
+            border: 1px solid #2A333A;
+            border-bottom: 0;
+            padding: 3px 12px;
+            margin-right: 2px;
+        }
+        QTabWidget#terminalTabs > QTabBar::tab:selected {
+            background: #050607;
+            color: #D9E1E8;
+        }
+        QTabWidget#terminalTabs > QTabBar::tab:hover {
+            color: #D9E1E8;
+        }
+        QToolButton#terminalActionButton {
+            background: #1B232A;
+            border: 1px solid #37434C;
+            border-radius: 3px;
+            color: #D9E1E8;
+            padding: 2px 8px;
+            margin: 2px 2px;
+            min-height: 18px;
+            font-weight: 600;
+        }
+        QToolButton#terminalActionButton:hover {
+            background: #26313A;
+            border-color: #4A5963;
+        }
+        QToolButton#terminalActionButton:pressed {
+            background: #304049;
+        }
         QToolButton#terminalCloseButton {
             background: transparent;
             border: 0;

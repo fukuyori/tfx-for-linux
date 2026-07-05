@@ -2,6 +2,21 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.7.0] - 2026-07-05
+
+### Added
+
+- Top toolbar navigation buttons: Back, Forward, and Parent Folder, placed to
+  the left of the search box.
+- Top toolbar toggle buttons on the right: hidden-file visibility and folder
+  sidebar visibility, alongside the existing split, preview, icon, and terminal
+  toggles. Toolbar toggles stay in sync with their View-menu counterparts.
+- Terminal pane signal buttons (`^C`, `^\`, `^Z`) that send the corresponding
+  control characters to the interactive shell; the directory-sync (`cwd`)
+  button moved next to them.
+- Terminal pane is now tabbed with a "Terminal" tab (interactive shell) and an
+  "Output" tab for user-command output.
+
 ## [0.6.7] - 2026-07-04
 
 ### Fixed

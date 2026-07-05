@@ -1,4 +1,5 @@
 #include "TerminalPane.h"
+#include "UiText.h"
 #include "core/FileOperations.h"
 #include "platform/Platform.h"
 
@@ -10,6 +11,8 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QShowEvent>
+#include <QTabWidget>
+#include <QTextCursor>
 #include <QTimer>
 #include <QToolButton>
 #include <QVBoxLayout>
@@ -63,11 +66,31 @@ TerminalPane::TerminalPane(QWidget *parent)
 
     auto *title = new QLabel("TERMINAL", this);
     title->setObjectName("terminalTitle");
+
+    auto *sigIntButton = new QToolButton(this);
+    sigIntButton->setObjectName("terminalActionButton");
+    sigIntButton->setText("^C");
+    sigIntButton->setToolTip("Send Ctrl+C (interrupt)");
+    connect(sigIntButton, &QToolButton::clicked, this, [this]() { sendControlCharacter(0x03); });
+
+    auto *sigQuitButton = new QToolButton(this);
+    sigQuitButton->setObjectName("terminalActionButton");
+    sigQuitButton->setText("^\\");
+    sigQuitButton->setToolTip("Send Ctrl+\\ (quit)");
+    connect(sigQuitButton, &QToolButton::clicked, this, [this]() { sendControlCharacter(0x1C); });
+
+    auto *sigStopButton = new QToolButton(this);
+    sigStopButton->setObjectName("terminalActionButton");
+    sigStopButton->setText("^Z");
+    sigStopButton->setToolTip("Send Ctrl+Z (suspend)");
+    connect(sigStopButton, &QToolButton::clicked, this, [this]() { sendControlCharacter(0x1A); });
+
     auto *syncButton = new QToolButton(this);
-    syncButton->setObjectName("terminalCloseButton");
+    syncButton->setObjectName("terminalActionButton");
     syncButton->setText("cwd");
     syncButton->setToolTip("Sync file pane to terminal directory");
     connect(syncButton, &QToolButton::clicked, this, &TerminalPane::requestDirectorySync);
+
     auto *closeButton = new QToolButton(this);
     closeButton->setObjectName("terminalCloseButton");
     closeButton->setText("x");
@@ -78,8 +101,12 @@ TerminalPane::TerminalPane(QWidget *parent)
     headerLayout->setContentsMargins(0, 0, 0, 0);
     headerLayout->setSpacing(0);
     headerLayout->addWidget(title);
-    headerLayout->addStretch(1);
+    headerLayout->addSpacing(8);
+    headerLayout->addWidget(sigIntButton);
+    headerLayout->addWidget(sigQuitButton);
+    headerLayout->addWidget(sigStopButton);
     headerLayout->addWidget(syncButton);
+    headerLayout->addStretch(1);
     headerLayout->addWidget(closeButton);
 
     auto *layout = new QVBoxLayout(this);
@@ -87,10 +114,28 @@ TerminalPane::TerminalPane(QWidget *parent)
     layout->setSpacing(0);
     layout->addLayout(headerLayout);
 
+    m_tabs = new QTabWidget(this);
+    m_tabs->setObjectName("terminalTabs");
+    m_tabs->setDocumentMode(true);
+    layout->addWidget(m_tabs, 1);
+
+    // The "Output" tab receives user-command output (commands with
+    // terminal = true). It is shared by both build variants.
+    m_outputView = new QPlainTextEdit(this);
+    m_outputView->setObjectName("terminalOutput");
+    m_outputView->setReadOnly(true);
+    m_outputView->setLineWrapMode(QPlainTextEdit::NoWrap);
+    m_outputView->setMaximumBlockCount(5000);
+
 #ifdef TFX_HAVE_QTERMWIDGET
-    m_layout = layout;
+    m_terminalTab = new QWidget(m_tabs);
+    m_terminalTabLayout = new QVBoxLayout(m_terminalTab);
+    m_terminalTabLayout->setContentsMargins(0, 0, 0, 0);
+    m_terminalTabLayout->setSpacing(0);
     m_font = resolveFont(QString(), 11);
     createTermWidget();
+    m_tabs->addTab(m_terminalTab, UiText::t("Terminal", "ターミナル"));
+    m_tabs->addTab(m_outputView, UiText::t("Output", "出力"));
 #else
     m_output = new QPlainTextEdit(this);
     m_command = new QLineEdit(this);
@@ -118,9 +163,60 @@ TerminalPane::TerminalPane(QWidget *parent)
     commandLayout->addWidget(m_command, 1);
     commandLayout->addWidget(runButton);
 
-    layout->addWidget(m_output, 1);
-    layout->addLayout(commandLayout);
+    auto *terminalTab = new QWidget(m_tabs);
+    auto *terminalTabLayout = new QVBoxLayout(terminalTab);
+    terminalTabLayout->setContentsMargins(0, 0, 0, 0);
+    terminalTabLayout->setSpacing(0);
+    terminalTabLayout->addWidget(m_output, 1);
+    terminalTabLayout->addLayout(commandLayout);
+    m_tabs->addTab(terminalTab, UiText::t("Terminal", "ターミナル"));
+    m_tabs->addTab(m_outputView, UiText::t("Output", "出力"));
 #endif
+}
+
+void TerminalPane::showOutputTab()
+{
+    if (m_tabs && m_outputView) {
+        m_tabs->setCurrentWidget(m_outputView);
+    }
+}
+
+void TerminalPane::beginCommandOutput(const QString &header)
+{
+    if (!m_outputView) {
+        return;
+    }
+    if (!m_outputView->document()->isEmpty()) {
+        m_outputView->appendPlainText(QString());
+    }
+    if (!header.isEmpty()) {
+        m_outputView->appendPlainText(header);
+    }
+    showOutputTab();
+    m_outputView->ensureCursorVisible();
+}
+
+void TerminalPane::appendCommandOutput(const QString &text)
+{
+    if (!m_outputView || text.isEmpty()) {
+        return;
+    }
+    // Insert at the end so partial lines (chunks without a trailing newline)
+    // continue on the same line as they arrive.
+    QTextCursor cursor = m_outputView->textCursor();
+    cursor.movePosition(QTextCursor::End);
+    cursor.insertText(text);
+    m_outputView->setTextCursor(cursor);
+    m_outputView->ensureCursorVisible();
+}
+
+void TerminalPane::endCommandOutput(const QString &footer)
+{
+    if (!m_outputView || footer.isEmpty()) {
+        return;
+    }
+    m_outputView->appendPlainText(footer);
+    m_outputView->ensureCursorVisible();
 }
 
 TerminalPane::~TerminalPane()
@@ -250,6 +346,18 @@ void TerminalPane::requestDirectorySync()
     }
 }
 
+void TerminalPane::sendControlCharacter(char code)
+{
+#ifdef TFX_HAVE_QTERMWIDGET
+    if (m_term && m_started) {
+        m_term->sendText(QString(QChar(static_cast<ushort>(static_cast<unsigned char>(code)))));
+        m_term->setFocus();
+    }
+#else
+    Q_UNUSED(code);
+#endif
+}
+
 #ifdef TFX_HAVE_QTERMWIDGET
 void TerminalPane::createTermWidget()
 {
@@ -278,14 +386,14 @@ void TerminalPane::createTermWidget()
         // this widget; showEvent() will build a fresh one in the active
         // directory the next time the pane is shown.
         if (m_term) {
-            m_layout->removeWidget(m_term);
+            m_terminalTabLayout->removeWidget(m_term);
             m_term->deleteLater();
             m_term = nullptr;
         }
         m_started = false;
         emit closeRequested();
     });
-    m_layout->addWidget(m_term, 1);
+    m_terminalTabLayout->addWidget(m_term, 1);
 }
 
 void TerminalPane::startTerminal()

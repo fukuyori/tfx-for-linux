@@ -90,6 +90,10 @@ void MainWindow::setSidebarVisible(bool visible)
         const QSignalBlocker blocker(m_sidebarAction);
         m_sidebarAction->setChecked(visible);
     }
+    if (m_sidebarButton && m_sidebarButton->isChecked() != visible) {
+        const QSignalBlocker blocker(m_sidebarButton);
+        m_sidebarButton->setChecked(visible);
+    }
     if (!m_isRestoringSettings) {
         saveSettings();
     }
@@ -151,6 +155,9 @@ void MainWindow::setHiddenFilesVisible(bool visible)
     m_treeModel->setFilter(filters);
     if (m_hiddenAction && m_hiddenAction->isChecked() != visible) {
         m_hiddenAction->setChecked(visible);
+    }
+    if (m_hiddenButton && m_hiddenButton->isChecked() != visible) {
+        m_hiddenButton->setChecked(visible);
     }
     if (!m_isRestoringSettings) {
         saveSettings();

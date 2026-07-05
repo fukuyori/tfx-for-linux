@@ -41,7 +41,36 @@ QIcon toolbarIcon(const QString &kind)
     painter.setPen(pen);
     painter.setBrush(Qt::NoBrush);
 
-    if (kind == "split") {
+    if (kind == "back") {
+        QPen arrow(QColor("#D9E1E8"), 2);
+        arrow.setCapStyle(Qt::RoundCap);
+        arrow.setJoinStyle(Qt::RoundJoin);
+        painter.setPen(arrow);
+        painter.drawPolyline(QPolygonF({QPointF(19, 9), QPointF(12, 16), QPointF(19, 23)}));
+    } else if (kind == "forward") {
+        QPen arrow(QColor("#D9E1E8"), 2);
+        arrow.setCapStyle(Qt::RoundCap);
+        arrow.setJoinStyle(Qt::RoundJoin);
+        painter.setPen(arrow);
+        painter.drawPolyline(QPolygonF({QPointF(13, 9), QPointF(20, 16), QPointF(13, 23)}));
+    } else if (kind == "up") {
+        QPen arrow(QColor("#D9E1E8"), 2);
+        arrow.setCapStyle(Qt::RoundCap);
+        arrow.setJoinStyle(Qt::RoundJoin);
+        painter.setPen(arrow);
+        painter.drawLine(QPointF(16, 8), QPointF(16, 24));
+        painter.drawPolyline(QPolygonF({QPointF(9, 15), QPointF(16, 8), QPointF(23, 15)}));
+    } else if (kind == "hidden") {
+        painter.drawEllipse(QRectF(9, 12, 14, 8));
+        painter.setBrush(QColor("#D9E1E8"));
+        painter.drawEllipse(QRectF(13.5, 13.5, 5, 5));
+        painter.setBrush(Qt::NoBrush);
+    } else if (kind == "sidebar") {
+        QRectF rect(7, 8, 18, 16);
+        painter.drawRoundedRect(rect, 2, 2);
+        painter.fillRect(QRectF(8, 9, 6, 14), QColor("#D9E1E8"));
+        painter.drawLine(QPointF(14, 8), QPointF(14, 24));
+    } else if (kind == "split") {
         QRectF rect(7, 8, 18, 16);
         painter.drawRoundedRect(rect, 2, 2);
         painter.drawLine(QPointF(16, 8), QPointF(16, 24));
@@ -170,6 +199,37 @@ void MainWindow::buildTopToolbar()
     m_topToolbar->setIconSize(QSize(18, 18));
     addToolBar(Qt::TopToolBarArea, m_topToolbar);
 
+    auto *backButton = new QToolButton(this);
+    backButton->setObjectName("toolbarIconButton");
+    backButton->setIcon(toolbarIcon("back"));
+    backButton->setIconSize(QSize(24, 24));
+    backButton->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    backButton->setToolTip(UiText::t("Back", "戻る"));
+    connect(backButton, &QToolButton::clicked, this, [this]() { activePane()->goBack(); });
+    m_topToolbar->addWidget(backButton);
+
+    auto *forwardButton = new QToolButton(this);
+    forwardButton->setObjectName("toolbarIconButton");
+    forwardButton->setIcon(toolbarIcon("forward"));
+    forwardButton->setIconSize(QSize(24, 24));
+    forwardButton->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    forwardButton->setToolTip(UiText::t("Forward", "進む"));
+    connect(forwardButton, &QToolButton::clicked, this, [this]() { activePane()->goForward(); });
+    m_topToolbar->addWidget(forwardButton);
+
+    auto *upButton = new QToolButton(this);
+    upButton->setObjectName("toolbarIconButton");
+    upButton->setIcon(toolbarIcon("up"));
+    upButton->setIconSize(QSize(24, 24));
+    upButton->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    upButton->setToolTip(UiText::t("Parent Folder", "上の階層へ"));
+    connect(upButton, &QToolButton::clicked, this, [this]() { activePane()->goUp(); });
+    m_topToolbar->addWidget(upButton);
+
+    auto *navSpacer = new QWidget(this);
+    navSpacer->setFixedWidth(16);
+    m_topToolbar->addWidget(navSpacer);
+
     m_searchEdit->setObjectName("searchEdit");
     m_searchEdit->setEditable(true);
     m_searchEdit->setPlaceholderText(UiText::t("Search (Enter to search subfolders)", "検索 (Enter でサブフォルダ検索)"));
@@ -201,6 +261,28 @@ void MainWindow::buildTopToolbar()
     auto *spacer = new QWidget(this);
     spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     m_topToolbar->addWidget(spacer);
+
+    m_hiddenButton = new QToolButton(this);
+    m_hiddenButton->setObjectName("toolbarIconButton");
+    m_hiddenButton->setIcon(toolbarIcon("hidden"));
+    m_hiddenButton->setIconSize(QSize(24, 24));
+    m_hiddenButton->setCheckable(true);
+    m_hiddenButton->setChecked(m_showHiddenFiles);
+    m_hiddenButton->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    m_hiddenButton->setToolTip(UiText::t("Show / hide hidden files", "不可視ファイルの表示切り替え"));
+    connect(m_hiddenButton, &QToolButton::toggled, this, &MainWindow::setHiddenFilesVisible);
+    m_topToolbar->addWidget(m_hiddenButton);
+
+    m_sidebarButton = new QToolButton(this);
+    m_sidebarButton->setObjectName("toolbarIconButton");
+    m_sidebarButton->setIcon(toolbarIcon("sidebar"));
+    m_sidebarButton->setIconSize(QSize(24, 24));
+    m_sidebarButton->setCheckable(true);
+    m_sidebarButton->setChecked(true);
+    m_sidebarButton->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    m_sidebarButton->setToolTip(UiText::t("Show / hide folder sidebar", "フォルダーペインの表示切り替え"));
+    connect(m_sidebarButton, &QToolButton::toggled, this, &MainWindow::setSidebarVisible);
+    m_topToolbar->addWidget(m_sidebarButton);
 
     m_splitButton->setObjectName("toolbarIconButton");
     m_splitButton->setIcon(toolbarIcon("split"));

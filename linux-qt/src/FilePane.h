@@ -44,6 +44,7 @@ public:
     void setViewMode(bool iconMode);
     bool isIconMode() const { return m_iconMode; }
     void setActive(bool active);
+    void setFileListFont(const QFont &font);
     void setThemeColors(const QString &fileForeground, const QString &directoryForeground);
     void setGitStatusColors(const QHash<QString, QString> &labelColors);
     void setDropTargetColor(const QString &color);

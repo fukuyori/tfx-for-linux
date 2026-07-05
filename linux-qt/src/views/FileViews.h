@@ -51,6 +51,9 @@ public:
     {
         QStyleOptionViewItem adjusted(option);
         initStyleOption(&adjusted, index);
+        // Elide with the metrics of the font that is actually painted;
+        // stale widget metrics over-shorten long names.
+        adjusted.fontMetrics = QFontMetrics(adjusted.font);
 
         const auto *view = qobject_cast<const QTableView *>(parent());
         const QModelIndex current = view ? view->currentIndex() : QModelIndex();

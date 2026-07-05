@@ -152,6 +152,14 @@ terminal = "JetBrains Mono"
 terminalSize = 13
 ```
 
+Notes:
+
+- For the terminal, prefer a strictly monospaced family (for Nerd Fonts, the
+  "... Nerd Font Mono" variant) so TUI applications keep their column
+  alignment. Icon glyphs in the non-Mono variants occupy more than one cell.
+- The file-list font is applied as a widget font so text elision uses the
+  same metrics as the painted glyphs.
+
 ## Startup
 
 `[startup] layout` accepts `single`, `split`, or `restore`.

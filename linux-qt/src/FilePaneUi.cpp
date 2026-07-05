@@ -122,6 +122,9 @@ void FilePane::setupFileView()
     m_view->sortByColumn(0, Qt::AscendingOrder);
     m_view->setShowGrid(false);
     m_view->setFrameShape(QFrame::NoFrame);
+    // Word wrap would break long names at hyphens and show only the first
+    // fragment plus an ellipsis; elide at the column edge instead.
+    m_view->setWordWrap(false);
     m_view->setEditTriggers(QAbstractItemView::EditKeyPressed);
     m_view->setIconSize(QSize(18, 18));
     m_view->setItemDelegate(new FileItemDelegate(m_view));
@@ -183,6 +186,7 @@ void FilePane::setupSearchView()
     m_searchView->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_searchView->setSortingEnabled(true);
     m_searchView->setShowGrid(false);
+    m_searchView->setWordWrap(false);
     m_searchView->setFrameShape(QFrame::NoFrame);
     m_searchView->setIconSize(QSize(18, 18));
     m_searchView->setItemDelegate(new FileItemDelegate(m_searchView));
@@ -254,6 +258,7 @@ void FilePane::setupZipView()
     m_zipView->setSelectionMode(QAbstractItemView::SingleSelection);
     m_zipView->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_zipView->setShowGrid(false);
+    m_zipView->setWordWrap(false);
     m_zipView->setFrameShape(QFrame::NoFrame);
     m_zipView->setIconSize(QSize(18, 18));
     m_zipView->setItemDelegate(new FileItemDelegate(m_zipView));

@@ -375,6 +375,23 @@ void MainWindow::applyTerminalTheme()
         return QString("\n%1 { font-family: %2; font-size: %3px; }\n")
             .arg(selector, resolvedFamily).arg(resolvedSize);
     };
+    // The file-list font is also applied as a widget font: when only the
+    // stylesheet sets it, the item views elide text with the widget font's
+    // metrics while painting with the stylesheet font, over-shortening long
+    // names. Setting the identical font on the widgets keeps the metrics and
+    // the painted glyphs in sync.
+    {
+        const QString family = m_config.font.fileListFamily.isEmpty()
+            ? m_config.resolvedMonoFontFamily()
+            : m_config.font.fileListFamily;
+        const int pixelSize = m_config.font.fileListSize > 0
+            ? m_config.font.fileListSize
+            : m_config.font.size;
+        QFont fileListFont(family);
+        fileListFont.setPixelSize(pixelSize);
+        m_leftPane->setFileListFont(fileListFont);
+        m_rightPane->setFileListFont(fileListFont);
+    }
     styleSheet += paneFontRule("QTableView#fileTable, QListView#fileIcons",
                                m_config.font.fileListFamily, m_config.font.fileListSize);
     styleSheet += paneFontRule("QPlainTextEdit#previewCode, QTextBrowser#previewRendered",

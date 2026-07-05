@@ -128,6 +128,22 @@ void FilePane::setActive(bool active)
     }
 }
 
+void FilePane::setFileListFont(const QFont &font)
+{
+    // A real widget font (not a stylesheet rule) keeps the elision metrics in
+    // sync with the painted glyphs; see MainWindowTheme.
+    m_view->setFont(font);
+    if (m_iconView) {
+        m_iconView->setFont(font);
+    }
+    if (m_searchView) {
+        m_searchView->setFont(font);
+    }
+    if (m_zipView) {
+        m_zipView->setFont(font);
+    }
+}
+
 void FilePane::setThemeColors(const QString &fileForeground, const QString &directoryForeground)
 {
     m_fileForeground = fileForeground;

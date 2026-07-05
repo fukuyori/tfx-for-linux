@@ -2,6 +2,21 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.7.4] - 2026-07-06
+
+### Fixed
+
+- Long file names no longer get cut far short of the column edge: word wrap
+  in the details/search/ZIP views broke names at hyphens and showed only the
+  first fragment plus an ellipsis ("tfx-0.7.2-…"). Names now elide at the
+  column boundary, and the file-list font is applied as a widget font so the
+  elision metrics match the painted glyphs.
+- Startup no longer prints "Using a variable-width font in the terminal":
+  QTermWidget's constructor probes its own "Monospace" default before the
+  configured font is applied, and on CJK systems that resolves to a
+  dual-width font. The spurious constructor warning is filtered; a genuinely
+  variable-width configured font still warns.
+
 ## [0.7.3] - 2026-07-06
 
 ### Added

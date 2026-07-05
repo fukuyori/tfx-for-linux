@@ -492,9 +492,32 @@ void TerminalPane::sendControlCharacter(char code)
 }
 
 #ifdef TFX_HAVE_QTERMWIDGET
+namespace {
+
+QtMessageHandler s_termPreviousHandler = nullptr;
+
+void filterTermConstructionWarning(QtMsgType type, const QMessageLogContext &context, const QString &message)
+{
+    // QTermWidget's constructor applies its own "Monospace" default before
+    // our font is set; on CJK systems that resolves to a dual-width font and
+    // emits a spurious variable-width warning.
+    if (message.contains("variable-width font")) {
+        return;
+    }
+    if (s_termPreviousHandler) {
+        s_termPreviousHandler(type, context, message);
+    }
+}
+
+}
+
 void TerminalPane::createTermWidget()
 {
+    // Suppress the constructor's font warning only; a genuinely
+    // variable-width configured font still warns from setTerminalFont below.
+    s_termPreviousHandler = qInstallMessageHandler(filterTermConstructionWarning);
     m_term = new QTermWidget(0, this); // 0: do not start the shell yet
+    qInstallMessageHandler(s_termPreviousHandler);
     m_started = false;
     m_term->setTerminalFont(m_font);
 

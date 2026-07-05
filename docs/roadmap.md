@@ -1,6 +1,6 @@
 # tfx for Linux Roadmap
 
-Current version: **0.7.3**
+Current version: **0.7.4**
 
 This roadmap tracks the practical development steps for the Linux Qt port as it
 moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
@@ -226,3 +226,51 @@ Measured before/after; no behavior changes.
   app-side per-row work (the pane list is `QFileSystemModel`'s async native
   enumeration; proxy columns compute on demand for visible rows only). No
   remaining app-side hotspot identified on the load path. (done)
+
+## 0.7.0–0.7.2 — Toolbar, commands, and config parity (done)
+
+- Top toolbar: Back/Forward/Parent navigation, search box, and toggle buttons
+  for hidden files, sidebar, split, preview, icon view, terminal, and the
+  Command Output dock. (done)
+- Terminal pane: signal buttons (`^C`, `^\`, `^Z`), a directory-sync button,
+  and a tabbed layout with a live Output tab for user commands. (done)
+- `[[commands]]` full schema (`run`, `extensions`, `target`, `selection`,
+  `requireGit`, `terminal`, `shell`), with selection-aware context-menu
+  visibility and multi-line bodies as temporary scripts. (done)
+- Config parity with the tfx `config.toml` spec: extra `[colors]` /
+  `[opacity]` tokens, `[preview]` sections, and previously unbound documented
+  shortcuts wired. (done)
+
+## 0.7.3 — Multi-selection robustness and interaction parity (done)
+
+- Multi-selection survives model refreshes: selections are normalised back to
+  full rows after layout changes, operations derive rows from any selected
+  cell, and `ItemIsDragEnabled` flags keep a press on a selected row from
+  collapsing it, so multi-item copy/cut/trash/drag work reliably. Regression
+  suites `FileViewsSelectionTest` and `FilePaneSelectionTest` cover the
+  scenarios. (done)
+- Rubber-band selection from the file list's empty area. (done)
+- Clickable breadcrumb path in the pane header with ellipsis for long paths
+  and an edit mode. (done)
+- Conflict dialog "Apply to all" checkbox (from tfx macOS 0.8.8). (done)
+- Copies preserve modification/access times for files, directories, and
+  links (from tfx macOS 0.9.6). (done)
+- Terminal cwd sync resolves the active tmux pane (from tfx macOS 0.8.2). (done)
+- New Folder avoids name collisions with a numbered suffix. (done)
+
+## 0.7.4 — Display fixes (done)
+
+- Long names elide at the column edge instead of wrapping at hyphens and
+  showing only the first fragment; file-list fonts are applied as widget
+  fonts so elision metrics match the painted glyphs. (done)
+- The spurious QTermWidget "variable-width font" constructor warning is
+  filtered on CJK systems. (done)
+
+## Next: remaining macOS parity candidates
+
+- Allow copying a folder into its own subtree (macOS 0.9.5 permits the copy
+  with a source snapshot; only the move stays refused). The Linux port
+  currently refuses both.
+- Video preview in the preview pane.
+- Same-pane drop confirmation before duplicating (macOS 0.8.6).
+- Finder-style tags would need an xattr-based design; unscheduled.

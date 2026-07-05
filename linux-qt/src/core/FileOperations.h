@@ -14,6 +14,11 @@ bool copyRecursively(const QString &source, const QString &destination);
 // created.
 bool copySymbolicLink(const QString &source, const QString &destination);
 
+// Copy the access and modification times of `source` onto `destination`.
+// Symbolic links get the link's own times (not the target's). Creation time
+// cannot be set on Linux and is left as-is.
+bool copyTimestamps(const QString &source, const QString &destination);
+
 // True when transferring `sourcePath` (a real directory) into
 // `targetDirectory` would nest the directory inside itself. Both sides are
 // canonicalized so the check cannot be bypassed through symlinked paths.

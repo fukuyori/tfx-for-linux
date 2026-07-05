@@ -192,7 +192,11 @@ Qt::ItemFlags FileSystemProxyModel::flags(const QModelIndex &index) const
         return Qt::NoItemFlags;
     }
 
-    Qt::ItemFlags flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable;
+    // ItemIsDragEnabled matters beyond drag-and-drop itself: without it the
+    // base view treats a press on a selected row as the start of a rubber
+    // band and collapses the multi-selection on the first pixel of movement,
+    // instead of waiting for the drag threshold.
+    Qt::ItemFlags flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsDragEnabled;
     if (index.column() == ColumnName) {
         flags |= Qt::ItemIsEditable;
     }

@@ -19,7 +19,7 @@ QList<QUrl> FilePane::selectedUrls() const
 {
     QList<QUrl> urls;
     QSet<QString> seen;
-    QModelIndexList rows = m_view->selectionModel()->selectedRows();
+    QModelIndexList rows = selectedRowIndexes(m_view->selectionModel(), ColumnName);
     if (rows.isEmpty() && m_view->currentIndex().isValid()) {
         rows << m_view->currentIndex().sibling(m_view->currentIndex().row(), ColumnName);
     }
@@ -31,6 +31,29 @@ QList<QUrl> FilePane::selectedUrls() const
         }
     }
     return urls;
+}
+
+void FilePane::normalizeRowSelection()
+{
+    // Selection ranges lose the proxy's synthesised columns on model layout
+    // changes, leaving rows partially selected. Re-select the full rows so
+    // cell-level checks (Qt's ExtendedSelection press handling, context-menu
+    // hit tests) keep seeing the whole multi-selection.
+    QItemSelectionModel *selection = m_view->selectionModel();
+    if (!selection) {
+        return;
+    }
+    const QModelIndexList rows = selectedRowIndexes(selection, ColumnName);
+    if (rows.isEmpty()) {
+        return;
+    }
+    QItemSelection full;
+    for (const QModelIndex &row : rows) {
+        full.merge(rowSelection(row), QItemSelectionModel::Select);
+    }
+    if (full != selection->selection()) {
+        selection->select(full, QItemSelectionModel::ClearAndSelect);
+    }
 }
 
 QStringList FilePane::selectedLocalPaths() const
@@ -133,7 +156,7 @@ QModelIndex FilePane::currentSourceIndex() const
 {
     QModelIndex index = m_view->currentIndex();
     if (!index.isValid()) {
-        const QModelIndexList rows = m_view->selectionModel()->selectedRows();
+        const QModelIndexList rows = selectedRowIndexes(m_view->selectionModel(), ColumnName);
         if (!rows.isEmpty()) {
             index = rows.first();
         }
@@ -154,7 +177,7 @@ void FilePane::refreshGitStatuses()
 
 void FilePane::updatePreviewFromSelection()
 {
-    const QModelIndexList rows = m_view->selectionModel()->selectedRows();
+    const QModelIndexList rows = selectedRowIndexes(m_view->selectionModel(), ColumnName);
     if (rows.size() > 1) {
         QStringList paths;
         for (const QModelIndex &index : rows) {
@@ -203,7 +226,7 @@ void FilePane::updateStatusLine()
 
     const QModelIndex root = m_view->rootIndex();
     const int total = m_proxyModel->rowCount(root);
-    int selected = m_view->selectionModel()->selectedRows().size();
+    int selected = selectedRowIndexes(m_view->selectionModel()).size();
     if (selected == 0 && m_view->currentIndex().isValid()) {
         selected = 1;
     }

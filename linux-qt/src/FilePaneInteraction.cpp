@@ -17,11 +17,13 @@ bool FilePane::eventFilter(QObject *watched, QEvent *event)
         }
         if (event->type() == QEvent::FocusOut) {
             m_pathEdit->setText(displayPath(m_currentPath));
+            showBreadcrumb();
         }
         if (event->type() == QEvent::KeyPress) {
             auto *keyEvent = static_cast<QKeyEvent *>(event);
             if (keyEvent->key() == Qt::Key_Escape) {
                 m_pathEdit->setText(displayPath(m_currentPath));
+                showBreadcrumb();
                 m_view->setFocus();
                 return true;
             }

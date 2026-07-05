@@ -21,6 +21,8 @@
 #include <qtermwidget.h>
 
 #include <QElapsedTimer>
+#include <QFile>
+#include <QHash>
 #include <QProcess>
 #include <QThread>
 
@@ -347,9 +349,119 @@ void TerminalPane::openAt(const QString &path)
 #endif
 }
 
+#ifdef TFX_HAVE_QTERMWIDGET
+namespace {
+
+// Breadth-first search of /proc for a tmux client among the shell's
+// descendants. The shell's own cwd goes stale inside tmux, so the active
+// pane's path has to come from the tmux server instead.
+qint64 tmuxClientDescendant(qint64 shellPid)
+{
+    if (shellPid <= 0) {
+        return 0;
+    }
+    QMultiHash<qint64, qint64> children;
+    QHash<qint64, QString> comm;
+    const QStringList entries = QDir("/proc").entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    for (const QString &entry : entries) {
+        bool numeric = false;
+        const qint64 pid = entry.toLongLong(&numeric);
+        if (!numeric) {
+            continue;
+        }
+        QFile statFile(QString("/proc/%1/stat").arg(pid));
+        if (!statFile.open(QIODevice::ReadOnly)) {
+            continue;
+        }
+        const QByteArray stat = statFile.readAll();
+        // "pid (comm) state ppid ..." — comm may contain spaces/parens, so
+        // parse around the last ')'.
+        const int close = stat.lastIndexOf(')');
+        const int open = stat.indexOf('(');
+        if (open < 0 || close < open) {
+            continue;
+        }
+        const QList<QByteArray> tail = stat.mid(close + 2).split(' ');
+        if (tail.size() < 2) {
+            continue;
+        }
+        children.insert(tail.at(1).toLongLong(), pid);
+        comm.insert(pid, QString::fromUtf8(stat.mid(open + 1, close - open - 1)));
+    }
+
+    QList<qint64> queue = children.values(shellPid);
+    int guard = 0;
+    while (!queue.isEmpty() && guard++ < 256) {
+        const qint64 pid = queue.takeFirst();
+        if (comm.value(pid).startsWith("tmux")) {
+            return pid;
+        }
+        queue.append(children.values(pid));
+    }
+    return 0;
+}
+
+QString runTmux(const QStringList &arguments)
+{
+    QProcess tmux;
+    tmux.setStandardErrorFile(QProcess::nullDevice());
+    tmux.start("tmux", arguments);
+    if (!tmux.waitForStarted(500) || !tmux.waitForFinished(1000)) {
+        tmux.kill();
+        tmux.waitForFinished(200);
+        return QString();
+    }
+    if (tmux.exitStatus() != QProcess::NormalExit || tmux.exitCode() != 0) {
+        return QString();
+    }
+    return QString::fromLocal8Bit(tmux.readAllStandardOutput());
+}
+
+QString tmuxPaneDirectory(qint64 shellPid)
+{
+    const qint64 clientPid = tmuxClientDescendant(shellPid);
+    if (clientPid <= 0) {
+        return QString();
+    }
+    // Identify the client by its controlling tty, then ask for the active
+    // pane of that client's session. (`display-message -c` alone resolves
+    // formats against the caller's session, not the target client's.)
+    const QString tty = QFile::symLinkTarget(QString("/proc/%1/fd/0").arg(clientPid));
+    if (!tty.startsWith("/dev/")) {
+        return QString();
+    }
+    QString sessionId;
+    const QString clients = runTmux({"list-clients", "-F", "#{client_tty}\t#{session_id}"});
+    const QStringList lines = clients.split('\n', Qt::SkipEmptyParts);
+    for (const QString &line : lines) {
+        const int tab = line.indexOf('\t');
+        if (tab > 0 && line.left(tab) == tty) {
+            sessionId = line.mid(tab + 1);
+            break;
+        }
+    }
+    if (sessionId.isEmpty()) {
+        return QString();
+    }
+    const QString path =
+        runTmux({"display-message", "-t", sessionId, "-p", "-F", "#{pane_current_path}"}).trimmed();
+    return tfx::core::canonicalDirectoryPath(path);
+}
+
+}
+#endif
+
 QString TerminalPane::currentTerminalDirectory() const
 {
 #ifdef TFX_HAVE_QTERMWIDGET
+    if (m_term) {
+        // Inside tmux the shell's cwd is where the client was started; ask
+        // the tmux server for the active pane's directory instead.
+        const QString tmuxDirectory = tmuxPaneDirectory(m_term->getShellPID());
+        if (!tmuxDirectory.isEmpty()) {
+            return tmuxDirectory;
+        }
+    }
     const QString terminalDirectory = m_term ? m_term->workingDirectory() : QString();
     const QString directory = tfx::core::canonicalDirectoryPath(terminalDirectory);
     if (!directory.isEmpty()) {

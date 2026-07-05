@@ -21,7 +21,11 @@ using namespace tfx::platform;
 void FilePane::showFileContextMenu(const QPoint &point)
 {
     const QModelIndex clicked = m_view->indexAt(point);
-    if (clicked.isValid() && !m_view->selectionModel()->isSelected(clicked)) {
+    // Row-based hit test: the clicked cell may be a synthesised column that
+    // dropped out of the stored selection, and selectRow() would collapse the
+    // multi-selection.
+    if (clicked.isValid()
+        && !m_view->selectionModel()->rowIntersectsSelection(clicked.row(), clicked.parent())) {
         m_view->selectRow(clicked.row());
     }
 

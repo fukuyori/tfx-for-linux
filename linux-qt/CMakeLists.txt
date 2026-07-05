@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(tfx-for-linux VERSION 0.7.2 LANGUAGES CXX)
+project(tfx-for-linux VERSION 0.7.3 LANGUAGES CXX)
 
 include(GNUInstallDirs)
 include(CTest)
@@ -49,6 +49,8 @@ qt_add_executable(tfx
     src/models/FileColumns.h
     src/models/FileSystemProxyModel.cpp
     src/models/FileSystemProxyModel.h
+    src/views/BreadcrumbBar.cpp
+    src/views/BreadcrumbBar.h
     src/views/FileViews.cpp
     src/views/FileViews.h
     src/platform/Platform.h
@@ -284,6 +286,56 @@ if(BUILD_TESTING AND Qt6Test_FOUND)
     target_link_libraries(tfx_preview_security_test PRIVATE Qt6::Core Qt6::DBus Qt6::Gui Qt6::Widgets Qt6::Test)
     add_test(NAME preview_security COMMAND tfx_preview_security_test)
     set_tests_properties(preview_security PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+    qt_add_executable(tfx_file_views_selection_test
+        tests/FileViewsSelectionTest.cpp
+        src/views/FileViews.cpp
+        src/views/FileViews.h
+    )
+    target_include_directories(tfx_file_views_selection_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(tfx_file_views_selection_test PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Test)
+    add_test(NAME file_views_selection COMMAND tfx_file_views_selection_test)
+    set_tests_properties(file_views_selection PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+    qt_add_executable(tfx_file_pane_selection_test
+        tests/FilePaneSelectionTest.cpp
+        src/views/BreadcrumbBar.cpp
+        src/views/BreadcrumbBar.h
+        src/core/DelimitedText.cpp
+        src/core/FileOperations.cpp
+        src/core/FileOperationWorker.cpp
+        src/core/FileTypeInfo.cpp
+        src/core/PreviewText.cpp
+        src/core/GitService.cpp
+        src/core/SearchState.cpp
+        src/core/TabState.cpp
+        src/controllers/GitStatusController.cpp
+        src/models/ColumnLayout.cpp
+        src/models/FileSystemProxyModel.cpp
+        src/views/FileViews.cpp
+        ${TFX_PLATFORM_SOURCES}
+        src/AppConfig.cpp
+        src/FilePaneActions.cpp
+        src/FilePaneArchive.cpp
+        src/FilePaneClipboard.cpp
+        src/FilePaneCommands.cpp
+        src/FilePaneConnections.cpp
+        src/FilePaneColumns.cpp
+        src/FilePaneFileOps.cpp
+        src/FilePaneInteraction.cpp
+        src/FilePaneNavigation.cpp
+        src/FilePane.cpp
+        src/FilePane.h
+        src/FilePaneSearch.cpp
+        src/FilePaneState.cpp
+        src/FilePaneTabs.cpp
+        src/FilePaneUi.cpp
+        src/UiText.cpp
+    )
+    target_include_directories(tfx_file_pane_selection_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(tfx_file_pane_selection_test PRIVATE Qt6::Core Qt6::DBus Qt6::Gui Qt6::Widgets Qt6::Test)
+    add_test(NAME file_pane_selection COMMAND tfx_file_pane_selection_test)
+    set_tests_properties(file_pane_selection PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
     qt_add_executable(tfx_preview_text_test
         tests/PreviewTextTest.cpp

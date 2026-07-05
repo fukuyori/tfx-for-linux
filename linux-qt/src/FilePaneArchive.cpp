@@ -2,6 +2,7 @@
 #include "UiText.h"
 #include "core/FileOperations.h"
 #include "platform/Platform.h"
+#include "views/BreadcrumbBar.h"
 
 #include <QDir>
 #include <QEventLoop>
@@ -134,6 +135,9 @@ void FilePane::populateZipView()
 
     const QString internal = m_zipDir.isEmpty() ? QString() : "/" + m_zipDir.chopped(1);
     m_pathEdit->setText(displayPath(m_zipPath) + internal);
+    if (m_breadcrumb) {
+        m_breadcrumb->setStaticText(displayPath(m_zipPath) + internal);
+    }
 }
 
 void FilePane::exitZipMode()

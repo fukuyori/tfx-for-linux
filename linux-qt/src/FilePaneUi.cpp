@@ -5,6 +5,7 @@
 #include "core/TabState.h"
 #include "models/FileColumns.h"
 #include "platform/Platform.h"
+#include "views/BreadcrumbBar.h"
 #include "views/FileViews.h"
 
 #include <QAbstractItemModel>
@@ -59,7 +60,29 @@ QWidget *FilePane::createHeaderLayout()
     headerLayout->setContentsMargins(8, 4, 8, 4);
     headerLayout->setSpacing(8);
     headerLayout->addWidget(m_badgeLabel);
-    headerLayout->addWidget(m_pathEdit, 1);
+
+    // Breadcrumb by default; clicking its empty area switches to the
+    // editable path field, which returns on Esc, focus loss, or commit.
+    m_breadcrumb = new BreadcrumbBar(this);
+    m_pathStack = new QStackedWidget(this);
+    m_pathStack->addWidget(m_breadcrumb);
+    m_pathStack->addWidget(m_pathEdit);
+    m_pathStack->setCurrentWidget(m_breadcrumb);
+    m_pathStack->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    connect(m_breadcrumb, &BreadcrumbBar::pathClicked, this, [this](const QString &path) {
+        emit activated(this);
+        if (m_viewStack && m_zipView && m_viewStack->currentWidget() == m_zipView) {
+            exitZipMode();
+        }
+        navigateTo(path);
+        focusFileList();
+    });
+    connect(m_breadcrumb, &BreadcrumbBar::editRequested, this, [this]() {
+        emit activated(this);
+        m_pathStack->setCurrentWidget(m_pathEdit);
+        m_pathEdit->setFocus(Qt::MouseFocusReason);
+    });
+    headerLayout->addWidget(m_pathStack, 1);
 
     // Wrap the header row in a styled container so [colors] titleBar* can paint
     // the pane title bar background and track the active/inactive pane state.
@@ -122,12 +145,19 @@ void FilePane::setupFileView()
     const auto beginLayoutChange = [this]() { m_suppressColumnSave = true; };
     const auto endLayoutChange = [this]() {
         applySharedColumnLayout();
+        normalizeRowSelection();
         QTimer::singleShot(0, this, [this]() { m_suppressColumnSave = false; });
     };
     connect(m_proxyModel, &QAbstractItemModel::layoutAboutToBeChanged, this, beginLayoutChange);
     connect(m_proxyModel, &QAbstractItemModel::modelAboutToBeReset, this, beginLayoutChange);
     connect(m_proxyModel, &QAbstractItemModel::layoutChanged, this, endLayoutChange);
     connect(m_proxyModel, &QAbstractItemModel::modelReset, this, endLayoutChange);
+    connect(m_proxyModel, &QAbstractItemModel::rowsRemoved, this, [this]() {
+        normalizeRowSelection();
+    });
+    connect(m_proxyModel, &QAbstractItemModel::rowsInserted, this, [this]() {
+        normalizeRowSelection();
+    });
     connect(m_model, &QFileSystemModel::directoryLoaded, this, [this](const QString &) {
         applySharedColumnLayout();
     });

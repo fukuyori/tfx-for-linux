@@ -322,6 +322,7 @@ bool FileOperationWorker::copyFile(const QString &source, const QString &destina
     }
 
     QFile::setPermissions(destination, input.permissions());
+    tfx::core::copyTimestamps(source, destination);
     emitStep(destination);
     return true;
 }
@@ -351,6 +352,8 @@ bool FileOperationWorker::copyDirectory(const QString &source, const QString &de
             return false;
         }
     }
+    // After the children are written, so their writes do not bump the mtime.
+    tfx::core::copyTimestamps(source, destination);
     return true;
 }
 

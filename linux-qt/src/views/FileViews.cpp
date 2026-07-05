@@ -2,6 +2,7 @@
 
 #include <QDebug>
 #include <QFile>
+#include <QSet>
 #include <QStringList>
 #include <QTextStream>
 
@@ -60,4 +61,24 @@ QItemSelection rowSelection(const QModelIndex &index)
         return {};
     }
     return QItemSelection(index.sibling(index.row(), 0), index.sibling(index.row(), kColumnCount - 1));
+}
+
+QModelIndexList selectedRowIndexes(const QItemSelectionModel *selectionModel, int column)
+{
+    QModelIndexList rows;
+    if (!selectionModel || !selectionModel->model()) {
+        return rows;
+    }
+    QSet<QModelIndex> seen;
+    const QItemSelection ranges = selectionModel->selection();
+    for (const QItemSelectionRange &range : ranges) {
+        for (int row = range.top(); row <= range.bottom(); ++row) {
+            const QModelIndex index = selectionModel->model()->index(row, column, range.parent());
+            if (index.isValid() && !seen.contains(index)) {
+                seen.insert(index);
+                rows.append(index);
+            }
+        }
+    }
+    return rows;
 }

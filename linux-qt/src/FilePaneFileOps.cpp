@@ -3,6 +3,7 @@
 #include "UiText.h"
 #include "models/FileColumns.h"
 #include "platform/Platform.h"
+#include "views/FileViews.h"
 
 #include <QDir>
 #include <QFile>
@@ -21,7 +22,7 @@ void FilePane::renameSelected()
 {
     QModelIndex index = m_view->currentIndex();
     if (!index.isValid()) {
-        const QModelIndexList rows = m_view->selectionModel()->selectedRows();
+        const QModelIndexList rows = selectedRowIndexes(m_view->selectionModel(), ColumnName);
         if (!rows.isEmpty()) {
             index = rows.first();
         }
@@ -43,10 +44,19 @@ void FilePane::createFolder()
     if (name.isEmpty()) {
         return;
     }
-    QDir dir(m_currentPath);
-    if (!dir.mkdir(name)) {
-        QMessageBox::warning(this, "tfx", UiText::t("Could not create folder.", "フォルダを作成できませんでした。"));
+    // Avoid name collisions the same way new files do: an existing name gets
+    // a " 2", " 3", ... suffix instead of failing. Unlike files, folder names
+    // keep any "." as-is (no extension splitting).
+    const QDir dir(m_currentPath);
+    QString folderName = name;
+    for (int i = 2; QFileInfo::exists(dir.filePath(folderName)); ++i) {
+        folderName = QString("%1 %2").arg(name).arg(i);
     }
+    if (!dir.mkdir(folderName)) {
+        QMessageBox::warning(this, "tfx", UiText::t("Could not create folder.", "フォルダを作成できませんでした。"));
+        return;
+    }
+    setCurrentIndexForPath(dir.filePath(folderName));
     updateStatusLine();
 }
 

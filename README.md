@@ -1,7 +1,7 @@
 # tfx for Linux
 
 **Terminal-inspired interface File eXplorer for Linux**  
-Version: **0.7.2**
+Version: **0.7.3**
 
 English | [Japanese](README.ja.md)
 
@@ -68,7 +68,8 @@ test for the Linux Qt target.
 - Folder sidebar visibility toggle, collapse-all control, and startup visibility control
 - Single-pane and split-pane file list, with per-pane details and icon view modes
 - Dockable panes: the sidebar, both file panes, the preview, and the terminal can be rearranged, floated, or tabbed; toggling visibility splits the current window instead of resizing it
-- Range selection (click then Shift+click) and toggle selection (Ctrl+click)
+- Range selection (click then Shift+click), toggle selection (Ctrl+click), and rubber-band selection by dragging from the empty area
+- Clickable breadcrumb path in the pane header (each segment navigates to that ancestor; clicking the empty area switches to the editable path field)
 - Startup path handling: the left pane opens the command-line folder, or the current working directory when no folder is specified
 - Startup visibility control for preview, terminal, and folder sidebar
 - Startup window geometry via `--geometry` or `[startup] geometry`
@@ -76,16 +77,16 @@ test for the Linux Qt target.
 - Preview keyboard shortcuts for source/rendered switching and opening the current preview externally
 - Markdown preview with GitHub-style tables and local image embedding
 - Browse ZIP archives as folders (navigate in, open/extract entries)
-- Interactive terminal pane (QTermWidget) whose working directory follows the active pane; falls back to a simple command pane when unavailable
+- Interactive terminal pane (QTermWidget) whose working directory follows the active pane; falls back to a simple command pane when unavailable. The cwd sync button resolves the active tmux pane's directory when tmux is running inside the terminal
 - User-editable `config.toml` created under `~/.config/tfx/`, including window/pane transparency, per-pane fonts, and the terminal colour scheme
 - User-defined `[[commands]]` for the context menu/menu bar, token expansion, shortcut conflict warnings, and the Command Output dock
 - Window, dock layout, pane visibility, tab, and column setting restoration
 - Multi-tab file panes with close buttons, duplicate-tab suppression, tab
   context menu actions, and restored tab cleanup
-- File operations: open, open with (native chooser), rename, link, new file/folder, trash, background copy/cut/paste with progress/cancel, copy path; symbolic links are copied as links with their link text preserved
+- File operations: open, open with (native chooser), rename, link, new file/folder, trash, background copy/cut/paste with progress/cancel, copy path; symbolic links are copied as links with their link text preserved; copies keep permissions and modification times
 - Drag-and-drop of files and folders between panes and to/from external file managers (drop onto a folder to move, or hold Ctrl to copy)
 - Drag-and-drop target highlighting and immediate refresh of affected panes
-- Conflict handling for paste/drop operations with overwrite, skip, and rename choices; overwrite replaces the existing item atomically so a failed copy never destroys it
+- Conflict handling for paste/drop operations with overwrite, skip, and rename choices and an "Apply to all" checkbox for the rest of the batch; overwrite replaces the existing item atomically so a failed copy never destroys it
 - Clipboard-to-file paste for images, rich/plain text, URLs, CSV, and TSV, plus Paste as Plain Text
 - Recursive subfolder search: type a term and press Enter; results stream into a dedicated view and the search is cancelled when the pane changes folder
 - Search-result keyboard navigation, context menu actions, sortable result

@@ -9,6 +9,7 @@ class QListView;
 class GitStatusController;
 class QMenu;
 class QHBoxLayout;
+class BreadcrumbBar;
 
 #include "AppConfig.h"
 #include "core/FileOperationWorker.h"
@@ -133,6 +134,7 @@ private:
     QModelIndex currentSourceIndex() const;
     QFileInfo currentFileInfo() const;
     QStringList selectedLocalPaths() const;
+    void normalizeRowSelection();
     void refreshGitStatuses();
     void updatePreviewFromSelection();
     void updatePreviewFromSearchSelection();
@@ -140,6 +142,7 @@ private:
 
     // Navigation
     void commitPathEditor();
+    void showBreadcrumb();
     QString displayPath(const QString &path) const;
     void pushHistory(const QString &path);
     void selectProxyIndex(const QModelIndex &index);
@@ -198,6 +201,8 @@ private:
     QTableView *m_view;
     QLabel *m_badgeLabel;
     QLineEdit *m_pathEdit;
+    BreadcrumbBar *m_breadcrumb = nullptr;
+    QStackedWidget *m_pathStack = nullptr;
     QLabel *m_statusLabel;
     QWidget *m_titleBar = nullptr;
     QStackedWidget *m_viewStack = nullptr;

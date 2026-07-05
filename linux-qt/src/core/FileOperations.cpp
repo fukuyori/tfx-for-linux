@@ -6,6 +6,8 @@
 #include <QFileInfo>
 
 #include <climits>
+#include <fcntl.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 namespace tfx::core {
@@ -47,7 +49,22 @@ bool copySymbolicLink(const QString &source, const QString &destination)
         return false;
     }
     linkText.truncate(static_cast<int>(length));
-    return ::symlink(linkText.constData(), QFile::encodeName(destination).constData()) == 0;
+    if (::symlink(linkText.constData(), QFile::encodeName(destination).constData()) != 0) {
+        return false;
+    }
+    copyTimestamps(source, destination);
+    return true;
+}
+
+bool copyTimestamps(const QString &source, const QString &destination)
+{
+    struct stat st;
+    if (::lstat(QFile::encodeName(source).constData(), &st) != 0) {
+        return false;
+    }
+    const struct timespec times[2] = {st.st_atim, st.st_mtim};
+    const int flags = S_ISLNK(st.st_mode) ? AT_SYMLINK_NOFOLLOW : 0;
+    return ::utimensat(AT_FDCWD, QFile::encodeName(destination).constData(), times, flags) == 0;
 }
 
 bool renameWithinDirectory(const QString &directory, const QString &oldName, const QString &newName)

@@ -159,6 +159,25 @@ void MainWindow::applyTerminalTheme()
         QLineEdit#panePath[activePane="true"] {
             color: #63F28D;
         }
+        QToolButton#breadcrumbSegment {
+            color: #AEBBC5;
+            background: transparent;
+            border: 0;
+            padding: 0px 2px;
+            font-weight: 600;
+        }
+        QToolButton#breadcrumbSegment:hover {
+            color: #63F28D;
+            text-decoration: underline;
+        }
+        QLabel#breadcrumbSeparator {
+            color: #5B6770;
+            font-weight: 600;
+        }
+        QLabel#breadcrumbStatic {
+            color: #AEBBC5;
+            font-weight: 600;
+        }
         QLabel#paneStatus {
             background: #10161A;
             color: #B9C4CC;

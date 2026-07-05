@@ -2,6 +2,48 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.7.3] - 2026-07-06
+
+### Added
+
+- Clickable breadcrumb path in the pane header: each segment navigates to
+  that ancestor, long paths collapse leading segments behind an ellipsis, and
+  clicking the empty area switches to the editable path field (Esc, focus
+  loss, or commit returns to the breadcrumb). ZIP browsing shows a static
+  path.
+- Rubber-band selection: press on the empty area of the file list and drag
+  across rows to range-select them; Ctrl/Shift adds the band to the existing
+  selection. (QTableView's own band selection gives up when a corner of the
+  rectangle falls outside the rows.)
+- Conflict dialog "Apply to all" checkbox: the chosen action (overwrite /
+  skip / rename) is reused for the remaining conflicts of the same paste or
+  drop batch.
+- Copies now preserve modification and access times for files, directories,
+  and symbolic links (`utimensat`; directory times are set after their
+  contents so child writes do not bump them).
+- The terminal cwd sync button resolves the active tmux pane's directory
+  when tmux is running inside the terminal (client found via /proc, then
+  `list-clients` → session → `display-message`).
+- New Folder avoids name collisions like New File does: an existing name
+  gets a " 2", " 3", ... suffix (without extension splitting) instead of
+  failing, and the new folder is selected.
+
+### Fixed
+
+- Multi-selection no longer breaks after model refreshes: selection ranges
+  covering the proxy's synthesised columns did not survive layout changes
+  (sort, Git-status refresh, directory reload), leaving rows partially
+  selected so move/copy/trash/drag acted on only the current row. Selections
+  are now normalised back to full rows on model changes, operations derive
+  rows from any selected cell, and the row highlight spans the full row
+  again.
+- Missing `ItemIsDragEnabled` flags made the base view treat a press on a
+  selected row as the start of a rubber band, collapsing the multi-selection
+  on the first pixel of movement; dragging several items at once now works.
+- Ctrl+click multi-selection is covered by widget-level and FilePane-level
+  regression tests (`FileViewsSelectionTest`, `FilePaneSelectionTest`),
+  including survival across deferred click handling and model refreshes.
+
 ## [0.7.2] - 2026-07-05
 
 ### Added

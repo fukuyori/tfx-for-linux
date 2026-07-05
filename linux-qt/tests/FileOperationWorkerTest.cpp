@@ -9,9 +9,30 @@
 #include <QTemporaryDir>
 #include <QTextStream>
 
+#include <fcntl.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 namespace {
+bool setFileTimes(const QString &path, time_t seconds, bool onLinkItself = false)
+{
+    struct timespec times[2];
+    times[0].tv_sec = seconds;
+    times[0].tv_nsec = 0;
+    times[1] = times[0];
+    return ::utimensat(AT_FDCWD, QFile::encodeName(path).constData(), times,
+                       onLinkItself ? AT_SYMLINK_NOFOLLOW : 0) == 0;
+}
+
+time_t mtimeOf(const QString &path, bool onLinkItself = false)
+{
+    struct stat st;
+    const QByteArray encoded = QFile::encodeName(path);
+    const int result = onLinkItself ? ::lstat(encoded.constData(), &st)
+                                    : ::stat(encoded.constData(), &st);
+    return result == 0 ? st.st_mtim.tv_sec : -1;
+}
+
 bool makeSymlink(const QString &linkText, const QString &linkPath)
 {
     return ::symlink(QFile::encodeName(linkText).constData(),
@@ -79,6 +100,7 @@ private slots:
     void overwriteReplacesExistingDirectory();
     void overwriteMoveReplacesFileAndRemovesSource();
     void writeErrorFailsCopy();
+    void copyPreservesTimestamps();
 };
 
 void FileOperationWorkerTest::copiesDirectoryTrees()
@@ -423,6 +445,40 @@ void FileOperationWorkerTest::writeErrorFailsCopy()
 
     QCOMPARE(finishedSpy.count(), 0);
     QCOMPARE(failedSpy.count(), 1);
+}
+
+void FileOperationWorkerTest::copyPreservesTimestamps()
+{
+    QTemporaryDir temp;
+    QVERIFY(temp.isValid());
+
+    const QString sourceRoot = QDir(temp.path()).filePath("source");
+    const QString nestedRoot = QDir(sourceRoot).filePath("nested");
+    const QString filePath = QDir(nestedRoot).filePath("one.txt");
+    const QString linkPath = QDir(sourceRoot).filePath("link");
+    QVERIFY(QDir().mkpath(nestedRoot));
+    QVERIFY(writeTextFile(filePath, "one"));
+    QVERIFY(makeSymlink("nested/one.txt", linkPath));
+
+    // Back-date everything; directories last so creating entries does not
+    // bump them again.
+    QVERIFY(setFileTimes(filePath, 1600000000));
+    QVERIFY(setFileTimes(linkPath, 1610000000, true));
+    QVERIFY(setFileTimes(nestedRoot, 1620000000));
+    QVERIFY(setFileTimes(sourceRoot, 1630000000));
+
+    const QString destinationRoot = QDir(temp.path()).filePath("destination");
+    FileOperationWorker worker({{sourceRoot, destinationRoot, false}});
+    QSignalSpy finishedSpy(&worker, &FileOperationWorker::finished);
+    QSignalSpy failedSpy(&worker, &FileOperationWorker::failed);
+    worker.run();
+
+    QCOMPARE(failedSpy.count(), 0);
+    QCOMPARE(finishedSpy.count(), 1);
+    QCOMPARE(mtimeOf(QDir(destinationRoot).filePath("nested/one.txt")), time_t(1600000000));
+    QCOMPARE(mtimeOf(QDir(destinationRoot).filePath("link"), true), time_t(1610000000));
+    QCOMPARE(mtimeOf(QDir(destinationRoot).filePath("nested")), time_t(1620000000));
+    QCOMPARE(mtimeOf(destinationRoot), time_t(1630000000));
 }
 
 QTEST_MAIN(FileOperationWorkerTest)

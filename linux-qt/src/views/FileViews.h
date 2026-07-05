@@ -17,6 +17,7 @@
 #include <QPainter>
 #include <QPalette>
 #include <QPixmap>
+#include <QRubberBand>
 #include <QStyle>
 #include <QStyledItemDelegate>
 #include <QTableView>
@@ -32,6 +33,13 @@ void logSelectionState(const char *where, QTableView *view);
 
 // Selection covering the whole row of `index` across all logical columns.
 QItemSelection rowSelection(const QModelIndex &index);
+
+// One index (at `column`) per row that has any selected cell. Unlike
+// QItemSelectionModel::selectedRows(), this does not require every column of
+// the row to be selected: ranges covering the proxy's synthesised columns do
+// not survive model layout changes (sort, refresh), which would otherwise
+// make a multi-selection invisible to file operations.
+QModelIndexList selectedRowIndexes(const QItemSelectionModel *selectionModel, int column = 0);
 
 // Item delegate that paints the persistent selected-row / hover highlight.
 class FileItemDelegate : public QStyledItemDelegate
@@ -49,7 +57,11 @@ public:
         const int logicalRow = view ? view->property("currentSelectionRow").toInt() : -1;
         const bool currentRow = (logicalRow >= 0 && logicalRow == index.row())
             || (logicalRow < 0 && current.isValid() && current.row() == index.row());
-        const bool selected = adjusted.state.testFlag(QStyle::State_Selected) || currentRow;
+        // Highlight the full row even when a layout change dropped some
+        // columns from the stored selection range.
+        const bool rowSelected = view && view->selectionModel()
+            && view->selectionModel()->rowIntersectsSelection(index.row(), index.parent());
+        const bool selected = adjusted.state.testFlag(QStyle::State_Selected) || rowSelected || currentRow;
         const bool hovered = adjusted.state.testFlag(QStyle::State_MouseOver);
         if (selected || hovered) {
             painter->save();
@@ -133,19 +145,47 @@ protected:
         m_pressedIndex = indexAt(event->pos());
         m_pressedModifiers = event->modifiers();
         m_pressPos = event->pos();
+
+        const bool plain = !(event->modifiers() & (Qt::ControlModifier | Qt::ShiftModifier));
+        // A row counts as selected when any of its cells is: ranges lose the
+        // synthesised columns on model layout changes, and the pressed cell
+        // may be one of them. Base ExtendedSelection checks the exact cell
+        // and would otherwise clear the multi-selection on press, so repair
+        // the rows to full-width before the base class looks at them.
+        const bool rowSelected = event->button() == Qt::LeftButton
+            && m_pressedIndex.isValid() && selectionModel()
+            && selectionModel()->rowIntersectsSelection(m_pressedIndex.row(), m_pressedIndex.parent());
+        if (rowSelected && !selectionModel()->isSelected(m_pressedIndex)) {
+            QItemSelection full;
+            const QModelIndexList rows = selectedRowIndexes(selectionModel());
+            for (const QModelIndex &row : rows) {
+                full.merge(rowSelection(row), QItemSelectionModel::Select);
+            }
+            selectionModel()->select(full, QItemSelectionModel::Select);
+        }
+
         QTableView::mousePressEvent(event);
         logSelectionState("after base mousePress", this);
         if (event->button() != Qt::LeftButton) {
             return;
         }
 
+        if (!m_pressedIndex.isValid()) {
+            // Rubber-band selection from the empty area. QTableView's own
+            // setSelection() gives up when a band corner falls outside the
+            // rows, so the band is tracked and applied here. Ctrl/Shift keeps
+            // the existing selection and adds the band to it.
+            m_bandActive = true;
+            m_bandOrigin = event->pos();
+            m_bandBaseSelection = (plain || !selectionModel())
+                ? QItemSelection()
+                : selectionModel()->selection();
+            return;
+        }
         // Keep an existing multi-selection on a plain press so it can be dragged;
         // selection collapses on release if no drag happens.
-        const bool plain = !(event->modifiers() & (Qt::ControlModifier | Qt::ShiftModifier));
-        const bool alreadySelected = selectionModel() && m_pressedIndex.isValid()
-            && selectionModel()->isSelected(m_pressedIndex);
-        const bool multi = selectionModel() && selectionModel()->selectedRows().size() > 1;
-        if (plain && alreadySelected && multi) {
+        const bool multi = selectionModel() && selectedRowIndexes(selectionModel()).size() > 1;
+        if (plain && rowSelected && multi) {
             setProperty("currentSelectionRow", m_pressedIndex.row());
             return;
         }
@@ -156,6 +196,10 @@ protected:
 
     void mouseMoveEvent(QMouseEvent *event) override
     {
+        if (m_bandActive && (event->buttons() & Qt::LeftButton)) {
+            updateBandSelection(event->pos());
+            return;
+        }
         // Start a drag explicitly: the custom selection handling above otherwise
         // leaves the view in rubber-band mode instead of initiating a drag.
         if ((event->buttons() & Qt::LeftButton) && m_pressedIndex.isValid() && model() && selectionModel()
@@ -192,6 +236,16 @@ protected:
         if (event->button() != Qt::LeftButton) {
             return;
         }
+        if (m_bandActive) {
+            // End rubber-band selection; keep what the band selected.
+            m_bandActive = false;
+            m_bandBaseSelection = QItemSelection();
+            if (m_rubberBand) {
+                m_rubberBand->hide();
+            }
+            logSelectionState("after band release", this);
+            return;
+        }
         // For Ctrl/Shift the press already set the selection; re-applying on
         // release would toggle it back or rebuild the range. Only plain clicks
         // finalize here (collapse to the clicked row when no drag occurred).
@@ -207,6 +261,42 @@ protected:
     }
 
 private:
+    void updateBandSelection(const QPoint &pos)
+    {
+        if (!model() || !selectionModel()) {
+            return;
+        }
+        const QRect band = QRect(m_bandOrigin, pos).normalized();
+        if (!m_rubberBand) {
+            m_rubberBand = new QRubberBand(QRubberBand::Rectangle, viewport());
+        }
+        m_rubberBand->setGeometry(band);
+        m_rubberBand->show();
+
+        QItemSelection selection = m_bandBaseSelection;
+        const QModelIndex root = rootIndex();
+        const int rowCount = model()->rowCount(root);
+        if (rowCount > 0) {
+            // rowAt() returns -1 in the empty area past the last row (or above
+            // the first row when dragging up), so clamp the band edges to the
+            // row range they crossed.
+            int first = rowAt(band.top());
+            int last = rowAt(band.bottom());
+            if (first >= 0 || last >= 0) {
+                if (first < 0) {
+                    first = 0;
+                }
+                if (last < 0) {
+                    last = rowCount - 1;
+                }
+                selection.merge(QItemSelection(model()->index(first, 0, root),
+                                               model()->index(last, kColumnCount - 1, root)),
+                                QItemSelectionModel::Select);
+            }
+        }
+        selectionModel()->select(selection, QItemSelectionModel::ClearAndSelect);
+    }
+
     void updateDropHighlight(const QPoint &pos)
     {
         m_dropTarget = indexAt(pos);
@@ -255,7 +345,7 @@ private:
         if (!selectionModel() || !model()) {
             return {};
         }
-        const QModelIndexList rows = selectionModel()->selectedRows(0);
+        const QModelIndexList rows = selectedRowIndexes(selectionModel(), 0);
         if (rows.isEmpty()) {
             return {};
         }
@@ -336,6 +426,10 @@ private:
     QPoint m_pressPos;
     int m_anchorRow = -1;
     bool m_dropActive = false;
+    bool m_bandActive = false;
+    QPoint m_bandOrigin;
+    QItemSelection m_bandBaseSelection;
+    QRubberBand *m_rubberBand = nullptr;
 };
 
 // Icon-mode counterpart of FileTableView. Drag-out uses the base view's default

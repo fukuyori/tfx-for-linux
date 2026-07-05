@@ -4,6 +4,7 @@
 #include "core/FileOperations.h"
 
 #include <QApplication>
+#include <QCheckBox>
 #include <QClipboard>
 #include <QDir>
 #include <QFile>
@@ -32,24 +33,56 @@ bool pathOccupied(const QString &path)
     return info.isSymLink() || info.exists();
 }
 
-ConflictChoice askConflict(QWidget *parent, const QString &fileName)
+// Per-batch conflict prompt: the "apply to all" checkbox remembers the choice
+// for the remaining conflicts of the same paste/drop operation.
+class ConflictPrompt
 {
-    QMessageBox box(parent);
-    box.setWindowTitle(UiText::t("Name Conflict", "名前の衝突"));
-    box.setText(UiText::t("An item named \"%1\" already exists.", "\"%1\" はすでに存在します。").arg(fileName));
-    auto *overwrite = box.addButton(UiText::t("Overwrite", "上書き"), QMessageBox::DestructiveRole);
-    auto *skip = box.addButton(UiText::t("Skip", "スキップ"), QMessageBox::RejectRole);
-    auto *rename = box.addButton(UiText::t("Rename", "名前を変更"), QMessageBox::AcceptRole);
-    auto *cancel = box.addButton(QMessageBox::Cancel);
-    box.setDefaultButton(rename);
-    box.exec();
+public:
+    explicit ConflictPrompt(QWidget *parent)
+        : m_parent(parent)
+    {
+    }
 
-    if (box.clickedButton() == overwrite) return ConflictChoice::Overwrite;
-    if (box.clickedButton() == rename) return ConflictChoice::Rename;
-    if (box.clickedButton() == cancel) return ConflictChoice::Cancel;
-    if (box.clickedButton() == skip) return ConflictChoice::Skip;
-    return ConflictChoice::Cancel;
-}
+    ConflictChoice ask(const QString &fileName)
+    {
+        if (m_applyAll) {
+            return m_remembered;
+        }
+
+        QMessageBox box(m_parent);
+        box.setWindowTitle(UiText::t("Name Conflict", "名前の衝突"));
+        box.setText(UiText::t("An item named \"%1\" already exists.", "\"%1\" はすでに存在します。").arg(fileName));
+        auto *applyAll = new QCheckBox(UiText::t("Apply to all", "すべてに適用"), &box);
+        box.setCheckBox(applyAll);
+        auto *overwrite = box.addButton(UiText::t("Overwrite", "上書き"), QMessageBox::DestructiveRole);
+        auto *skip = box.addButton(UiText::t("Skip", "スキップ"), QMessageBox::RejectRole);
+        auto *rename = box.addButton(UiText::t("Rename", "名前を変更"), QMessageBox::AcceptRole);
+        auto *cancel = box.addButton(QMessageBox::Cancel);
+        box.setDefaultButton(rename);
+        box.exec();
+
+        ConflictChoice choice = ConflictChoice::Cancel;
+        if (box.clickedButton() == overwrite) {
+            choice = ConflictChoice::Overwrite;
+        } else if (box.clickedButton() == rename) {
+            choice = ConflictChoice::Rename;
+        } else if (box.clickedButton() == skip) {
+            choice = ConflictChoice::Skip;
+        } else if (box.clickedButton() == cancel) {
+            choice = ConflictChoice::Cancel;
+        }
+        if (applyAll->isChecked() && choice != ConflictChoice::Cancel) {
+            m_applyAll = true;
+            m_remembered = choice;
+        }
+        return choice;
+    }
+
+private:
+    QWidget *m_parent;
+    bool m_applyAll = false;
+    ConflictChoice m_remembered = ConflictChoice::Cancel;
+};
 
 bool looksLikeDelimitedText(const QString &text, QChar separator)
 {
@@ -171,6 +204,7 @@ void FilePane::performDrop(const QList<QUrl> &urls, Qt::DropAction action, const
     const QDir dir(targetDir);
     const QString targetCanonical = QFileInfo(targetDir).absoluteFilePath();
     QVector<FileOperationRequest> requests;
+    ConflictPrompt conflictPrompt(this);
 
     for (const QUrl &url : urls) {
         const QString source = url.toLocalFile();
@@ -197,7 +231,7 @@ void FilePane::performDrop(const QList<QUrl> &urls, Qt::DropAction action, const
         if (samePath && !move) {
             destination = uniquePathInDirectory(targetDir, sourceInfo.fileName());
         } else if (pathOccupied(destination)) {
-            const ConflictChoice choice = askConflict(this, sourceInfo.fileName());
+            const ConflictChoice choice = conflictPrompt.ask(sourceInfo.fileName());
             if (choice == ConflictChoice::Cancel) {
                 break;
             }
@@ -241,6 +275,7 @@ void FilePane::pasteClipboard(bool forceMove)
     const bool move = forceMove || mime->hasFormat("application/x-tfx-cut");
     if (mime->hasUrls()) {
         QVector<FileOperationRequest> requests;
+        ConflictPrompt conflictPrompt(this);
         for (const QUrl &url : mime->urls()) {
             const QString source = url.toLocalFile();
             if (source.isEmpty()) {
@@ -265,7 +300,7 @@ void FilePane::pasteClipboard(bool forceMove)
             if (samePath && !move) {
                 destination = uniquePathInDirectory(m_currentPath, sourceInfo.fileName());
             } else if (pathOccupied(destination)) {
-                const ConflictChoice choice = askConflict(this, sourceInfo.fileName());
+                const ConflictChoice choice = conflictPrompt.ask(sourceInfo.fileName());
                 if (choice == ConflictChoice::Cancel) {
                     break;
                 }

@@ -2,6 +2,7 @@
 #include "UiText.h"
 #include "core/TabState.h"
 #include "platform/Platform.h"
+#include "views/BreadcrumbBar.h"
 #include "views/FileViews.h"
 
 #include <QDir>
@@ -41,6 +42,9 @@ void FilePane::navigateTo(const QString &path, bool recordHistory)
 
     m_currentPath = nextPath;
     m_pathEdit->setText(displayPath(m_currentPath));
+    if (m_breadcrumb) {
+        m_breadcrumb->setPath(m_currentPath);
+    }
     if (!m_isSwitchingTabs) {
         updateCurrentTabPath(m_currentPath);
     }
@@ -137,6 +141,7 @@ void FilePane::commitPathEditor()
     const QString path = m_pathEdit->text().trimmed();
     if (path.isEmpty()) {
         m_pathEdit->setText(displayPath(m_currentPath));
+        showBreadcrumb();
         return;
     }
     const QString expandedPath = path == "~"
@@ -144,6 +149,15 @@ void FilePane::commitPathEditor()
         : (path.startsWith("~/") ? QDir::home().filePath(path.mid(2)) : path);
     navigateTo(expandedPath);
     m_pathEdit->setText(displayPath(m_currentPath));
+    showBreadcrumb();
+    focusFileList();
+}
+
+void FilePane::showBreadcrumb()
+{
+    if (m_pathStack && m_breadcrumb) {
+        m_pathStack->setCurrentWidget(m_breadcrumb);
+    }
 }
 
 QString FilePane::displayPath(const QString &path) const

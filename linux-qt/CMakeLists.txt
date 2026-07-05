@@ -159,12 +159,33 @@ set(CPACK_PACKAGE_CHECKSUM SHA256)
 set(CPACK_STRIP_FILES ON)
 # Debian: resolve shared-library dependencies from the built binary; the
 # archive/preview helper tools are runtime-optional, so they are Recommends.
-set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+# Name the .deb tfx-<version>-Linux_<arch>.deb to match the tar.gz naming.
+find_program(DPKG_EXECUTABLE dpkg)
+if(DPKG_EXECUTABLE)
+    execute_process(COMMAND ${DPKG_EXECUTABLE} --print-architecture
+                    OUTPUT_VARIABLE TFX_DEB_ARCH
+                    OUTPUT_STRIP_TRAILING_WHITESPACE)
+endif()
+if(NOT TFX_DEB_ARCH)
+    set(TFX_DEB_ARCH "amd64")
+endif()
+set(CPACK_DEBIAN_FILE_NAME "tfx-${PROJECT_VERSION}-Linux_${TFX_DEB_ARCH}.deb")
 set(CPACK_DEBIAN_PACKAGE_SECTION "utils")
 set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
 set(CPACK_DEBIAN_PACKAGE_RECOMMENDS "zip, unzip, poppler-utils")
-set(CPACK_RPM_FILE_NAME RPM-DEFAULT)
+# RPM: match the tar.gz / deb naming (tfx-<version>-Linux_<arch>.rpm).
+execute_process(COMMAND uname -m
+                OUTPUT_VARIABLE TFX_RPM_ARCH
+                OUTPUT_STRIP_TRAILING_WHITESPACE)
+if(NOT TFX_RPM_ARCH)
+    set(TFX_RPM_ARCH "x86_64")
+endif()
+set(CPACK_RPM_FILE_NAME "tfx-${PROJECT_VERSION}-Linux_${TFX_RPM_ARCH}.rpm")
 set(CPACK_RPM_PACKAGE_GROUP "Applications/File")
+# tar.gz: the Archive generator uses CPACK_PACKAGE_FILE_NAME; the deb/rpm
+# generators override it with their own *_FILE_NAME set above, so this only
+# affects the tar.gz and its checksum.
+set(CPACK_PACKAGE_FILE_NAME "tfx-${PROJECT_VERSION}-Linux_${TFX_RPM_ARCH}")
 include(CPack)
 
 if(BUILD_TESTING AND Qt6Test_FOUND)

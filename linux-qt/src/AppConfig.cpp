@@ -240,10 +240,10 @@ QString AppConfig::defaultConfigText()
         "\n"
         "# [[commands]]\n"
         "# name = \"Open in VS Code\"\n"
-        "# command = \"code {paths}\"\n"
+        "# run = \"code {paths}\"\n"
         "# shortcut = \"ctrl+shift+o\"\n"
-        "# requiresSelection = true\n"
-        "# showOutput = false\n");
+        "# target = \"any\"\n"
+        "# terminal = false\n");
 }
 
 QString AppConfig::stripComment(const QString &line)
@@ -538,15 +538,30 @@ void AppConfig::applyValue(const QString &section, const QString &key, const QSt
         }
 
         UserCommand &command = commands.last();
-        if (key == "requiresSelection" || key == "showOutput") {
-            if (value == "true") {
-                if (key == "requiresSelection") command.requiresSelection = true;
-                else command.showOutput = true;
-            } else if (value == "false") {
-                if (key == "requiresSelection") command.requiresSelection = false;
-                else command.showOutput = false;
-            } else {
+        if (key == "requiresSelection" || key == "showOutput"
+            || key == "requireGit" || key == "terminal") {
+            if (value != "true" && value != "false") {
                 addWarning(lineNumber, QString("Invalid boolean value for command %1").arg(key));
+                return;
+            }
+            const bool flag = value == "true";
+            if (key == "requiresSelection") command.requiresSelection = flag;
+            else if (key == "showOutput") command.showOutput = flag;
+            else if (key == "requireGit") command.requireGit = flag;
+            else command.terminal = flag;
+            return;
+        }
+
+        if (key == "extensions") {
+            bool ok = false;
+            QStringList values = parseStringArray(value, &ok);
+            if (!ok) {
+                addWarning(lineNumber, "Invalid extensions value");
+                return;
+            }
+            command.extensions.clear();
+            for (const QString &entry : values) {
+                command.extensions << entry.trimmed().toLower();
             }
             return;
         }
@@ -558,8 +573,11 @@ void AppConfig::applyValue(const QString &section, const QString &key, const QSt
             return;
         }
         if (key == "name") command.name = text;
-        else if (key == "command") command.command = text;
+        else if (key == "run" || key == "command") command.run = text;
         else if (key == "shortcut") command.shortcut = normalizedShortcut(text);
+        else if (key == "target") command.target = text.trimmed().toLower();
+        else if (key == "selection") command.selection = text.trimmed().toLower();
+        else if (key == "shell") command.shell = text;
         else if (key == "workingDirectory") command.workingDirectory = text;
         else addWarning(lineNumber, QString("Unknown command key: %1").arg(key));
     }

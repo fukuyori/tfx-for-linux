@@ -138,6 +138,10 @@ void MainWindow::setCommandOutputVisible(bool visible)
         const QSignalBlocker blocker(m_commandOutputAction);
         m_commandOutputAction->setChecked(visible);
     }
+    if (m_commandOutputButton && m_commandOutputButton->isChecked() != visible) {
+        const QSignalBlocker blocker(m_commandOutputButton);
+        m_commandOutputButton->setChecked(visible);
+    }
     if (!m_isRestoringSettings) {
         saveSettings();
     }

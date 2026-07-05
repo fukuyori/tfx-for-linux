@@ -74,6 +74,11 @@ signals:
                             const QString &stdoutText,
                             const QString &stderrText,
                             bool reveal);
+    // Streaming counterparts for commands with terminal = true: output flows to
+    // the terminal pane's Output tab as it arrives.
+    void terminalCommandStarted(const QString &header);
+    void terminalCommandOutput(const QString &chunk);
+    void terminalCommandFinished(const QString &footer);
 
 public slots:
     void goUp();

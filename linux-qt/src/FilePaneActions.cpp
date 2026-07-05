@@ -31,8 +31,9 @@ void FilePane::showFileContextMenu(const QPoint &point)
     const bool isZip = hasSelection && info.suffix().compare("zip", Qt::CaseInsensitive) == 0;
 
     QMenu menu(this);
-    menu.addAction(UiText::t("Open", "開く"), this, &FilePane::openSelected)->setEnabled(hasSelection);
 
+    // Group 1 — Open
+    menu.addAction(UiText::t("Open", "開く"), this, &FilePane::openSelected)->setEnabled(hasSelection);
     if (hasSelection && !isDirectory) {
         auto *openWith = menu.addMenu(UiText::t("Open With", "このアプリケーションで開く"));
         openWith->addAction(UiText::t("Default Application", "既定のアプリケーション"), this, &FilePane::openSelected);
@@ -59,9 +60,29 @@ void FilePane::showFileContextMenu(const QPoint &point)
         openWith->addAction(UiText::t("Other...", "その他..."), this, &FilePane::openWithCustomApplication);
     }
 
-    menu.addSeparator();
-    menu.addAction(UiText::t("Move to Trash", "ゴミ箱へ移動"), this, &FilePane::moveSelectedToTrash)->setEnabled(hasSelection);
+    // Group 2 — User commands (flat), right after Open
+    addUserCommandActions(&menu, hasSelection);
 
+    // Group 3 — Edit / manipulate
+    menu.addSeparator();
+    menu.addAction(UiText::t("Rename", "名前を変更"), this, &FilePane::renameSelected)->setEnabled(hasSelection);
+    menu.addAction(UiText::t("Create Link", "リンクを作成"), this, &FilePane::createLinkForSelection)->setEnabled(hasSelection);
+    menu.addAction(UiText::t("Compress to Zip", "zip に圧縮"), this, &FilePane::compressSelectedItemsToZip)->setEnabled(hasSelection);
+    if (isZip) {
+        menu.addAction(UiText::t("Extract Zip", "zip を展開"), this, &FilePane::extractSelectedZip);
+    }
+
+    // Group 3 — Clipboard
+    menu.addSeparator();
+    menu.addAction(UiText::t("Copy Items", "項目をコピー"), this, &FilePane::copySelected)->setEnabled(hasSelection);
+    menu.addAction(UiText::t("Cut Items", "項目をカット"), this, &FilePane::cutSelected)->setEnabled(hasSelection);
+    menu.addAction(UiText::t("Paste Here", "ここにペースト"), this, &FilePane::pasteIntoCurrentDirectory)
+        ->setEnabled(tfx::filepane::clipboardCanPaste(QApplication::clipboard()->mimeData()));
+    menu.addAction(UiText::t("Paste as Plain Text", "プレーンテキストとしてペースト"), this, &FilePane::pasteClipboardAsPlainText)
+        ->setEnabled(QApplication::clipboard()->mimeData()->hasText());
+
+    // Group 4 — Tags
+    menu.addSeparator();
     auto *tagsMenu = menu.addMenu(UiText::t("Tags", "タグ"));
     tagsMenu->addAction(UiText::t("Add Custom Tag...", "カスタムタグを追加..."))->setEnabled(false);
     tagsMenu->addSeparator();
@@ -73,24 +94,12 @@ void FilePane::showFileContextMenu(const QPoint &point)
     tagsMenu->addAction("Purple")->setEnabled(false);
     tagsMenu->addAction("Gray")->setEnabled(false);
 
-    menu.addSeparator();
-    menu.addAction(UiText::t("Rename", "名前を変更"), this, &FilePane::renameSelected)->setEnabled(hasSelection);
-    menu.addAction(UiText::t("Create Link", "リンクを作成"), this, &FilePane::createLinkForSelection)->setEnabled(hasSelection);
-    menu.addAction(UiText::t("Compress to Zip", "zip に圧縮"), this, &FilePane::compressSelectedItemsToZip)->setEnabled(hasSelection);
-    if (isZip) {
-        menu.addAction(UiText::t("Extract Zip", "zip を展開"), this, &FilePane::extractSelectedZip);
-    }
-    menu.addAction(UiText::t("Copy Items", "項目をコピー"), this, &FilePane::copySelected)->setEnabled(hasSelection);
-    menu.addAction(UiText::t("Cut Items", "項目をカット"), this, &FilePane::cutSelected)->setEnabled(hasSelection);
-    menu.addAction(UiText::t("Paste Here", "ここにペースト"), this, &FilePane::pasteIntoCurrentDirectory)
-        ->setEnabled(tfx::filepane::clipboardCanPaste(QApplication::clipboard()->mimeData()));
-    menu.addAction(UiText::t("Paste as Plain Text", "プレーンテキストとしてペースト"), this, &FilePane::pasteClipboardAsPlainText)
-        ->setEnabled(QApplication::clipboard()->mimeData()->hasText());
-
+    // Group 5 — Location
     menu.addSeparator();
     menu.addAction(UiText::t("Reveal in File Manager", "ファイルマネージャで表示"), this, &FilePane::revealSelectionInFileManager)->setEnabled(hasSelection);
     menu.addAction(UiText::t("Copy Path", "パスをコピー"), this, &FilePane::copySelectedPaths)->setEnabled(hasSelection);
 
+    // Group 6 — Folder actions
     if (isDirectory) {
         menu.addSeparator();
         menu.addAction(UiText::t("Pin Folder", "フォルダをピン留め"), this, [this, info]() {
@@ -99,7 +108,9 @@ void FilePane::showFileContextMenu(const QPoint &point)
         menu.addAction(UiText::t("Open Terminal Here", "ここでターミナルを開く"), this, &FilePane::openTerminalHere);
     }
 
-    addUserCommandActions(&menu, hasSelection);
+    // Group 7 — Destructive
+    menu.addSeparator();
+    menu.addAction(UiText::t("Move to Trash", "ゴミ箱へ移動"), this, &FilePane::moveSelectedToTrash)->setEnabled(hasSelection);
 
     menu.exec(m_view->viewport()->mapToGlobal(point));
 }

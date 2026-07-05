@@ -192,6 +192,11 @@ void TerminalPane::beginCommandOutput(const QString &header)
     if (!header.isEmpty()) {
         m_outputView->appendPlainText(header);
     }
+    // Start the command's output on its own line, below the header.
+    QTextCursor cursor = m_outputView->textCursor();
+    cursor.movePosition(QTextCursor::End);
+    cursor.insertText(QStringLiteral("\n"));
+    m_outputView->setTextCursor(cursor);
     showOutputTab();
     m_outputView->ensureCursorVisible();
 }

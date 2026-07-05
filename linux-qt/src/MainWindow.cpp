@@ -157,6 +157,16 @@ MainWindow::MainWindow(const QString &initialPath, const QString &geometryOverri
                 setCommandOutputVisible(true);
             }
         });
+        connect(pane, &FilePane::terminalCommandStarted, this, [this](const QString &header) {
+            setTerminalVisible(true);
+            m_terminalPane->beginCommandOutput(header);
+        });
+        connect(pane, &FilePane::terminalCommandOutput, this, [this](const QString &chunk) {
+            m_terminalPane->appendCommandOutput(chunk);
+        });
+        connect(pane, &FilePane::terminalCommandFinished, this, [this](const QString &footer) {
+            m_terminalPane->endCommandOutput(footer);
+        });
     };
     wirePane(m_leftPane);
     wirePane(m_rightPane);

@@ -123,10 +123,10 @@ quit = "ctrl+q"
 
 # [[commands]]
 # name = "Open in VS Code"
-# command = "code {paths}"
+# run = "code {paths}"
 # shortcut = "ctrl+shift+o"
-# requiresSelection = true
-# showOutput = false
+# target = "any"
+# terminal = false
 ```
 
 ## Fonts
@@ -245,34 +245,56 @@ The terminal font is set with `[font] terminal` / `terminalSize` (see Fonts).
 ## User Commands
 
 `[[commands]]` adds custom commands to the menu bar and file-list context menu.
-Commands run through `/bin/sh -c` with the current pane directory as the default
-working directory. Runs are recorded in the Command Output dock; commands with
-`showOutput = true` and failed commands automatically reveal that dock.
+A command is shown in the context menu only when the current selection matches
+its `target` / `selection` / `extensions` / `requireGit` filters. Each command
+runs in its own process whose working directory is the parent folder of the
+first selected item (or the pane's current folder for `target = "current"` and
+empty selections).
 
 ```toml
 [[commands]]
 name = "Count Lines"
-command = "wc -l {paths}"
+run = "wc -l {paths}"
+target = "file"
+selection = "single"
+extensions = ["txt", "md"]
+terminal = true
 shortcut = "ctrl+shift+l"
-requiresSelection = true
-showOutput = true
+
+[[commands]]
+name = "Git Pull"
+run = "git pull --ff-only"
+target = "current"
+requireGit = true
+terminal = true
 
 [[commands]]
 name = "Open Config Scripts"
-command = "xdg-open {scripts}"
-requiresSelection = false
-showOutput = false
+run = "xdg-open {scripts}"
+target = "current"
 ```
 
 Supported fields:
 
-- `name` — menu label.
-- `command` — shell command to run.
+- `name` — menu label. **Required.**
+- `run` — command line or multi-line script body. **Required.** (`command` is
+  accepted as a legacy alias.) A multi-line `run` is written to a temporary
+  script file and executed through `shell`.
+- `extensions` — array of matching file extensions, lowercase and without the
+  dot (e.g. `["txt", "md"]`). Empty or `["*"]` matches all files.
+- `target` — `file`, `folder`, `current`, or `any` (default `any`). `file` /
+  `folder` require the selection to be entirely files / folders; `current`
+  operates on the pane folder regardless of selection.
+- `selection` — `single`, `multiple`, or `any` (default `any`). Ignored when
+  `target = "current"`.
+- `requireGit` — `true` to show the command only inside a Git work tree.
+  Default `false`.
+- `terminal` — `true` streams stdout/stderr live to the terminal pane's
+  **Output** tab. `false` (default) captures output quietly into the Command
+  Output dock as browsable history (revealed automatically only on failure).
 - `shortcut` — optional keyboard shortcut. Conflicts with built-in shortcuts or
   other commands are reported as configuration warnings.
-- `workingDirectory` — optional directory, defaulting to `{cwd}`.
-- `requiresSelection` — `true` by default. Set `false` for folder-level commands.
-- `showOutput` — `true` by default. Failures always show output.
+- `shell` — shell used to run the command. Defaults to `$SHELL`, then `/bin/sh`.
 
 Supported tokens:
 

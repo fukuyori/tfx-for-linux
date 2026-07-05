@@ -88,6 +88,14 @@ QIcon toolbarIcon(const QString &kind)
                 painter.drawRoundedRect(QRectF(8 + col * 9, 8 + row * 9, 7, 7), 1.5, 1.5);
             }
         }
+    } else if (kind == "output") {
+        painter.drawRoundedRect(QRectF(6, 8, 20, 16), 2, 2);
+        QPen line(QColor("#D9E1E8"), 1.6);
+        line.setCapStyle(Qt::RoundCap);
+        painter.setPen(line);
+        painter.drawLine(QPointF(10, 13), QPointF(22, 13));
+        painter.drawLine(QPointF(10, 16), QPointF(19, 16));
+        painter.drawLine(QPointF(10, 19), QPointF(22, 19));
     } else if (kind == "terminal") {
         painter.drawRoundedRect(QRectF(6, 8, 20, 16), 2, 2);
         QPen prompt(QColor("#63F28D"), 2);
@@ -178,7 +186,7 @@ void MainWindow::buildActions()
     QMenu *commandMenu = nullptr;
     for (int i = 0; i < m_config.commands.size(); ++i) {
         const UserCommand &command = m_config.commands.at(i);
-        if (command.name.trimmed().isEmpty() || command.command.trimmed().isEmpty()) {
+        if (command.name.trimmed().isEmpty() || command.run.trimmed().isEmpty()) {
             continue;
         }
         if (!hasCommandMenu) {
@@ -323,4 +331,14 @@ void MainWindow::buildTopToolbar()
     m_terminalButton->setToolTip(UiText::t("Show / hide terminal", "ターミナルを表示 / 非表示"));
     connect(m_terminalButton, &QToolButton::toggled, this, &MainWindow::setTerminalVisible);
     m_topToolbar->addWidget(m_terminalButton);
+
+    m_commandOutputButton = new QToolButton(this);
+    m_commandOutputButton->setObjectName("toolbarIconButton");
+    m_commandOutputButton->setIcon(toolbarIcon("output"));
+    m_commandOutputButton->setIconSize(QSize(24, 24));
+    m_commandOutputButton->setCheckable(true);
+    m_commandOutputButton->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    m_commandOutputButton->setToolTip(UiText::t("Show / hide command output", "コマンド出力を表示 / 非表示"));
+    connect(m_commandOutputButton, &QToolButton::toggled, this, &MainWindow::setCommandOutputVisible);
+    m_topToolbar->addWidget(m_commandOutputButton);
 }

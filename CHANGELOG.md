@@ -2,6 +2,28 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.7.1] - 2026-07-05
+
+### Added
+
+- User-defined commands now follow the fuller `[[commands]]` schema: `run`,
+  `extensions`, `target` (file/folder/current/any), `selection`
+  (single/multiple/any), `requireGit`, `terminal`, and `shell`. Commands appear
+  in the context menu only when the current selection matches their filters, and
+  multi-line `run` bodies execute as temporary shell scripts.
+- Commands with `terminal = true` stream their output live to the terminal
+  pane's Output tab; `terminal = false` records output quietly in the Command
+  Output dock (revealed on failure).
+- Toolbar toggle button for the Command Output dock.
+
+### Changed
+
+- Context menu regrouped into a standard order with clearer separators;
+  user-defined commands are listed flat, directly under Open.
+- The Command Output dock's history and output areas are now resizable via a
+  draggable splitter, and its detail view omits the redundant command / working
+  directory / exit lines.
+
 ## [0.7.0] - 2026-07-05
 
 ### Added

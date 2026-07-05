@@ -8,8 +8,16 @@
 struct UserCommand
 {
     QString name;
-    QString command;
+    QString run;                    // command line or multi-line script body
     QString shortcut;
+    QStringList extensions;         // lowercase, no dot; empty or {"*"} = all
+    QString target = "any";         // file | folder | current | any
+    QString selection = "any";      // single | multiple | any
+    bool requireGit = false;        // show only inside a Git work tree
+    bool terminal = false;          // stream output to the terminal Output tab
+    QString shell;                  // empty => $SHELL, then /bin/sh
+
+    // Legacy fields kept until the execution model adopts the fields above.
     QString workingDirectory = "{cwd}";
     bool requiresSelection = true;
     bool showOutput = true;

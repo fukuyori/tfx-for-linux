@@ -6,6 +6,7 @@
 #include <QLabel>
 #include <QListWidget>
 #include <QPushButton>
+#include <QSplitter>
 #include <QTextEdit>
 #include <QVBoxLayout>
 
@@ -17,8 +18,7 @@ CommandOutputPane::CommandOutputPane(QWidget *parent)
 {
     setObjectName("commandOutputPane");
     m_historyList->setObjectName("commandHistoryList");
-    m_historyList->setMinimumHeight(92);
-    m_historyList->setMaximumHeight(150);
+    m_historyList->setMinimumHeight(48);
 
     m_summaryLabel->setObjectName("sectionLabel");
     m_summaryLabel->setText(UiText::t("No command output yet.", "コマンド出力はまだありません。"));
@@ -34,17 +34,32 @@ CommandOutputPane::CommandOutputPane(QWidget *parent)
         m_outputText->clear();
     });
 
+    // The output section (summary + text) forms the lower half so the whole
+    // group can be resized against the history list via the splitter handle.
+    auto *outputSection = new QWidget(this);
+    auto *outputLayout = new QVBoxLayout(outputSection);
+    outputLayout->setContentsMargins(0, 0, 0, 0);
+    outputLayout->setSpacing(6);
     auto *headerLayout = new QHBoxLayout();
     headerLayout->setContentsMargins(0, 0, 0, 0);
     headerLayout->addWidget(m_summaryLabel, 1);
     headerLayout->addWidget(clearButton);
+    outputLayout->addLayout(headerLayout);
+    outputLayout->addWidget(m_outputText, 1);
+
+    auto *splitter = new QSplitter(Qt::Vertical, this);
+    splitter->setObjectName("commandOutputSplitter");
+    splitter->addWidget(m_historyList);
+    splitter->addWidget(outputSection);
+    splitter->setStretchFactor(0, 0);
+    splitter->setStretchFactor(1, 1);
+    splitter->setChildrenCollapsible(false);
+    splitter->setSizes({120, 300});
 
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(8, 8, 8, 8);
     layout->setSpacing(6);
-    layout->addWidget(m_historyList);
-    layout->addLayout(headerLayout);
-    layout->addWidget(m_outputText, 1);
+    layout->addWidget(splitter, 1);
 
     connect(m_historyList, &QListWidget::currentRowChanged, this, &CommandOutputPane::showEntry);
 }
@@ -65,10 +80,7 @@ void CommandOutputPane::appendOutput(const QString &name,
     auto *item = new QListWidgetItem(QString("[%1] %2 (%3)").arg(time, name, status), m_historyList);
 
     QString details;
-    details += UiText::t("Command: %1\n", "コマンド: %1\n").arg(name);
-    details += UiText::t("Working directory: %1\n", "作業ディレクトリ: %1\n").arg(workingDirectory);
-    details += UiText::t("Exit: %1\n", "終了: %1\n").arg(status);
-    details += "\n$ " + commandLine + "\n\n";
+    details += "$ " + commandLine + "\n\n";
     if (!stdoutText.trimmed().isEmpty()) {
         details += "stdout\n------\n" + stdoutText.trimmed() + "\n\n";
     }

@@ -78,6 +78,7 @@ private:
     QToolButton *m_terminalButton = nullptr;
     QToolButton *m_hiddenButton = nullptr;
     QToolButton *m_sidebarButton = nullptr;
+    QToolButton *m_commandOutputButton = nullptr;
     QWidget *m_sidebar;
     QAction *m_splitAction = nullptr;
     QAction *m_sidebarAction = nullptr;

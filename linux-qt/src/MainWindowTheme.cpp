@@ -31,6 +31,11 @@ void MainWindow::applyTerminalTheme()
         }
         QMenu::item { padding: 5px 22px 5px 18px; }
         QMenu::item:selected { background: #243947; color: #FFFFFF; }
+        QMenu::separator {
+            height: 1px;
+            background: #4A5963;
+            margin: 5px 8px;
+        }
         QToolBar#topToolbar {
             background: #151A1E;
             border: 0;

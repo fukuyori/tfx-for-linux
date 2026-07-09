@@ -2,6 +2,16 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.7.5] - 2026-07-09
+
+### Fixed
+
+- Ctrl+C in the preview pane now copies the selected preview text instead of
+  triggering the window-wide "Copy Items" (file copy) shortcut. Read-only
+  preview text widgets don't reserve Ctrl+C via Qt's shortcut-override
+  mechanism, so the global copy action used to win even with an active text
+  selection in the preview.
+
 ## [0.7.4] - 2026-07-06
 
 ### Fixed

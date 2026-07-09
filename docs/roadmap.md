@@ -1,6 +1,6 @@
 # tfx for Linux Roadmap
 
-Current version: **0.7.4**
+Current version: **0.7.5**
 
 This roadmap tracks the practical development steps for the Linux Qt port as it
 moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
@@ -265,6 +265,14 @@ Measured before/after; no behavior changes.
   fonts so elision metrics match the painted glyphs. (done)
 - The spurious QTermWidget "variable-width font" constructor warning is
   filtered on CJK systems. (done)
+
+## 0.7.5 — Preview pane copy fix (done)
+
+- Ctrl+C now copies the selected text in the preview pane instead of always
+  triggering the window-wide "Copy Items" (file copy) shortcut: read-only
+  preview text widgets don't reserve the key via Qt's shortcut-override
+  mechanism, so the global action used to win even with an active text
+  selection. (done)
 
 ## Next: remaining macOS parity candidates
 

@@ -8,9 +8,11 @@
 #include <QMenu>
 #include <QMenuBar>
 #include <QPainter>
+#include <QPlainTextEdit>
 #include <QPolygonF>
 #include <QShortcut>
 #include <QSizePolicy>
+#include <QTextEdit>
 #include <QToolButton>
 
 #include <functional>
@@ -28,6 +30,29 @@ QAction *addMenuAction(QMenu *menu,
     }
     QObject::connect(action, &QAction::triggered, receiver, slot);
     return action;
+}
+
+// Ctrl+C is also the global "Copy Items" shortcut. When focus is in a
+// read-only preview text widget with a selection, Qt doesn't reserve the key
+// for it (no ShortcutOverride), so the window-wide action would win and copy
+// files instead of the selected preview text. Route to the widget's own
+// copy() in that case.
+bool copySelectedPreviewText()
+{
+    QWidget *focused = QApplication::focusWidget();
+    if (auto *plainText = qobject_cast<QPlainTextEdit *>(focused)) {
+        if (plainText->textCursor().hasSelection()) {
+            plainText->copy();
+            return true;
+        }
+    }
+    if (auto *richText = qobject_cast<QTextEdit *>(focused)) {
+        if (richText->textCursor().hasSelection()) {
+            richText->copy();
+            return true;
+        }
+    }
+    return false;
 }
 
 QIcon toolbarIcon(const QString &kind, const QColor &color)
@@ -121,7 +146,7 @@ void MainWindow::buildActions()
     addMenuAction(fileMenu, UiText::t("Quit", "終了"), qApp, []() { QApplication::quit(); }, QKeySequence(m_config.shortcut("quit", "Ctrl+Q")));
 
     auto *editMenu = menuBar()->addMenu(UiText::t("Edit", "編集"));
-    addMenuAction(editMenu, UiText::t("Copy", "コピー"), this, [this]() { activePane()->copySelected(); }, QKeySequence(m_config.shortcut("copyItems", "Ctrl+C")));
+    addMenuAction(editMenu, UiText::t("Copy", "コピー"), this, [this]() { if (!copySelectedPreviewText()) activePane()->copySelected(); }, QKeySequence(m_config.shortcut("copyItems", "Ctrl+C")));
     addMenuAction(editMenu, UiText::t("Cut", "カット"), this, [this]() { activePane()->cutSelected(); }, QKeySequence(m_config.shortcut("cutItems", "Ctrl+X")));
     addMenuAction(editMenu, UiText::t("Paste", "ペースト"), this, [this]() { activePane()->pasteIntoCurrentDirectory(); }, QKeySequence(m_config.shortcut("pasteItems", "Ctrl+V")));
     addMenuAction(editMenu, UiText::t("Copy Path", "パスをコピー"), this, [this]() { activePane()->copySelectedPaths(); }, QKeySequence(m_config.shortcut("copyPath", "Ctrl+Shift+C")));

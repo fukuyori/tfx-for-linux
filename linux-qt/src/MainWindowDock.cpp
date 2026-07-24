@@ -4,6 +4,7 @@
 #include <QDockWidget>
 #include <QFileSystemModel>
 #include <QSignalBlocker>
+#include <QSplitter>
 #include <QTimer>
 #include <QToolButton>
 
@@ -18,23 +19,23 @@ QDockWidget *MainWindow::makeDock(const QString &objectName, const QString &titl
 
 void MainWindow::applyDefaultDockLayout()
 {
-    for (QDockWidget *dock : {m_dockSidebar, m_dockLeftPane, m_dockRightPane,
+    for (QDockWidget *dock : {m_dockSidebar, m_dockFilePanes,
                               m_dockPreview, m_dockTerminal, m_dockCommandOutput}) {
         dock->setFloating(false);
     }
     addDockWidget(Qt::LeftDockWidgetArea, m_dockSidebar);
     splitDockWidget(m_dockSidebar, m_dockTerminal, Qt::Vertical);
     splitDockWidget(m_dockTerminal, m_dockCommandOutput, Qt::Horizontal);
-    splitDockWidget(m_dockSidebar, m_dockLeftPane, Qt::Horizontal);
-    splitDockWidget(m_dockLeftPane, m_dockRightPane, Qt::Horizontal);
-    splitDockWidget(m_dockRightPane, m_dockPreview, Qt::Horizontal);
-    resizeDocks({m_dockSidebar, m_dockLeftPane, m_dockRightPane, m_dockPreview},
-                {200, 460, 460, 360}, Qt::Horizontal);
+    splitDockWidget(m_dockSidebar, m_dockFilePanes, Qt::Horizontal);
+    splitDockWidget(m_dockFilePanes, m_dockPreview, Qt::Horizontal);
+    resizeDocks({m_dockSidebar, m_dockFilePanes, m_dockPreview},
+                {200, 920, 360}, Qt::Horizontal);
+    m_paneSplitter->setSizes({460, 460});
 }
 
 void MainWindow::resetDockLayout()
 {
-    const bool rightVisible = m_dockRightPane->isVisible();
+    const bool rightVisible = !m_rightPane->isHidden();
     const bool previewVisible = m_dockPreview->isVisible();
     const bool terminalVisible = m_dockTerminal->isVisible();
     const bool commandOutputVisible = m_dockCommandOutput->isVisible();
@@ -42,8 +43,8 @@ void MainWindow::resetDockLayout()
     applyDefaultDockLayout();
 
     m_dockSidebar->setVisible(true);
-    m_dockLeftPane->setVisible(true);
-    m_dockRightPane->setVisible(rightVisible);
+    m_dockFilePanes->setVisible(true);
+    m_rightPane->setVisible(rightVisible);
     m_dockPreview->setVisible(previewVisible);
     m_dockTerminal->setVisible(terminalVisible);
     m_dockCommandOutput->setVisible(commandOutputVisible);
@@ -53,22 +54,33 @@ void MainWindow::resetDockLayout()
     }
 }
 
-void MainWindow::setSplitVisible(bool visible)
+void MainWindow::setDockVisiblePreservingSidebar(QDockWidget *dock, bool visible)
 {
-    if (visible && !m_dockRightPane->isVisible()) {
-        m_rightPane->applySharedColumnLayout();
-    }
     const bool pinSidebar = m_dockSidebar->isVisible() && !m_dockSidebar->isFloating();
     if (pinSidebar) {
-        const int sidebarWidth = m_dockSidebar->width();
-        m_dockSidebar->setFixedWidth(sidebarWidth);
+        m_dockSidebar->setFixedWidth(m_dockSidebar->width());
     }
-    m_dockRightPane->setVisible(visible);
+    dock->setVisible(visible);
     if (pinSidebar) {
         QTimer::singleShot(0, this, [this]() {
             m_dockSidebar->setMinimumWidth(0);
             m_dockSidebar->setMaximumWidth(QWIDGETSIZE_MAX);
         });
+    }
+}
+
+void MainWindow::setSplitVisible(bool visible)
+{
+    // The panes share one dock, so showing/hiding the right pane happens
+    // inside the splitter and never disturbs the other docks' widths.
+    const bool opening = visible && m_rightPane->isHidden();
+    if (opening) {
+        m_rightPane->applySharedColumnLayout();
+    }
+    m_rightPane->setVisible(visible);
+    if (opening) {
+        const int half = qMax(1, m_paneSplitter->width() / 2);
+        m_paneSplitter->setSizes({half, half});
     }
     {
         const QSignalBlocker blocker(m_splitButton);
@@ -101,7 +113,7 @@ void MainWindow::setSidebarVisible(bool visible)
 
 void MainWindow::setPreviewVisible(bool visible)
 {
-    m_dockPreview->setVisible(visible);
+    setDockVisiblePreservingSidebar(m_dockPreview, visible);
     {
         const QSignalBlocker blocker(m_previewButton);
         m_previewButton->setChecked(visible);

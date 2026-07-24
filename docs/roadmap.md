@@ -1,6 +1,6 @@
 # tfx for Linux Roadmap
 
-Current version: **0.7.5**
+Current version: **0.7.6**
 
 This roadmap tracks the practical development steps for the Linux Qt port as it
 moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
@@ -273,6 +273,16 @@ Measured before/after; no behavior changes.
   preview text widgets don't reserve the key via Qt's shortcut-override
   mechanism, so the global action used to win even with an active text
   selection. (done)
+
+## 0.7.6 — Folder tree width fix (done)
+
+- The folder tree pane keeps its width when the preview pane is shown or
+  hidden: the sidebar width is pinned during the dock relayout, reusing the
+  mechanism the split-view toggle already had. (done)
+- Turning on split view divides the single file list's width evenly between
+  the two panes instead of Qt's arbitrary redistribution. (done)
+- The two file panes share one dock through a splitter, so they always stay
+  adjacent and float together as a single unit. (done)
 
 ## Next: remaining macOS parity candidates
 

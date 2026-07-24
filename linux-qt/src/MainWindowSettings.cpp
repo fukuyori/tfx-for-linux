@@ -9,6 +9,7 @@
 #include <QRegularExpression>
 #include <QSettings>
 #include <QSignalBlocker>
+#include <QSplitter>
 #include <QStatusBar>
 #include <QToolButton>
 
@@ -102,10 +103,14 @@ void MainWindow::restoreSettings()
     if (!state.isEmpty()) {
         restoreState(state, 1);
     }
+    const QByteArray splitterState = settings.value("MainWindow/paneSplitter").toByteArray();
+    if (!splitterState.isEmpty()) {
+        m_paneSplitter->restoreState(splitterState);
+    }
 
     m_dockSidebar->setVisible(sidebarVisible);
-    m_dockLeftPane->setVisible(true);
-    m_dockRightPane->setVisible(splitVisible);
+    m_dockFilePanes->setVisible(true);
+    m_rightPane->setVisible(splitVisible);
     m_dockPreview->setVisible(previewVisible);
     m_dockTerminal->setVisible(terminalVisible);
     m_dockCommandOutput->setVisible(commandOutputVisible);
@@ -197,8 +202,9 @@ void MainWindow::saveSettings()
     QSettings settings;
     settings.setValue("MainWindow/geometry", saveGeometry());
     settings.setValue("MainWindow/state", saveState(1));
+    settings.setValue("MainWindow/paneSplitter", m_paneSplitter->saveState());
     settings.setValue("View/sidebarVisible", m_dockSidebar->isVisible());
-    settings.setValue("View/splitVisible", m_dockRightPane->isVisible());
+    settings.setValue("View/splitVisible", !m_rightPane->isHidden());
     settings.setValue("View/previewVisible", m_dockPreview->isVisible());
     settings.setValue("View/terminalVisible", m_dockTerminal->isVisible());
     settings.setValue("View/commandOutputVisible", m_dockCommandOutput->isVisible());

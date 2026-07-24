@@ -2,6 +2,25 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.7.6] - 2026-07-24
+
+### Changed
+
+- The two file panes now live in one dock connected by a splitter, so they
+  always stay adjacent and float together as a single unit instead of being
+  separable into two detached windows. Toggling split view happens inside
+  the splitter and no longer disturbs the other docks' widths.
+- Turning on split view now divides the single file list's width evenly, so
+  both panes open at the same width instead of Qt's arbitrary redistribution.
+  The splitter position is saved and restored across sessions.
+
+### Fixed
+
+- The folder tree pane no longer changes width when the preview pane is
+  shown or hidden. Toggling a dock made Qt redistribute the horizontal space
+  across all docks; the sidebar width is now pinned during the relayout, the
+  same way the split-view toggle already handled it.
+
 ## [0.7.5] - 2026-07-09
 
 ### Fixed

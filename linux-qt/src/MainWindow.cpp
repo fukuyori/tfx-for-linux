@@ -14,6 +14,7 @@
 #include <QPushButton>
 #include <QShortcut>
 #include <QSignalBlocker>
+#include <QSplitter>
 #include <QStatusBar>
 #include <QTimer>
 #include <QToolBar>
@@ -97,10 +98,15 @@ MainWindow::MainWindow(const QString &initialPath, const QString &geometryOverri
     setCentralWidget(centerFiller);
 
     m_dockSidebar = makeDock("dockSidebar", UiText::t("Folders", "フォルダー"), m_sidebar);
-    // The left/right file panes are identified by position, so their dock
-    // titles are left blank.
-    m_dockLeftPane = makeDock("dockLeftPane", QString(), m_leftPane);
-    m_dockRightPane = makeDock("dockRightPane", QString(), m_rightPane);
+    // Both file panes share one dock through a splitter so they always stay
+    // adjacent and float as a single unit; split view just hides the right
+    // pane inside the splitter.
+    m_paneSplitter = new QSplitter(Qt::Horizontal, this);
+    m_paneSplitter->setObjectName("filePaneSplitter");
+    m_paneSplitter->setChildrenCollapsible(false);
+    m_paneSplitter->addWidget(m_leftPane);
+    m_paneSplitter->addWidget(m_rightPane);
+    m_dockFilePanes = makeDock("dockFilePanes", QString(), m_paneSplitter);
     m_dockPreview = makeDock("dockPreview", UiText::t("Preview", "プレビュー"), m_previewPane);
     m_dockTerminal = makeDock("dockTerminal", UiText::t("Terminal", "ターミナル"), m_terminalPane);
     m_dockCommandOutput = makeDock("dockCommandOutput", UiText::t("Command Output", "コマンド出力"), m_commandOutputPane);

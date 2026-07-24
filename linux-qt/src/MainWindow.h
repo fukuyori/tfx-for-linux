@@ -19,6 +19,7 @@
 
 class QProgressBar;
 class QPushButton;
+class QSplitter;
 class QThread;
 class QLabel;
 
@@ -63,6 +64,7 @@ private:
     void focusOtherPane();
     void swapPanes();
     QDockWidget *makeDock(const QString &objectName, const QString &title, QWidget *content);
+    void setDockVisiblePreservingSidebar(QDockWidget *dock, bool visible);
     void applyDefaultDockLayout();
     void resetDockLayout();
     FilePane *activePane() const;
@@ -104,8 +106,8 @@ private:
     int m_lastFileOperationTotal = 0;
     bool m_closeAfterFileOperationCancel = false;
     QDockWidget *m_dockSidebar = nullptr;
-    QDockWidget *m_dockLeftPane = nullptr;
-    QDockWidget *m_dockRightPane = nullptr;
+    QDockWidget *m_dockFilePanes = nullptr;
+    QSplitter *m_paneSplitter = nullptr;
     QDockWidget *m_dockPreview = nullptr;
     QDockWidget *m_dockTerminal = nullptr;
     QDockWidget *m_dockCommandOutput = nullptr;

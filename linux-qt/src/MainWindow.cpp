@@ -1,5 +1,5 @@
 #include "MainWindow.h"
-#include "MainWindowSidebar.h"
+#include "views/SidebarViews.h"
 #include "UiText.h"
 
 #include <QAction>

@@ -2,6 +2,21 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.8.2] - 2026-07-26
+
+Structural refactoring; no user-visible behavior changes.
+
+### Internal
+
+- The sidebar view classes (`FolderTreeView`, `PinnedListWidget`, the DISKS
+  and folder-tree delegates) moved from `MainWindowSidebar.{h,cpp}` into
+  `views/SidebarViews.{h,cpp}`; `MainWindowSidebar.cpp` now holds only the
+  MainWindow-side sidebar logic.
+- `applyTerminalTheme()` (460 lines) split into `buildThemeStyleSheet()`
+  (stylesheet assembly, const) and `applyPaneThemeSettings()` (widget-side
+  fonts/colors that a stylesheet cannot express), with a thin orchestrator
+  on top — the config live reload path is now easier to follow.
+
 ## [0.8.1] - 2026-07-26
 
 Hardening and internal refactoring; no user-visible behavior changes.

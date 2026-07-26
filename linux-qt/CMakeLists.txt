@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(tfx-for-linux VERSION 0.8.1 LANGUAGES CXX)
+project(tfx-for-linux VERSION 0.8.2 LANGUAGES CXX)
 
 include(GNUInstallDirs)
 include(CTest)
@@ -56,6 +56,8 @@ qt_add_executable(tfx
     src/views/BreadcrumbBar.cpp
     src/views/BreadcrumbBar.h
     src/views/FileViews.cpp
+    src/views/SidebarViews.cpp
+    src/views/SidebarViews.h
     src/views/FileViews.h
     src/platform/Platform.h
     ${TFX_PLATFORM_SOURCES}
@@ -84,7 +86,6 @@ qt_add_executable(tfx
     src/MainWindowMenus.cpp
     src/MainWindowSettings.cpp
     src/MainWindowSidebar.cpp
-    src/MainWindowSidebar.h
     src/MainWindowTheme.cpp
     src/MainWindow.cpp
     src/MainWindow.h
@@ -335,11 +336,11 @@ if(BUILD_TESTING AND Qt6Test_FOUND)
         src/core/PreviewText.cpp
         src/core/GitService.cpp
         src/core/SearchState.cpp
-    src/core/SearchState.h
-    src/core/SidebarLogic.cpp
-    src/core/SidebarLogic.h
-    src/core/TypeAhead.cpp
-    src/core/TypeAhead.h
+        src/core/SearchState.h
+        src/core/SidebarLogic.cpp
+        src/core/SidebarLogic.h
+        src/core/TypeAhead.cpp
+        src/core/TypeAhead.h
         src/core/TabState.cpp
         src/controllers/GitStatusController.cpp
         src/models/ColumnLayout.cpp

@@ -1,5 +1,5 @@
 #include "MainWindow.h"
-#include "MainWindowSidebar.h"
+#include "views/SidebarViews.h"
 
 #include <QApplication>
 
@@ -16,7 +16,19 @@ QString withAlpha(const QString &color, double alpha)
 }
 }
 
+// Applies the whole theme: the application stylesheet plus the widget-side
+// settings (fonts, pane colors, terminal scheme) that a stylesheet cannot
+// express. Safe to call repeatedly — the config live reload re-runs it.
 void MainWindow::applyTerminalTheme()
+{
+    qApp->setStyleSheet(buildThemeStyleSheet());
+    applyPaneThemeSettings();
+}
+
+// Assembles the application stylesheet from the dark-theme template: the
+// hardcoded palette below is substituted with the [colors]/[opacity]/[font]
+// values, then the per-pane font and color rules are appended.
+QString MainWindow::buildThemeStyleSheet() const
 {
     QString styleSheet = R"(
         QMainWindow, QWidget {
@@ -382,23 +394,6 @@ void MainWindow::applyTerminalTheme()
         return QString("\n%1 { font-family: %2; font-size: %3px; }\n")
             .arg(selector, resolvedFamily).arg(resolvedSize);
     };
-    // The file-list font is also applied as a widget font: when only the
-    // stylesheet sets it, the item views elide text with the widget font's
-    // metrics while painting with the stylesheet font, over-shortening long
-    // names. Setting the identical font on the widgets keeps the metrics and
-    // the painted glyphs in sync.
-    {
-        const QString family = m_config.font.fileListFamily.isEmpty()
-            ? m_config.resolvedMonoFontFamily()
-            : m_config.font.fileListFamily;
-        const int pixelSize = m_config.font.fileListSize > 0
-            ? m_config.font.fileListSize
-            : m_config.font.size;
-        QFont fileListFont(family);
-        fileListFont.setPixelSize(pixelSize);
-        m_leftPane->setFileListFont(fileListFont);
-        m_rightPane->setFileListFont(fileListFont);
-    }
     styleSheet += paneFontRule("QTableView#fileTable, QListView#fileIcons",
                                m_config.font.fileListFamily, m_config.font.fileListSize);
     styleSheet += paneFontRule("QPlainTextEdit#previewCode, QTextBrowser#previewRendered",
@@ -430,7 +425,25 @@ void MainWindow::applyTerminalTheme()
         .arg(m_config.colors.titleBarInactive)
         .arg(m_config.colors.titleBarActive);
 
-    qApp->setStyleSheet(styleSheet);
+    return styleSheet;
+}
+
+// Widget-side theme settings that a stylesheet cannot carry: pane fonts (the
+// file-list font is also set as a widget font so the item views' elision
+// metrics match the painted glyphs), terminal font and color scheme, Git
+// badge colors, and drop-indicator colors.
+void MainWindow::applyPaneThemeSettings()
+{
+    const QString family = m_config.font.fileListFamily.isEmpty()
+        ? m_config.resolvedMonoFontFamily()
+        : m_config.font.fileListFamily;
+    const int pixelSize = m_config.font.fileListSize > 0
+        ? m_config.font.fileListSize
+        : m_config.font.size;
+    QFont fileListFont(family);
+    fileListFont.setPixelSize(pixelSize);
+    m_leftPane->setFileListFont(fileListFont);
+    m_rightPane->setFileListFont(fileListFont);
 
     m_terminalPane->setContentFont(TerminalPane::resolveFont(
         m_config.font.terminalFamily,

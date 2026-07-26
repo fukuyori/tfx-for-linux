@@ -50,6 +50,8 @@ private:
     void buildTopToolbar();
     void buildFolderSidebar(const QString &initialPath);
     void applyTerminalTheme();
+    QString buildThemeStyleSheet() const;
+    void applyPaneThemeSettings();
     void addPinnedFolder(const QString &path);
     void removePinnedFolder(const QString &path);
     void updatePinnedFolderArea();

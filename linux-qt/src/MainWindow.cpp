@@ -3,6 +3,7 @@
 #include "UiText.h"
 
 #include <QAction>
+#include <QApplication>
 #include <QComboBox>
 #include <QDir>
 #include <QFileSystemModel>

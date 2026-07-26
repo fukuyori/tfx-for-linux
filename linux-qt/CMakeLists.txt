@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(tfx-for-linux VERSION 0.8.0 LANGUAGES CXX)
+project(tfx-for-linux VERSION 0.8.1 LANGUAGES CXX)
 
 include(GNUInstallDirs)
 include(CTest)
@@ -38,6 +38,10 @@ qt_add_executable(tfx
     src/core/GitService.h
     src/core/SearchState.cpp
     src/core/SearchState.h
+    src/core/SidebarLogic.cpp
+    src/core/SidebarLogic.h
+    src/core/TypeAhead.cpp
+    src/core/TypeAhead.h
     src/core/TabState.cpp
     src/core/TabState.h
     src/controllers/GitStatusController.cpp
@@ -232,6 +236,11 @@ if(BUILD_TESTING AND Qt6Test_FOUND)
     qt_add_executable(tfx_search_state_test
         tests/SearchStateTest.cpp
         src/core/SearchState.cpp
+    src/core/SearchState.h
+    src/core/SidebarLogic.cpp
+    src/core/SidebarLogic.h
+    src/core/TypeAhead.cpp
+    src/core/TypeAhead.h
         src/core/SearchState.h
     )
     target_include_directories(tfx_search_state_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -248,6 +257,24 @@ if(BUILD_TESTING AND Qt6Test_FOUND)
     target_include_directories(tfx_tab_state_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(tfx_tab_state_test PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME tab_state COMMAND tfx_tab_state_test)
+
+    qt_add_executable(tfx_sidebar_logic_test
+        tests/SidebarLogicTest.cpp
+        src/core/SidebarLogic.cpp
+        src/core/SidebarLogic.h
+    )
+    target_include_directories(tfx_sidebar_logic_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(tfx_sidebar_logic_test PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME sidebar_logic COMMAND tfx_sidebar_logic_test)
+
+    qt_add_executable(tfx_type_ahead_test
+        tests/TypeAheadTest.cpp
+        src/core/TypeAhead.cpp
+        src/core/TypeAhead.h
+    )
+    target_include_directories(tfx_type_ahead_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(tfx_type_ahead_test PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME type_ahead COMMAND tfx_type_ahead_test)
 
     qt_add_executable(tfx_column_layout_test
         tests/ColumnLayoutTest.cpp
@@ -308,6 +335,11 @@ if(BUILD_TESTING AND Qt6Test_FOUND)
         src/core/PreviewText.cpp
         src/core/GitService.cpp
         src/core/SearchState.cpp
+    src/core/SearchState.h
+    src/core/SidebarLogic.cpp
+    src/core/SidebarLogic.h
+    src/core/TypeAhead.cpp
+    src/core/TypeAhead.h
         src/core/TabState.cpp
         src/controllers/GitStatusController.cpp
         src/models/ColumnLayout.cpp

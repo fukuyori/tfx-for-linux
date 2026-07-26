@@ -33,6 +33,8 @@ private slots:
     void invalidThemeFallsBackToDarkAndWarns();
     void openWithMappingsLoadExtensionsAndFallback();
     void malformedConfigFallsBackToDefaults();
+    void windowTitleBarParsesAndValidates();
+    void shortcutConflictWarnsWithLineNumber();
 };
 
 void AppConfigTest::lightThemeAppliesPaletteAndColorOverrides()
@@ -126,6 +128,45 @@ void AppConfigTest::malformedConfigFallsBackToDefaults()
     // Defaults survive: dark palette and no crash.
     QCOMPARE(config.theme.name, QString("dark"));
     QCOMPARE(config.colors.panelBackground, QString("#151A1E"));
+}
+
+void AppConfigTest::windowTitleBarParsesAndValidates()
+{
+    QTemporaryDir temp;
+    QVERIFY(temp.isValid());
+    qputenv("XDG_CONFIG_HOME", temp.path().toUtf8());
+    QVERIFY(writeConfig(temp.path(),
+                        "version = 1\n"
+                        "[window]\n"
+                        "titleBar = \"integrated\"\n"));
+    AppConfig config = AppConfig::loadOrCreate();
+    QCOMPARE(config.window.titleBar, QString("integrated"));
+    QVERIFY(config.warningText().isEmpty());
+
+    QVERIFY(writeConfig(temp.path(),
+                        "version = 1\n"
+                        "[window]\n"
+                        "titleBar = \"floating\"\n"));
+    config = AppConfig::loadOrCreate();
+    QCOMPARE(config.window.titleBar, QString("system"));
+    QVERIFY(config.warningText().contains("config.toml:3"));
+    QVERIFY(config.warningText().contains("Invalid titleBar value"));
+}
+
+void AppConfigTest::shortcutConflictWarnsWithLineNumber()
+{
+    QTemporaryDir temp;
+    QVERIFY(temp.isValid());
+    qputenv("XDG_CONFIG_HOME", temp.path().toUtf8());
+    QVERIFY(writeConfig(temp.path(),
+                        "version = 1\n"
+                        "[shortcuts]\n"
+                        "newTab = \"ctrl+t\"\n"
+                        "newFile = \"ctrl+t\"\n"));
+    const AppConfig config = AppConfig::loadOrCreate();
+    QVERIFY(config.warningText().contains("Shortcut conflict"));
+    // The warning carries the config.toml line of the conflicting entry.
+    QVERIFY(config.warningText().contains("config.toml:"));
 }
 
 QTEST_GUILESS_MAIN(AppConfigTest)

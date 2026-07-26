@@ -1,5 +1,6 @@
 #include "FilePane.h"
 #include "UiText.h"
+#include "core/TypeAhead.h"
 #include "models/FileColumns.h"
 
 #include <QAbstractItemView>
@@ -134,40 +135,20 @@ bool FilePane::handleTypeAheadKey(QAbstractItemView *view, const QKeyEvent *even
     QAbstractItemModel *model = view->model();
     const QModelIndex root = view->rootIndex();
     const int rows = model->rowCount(root);
-    const auto nameAt = [&](int row) {
-        return model->index(row, ColumnName, root).data(Qt::DisplayRole).toString();
-    };
-    const auto selectRow = [&](int row) {
-        const QModelIndex index = model->index(row, ColumnName, root);
+    QStringList names;
+    names.reserve(rows);
+    for (int row = 0; row < rows; ++row) {
+        names.append(model->index(row, ColumnName, root).data(Qt::DisplayRole).toString());
+    }
+    const int currentRow = view->currentIndex().isValid() ? view->currentIndex().row() : -1;
+    const tfx::core::TypeAheadStep step =
+        tfx::core::typeAheadStep(names, currentRow, m_typeAheadPrefix, typed);
+    m_typeAheadPrefix = step.prefix;
+    if (step.row >= 0) {
+        const QModelIndex index = model->index(step.row, ColumnName, root);
         selectProxyIndex(index);
         if (view == m_iconView) {
             m_iconView->scrollTo(index);
-        }
-    };
-
-    if (rows > 0) {
-        if (m_typeAheadPrefix.size() == 1
-            && m_typeAheadPrefix.compare(typed, Qt::CaseInsensitive) == 0) {
-            // Same single character again: cycle to the next row with that
-            // initial, starting after the current row and wrapping.
-            const int currentRow = view->currentIndex().isValid() ? view->currentIndex().row() : -1;
-            for (int step = 1; step <= rows; ++step) {
-                const int row = (currentRow + step + rows) % rows;
-                if (nameAt(row).startsWith(m_typeAheadPrefix, Qt::CaseInsensitive)) {
-                    selectRow(row);
-                    break;
-                }
-            }
-        } else {
-            const QString candidate = m_typeAheadPrefix + typed;
-            for (int row = 0; row < rows; ++row) {
-                if (nameAt(row).startsWith(candidate, Qt::CaseInsensitive)) {
-                    selectRow(row);
-                    m_typeAheadPrefix = candidate;
-                    break;
-                }
-            }
-            // No match: the prefix and the selection stay where they are.
         }
     }
 

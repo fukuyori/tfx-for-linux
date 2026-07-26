@@ -2,6 +2,20 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.8.1] - 2026-07-26
+
+Hardening and internal refactoring; no user-visible behavior changes.
+
+### Internal
+
+- The configuration-error dialog renders as plain text so config.toml
+  content can never be interpreted as rich text; the mount-table watch fd
+  is closed on shutdown.
+- The type-to-select matching, DISKS volume filter, and pinned-path
+  display logic moved into testable core units (`core/TypeAhead`,
+  `core/SidebarLogic`) with new test suites; AppConfig tests now cover
+  `[window]` parsing and shortcut-conflict line numbers (14 suites total).
+
 ## [0.8.0] - 2026-07-26
 
 Parity with the macOS 0.9.9 network-volume resilience fix, applied to the

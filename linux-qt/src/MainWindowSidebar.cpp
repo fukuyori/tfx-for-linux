@@ -1,6 +1,7 @@
 #include "MainWindow.h"
 #include "MainWindowSidebar.h"
 #include "UiText.h"
+#include "core/SidebarLogic.h"
 #include "platform/Platform.h"
 
 #include <QAbstractItemView>
@@ -36,18 +37,11 @@
 namespace {
 constexpr int kDiskUsageRole = Qt::UserRole + 1;
 
-// Pinned rows show the folder with its directory: paths under the home
-// directory start with "~". The list view middle-elides what doesn't fit.
+// Pinned rows show the folder with its directory ("~"-relative under home);
+// the list view middle-elides what doesn't fit.
 QString pinnedDisplayPath(const QString &path)
 {
-    const QString home = QDir::homePath();
-    if (path == home) {
-        return QStringLiteral("~");
-    }
-    if (path.startsWith(home + QLatin1Char('/'))) {
-        return QStringLiteral("~") + path.mid(home.size());
-    }
-    return path;
+    return tfx::core::pinnedDisplayPath(path, QDir::homePath());
 }
 }
 
@@ -566,18 +560,9 @@ void MainWindow::refreshDiskList()
                 continue;
             }
             const QString root = volume.rootPath();
-            const QString device = QString::fromUtf8(volume.device());
-            const QString fsType = QString::fromUtf8(volume.fileSystemType());
-            const bool physical = device.startsWith(QLatin1String("/dev/"))
-                && !device.startsWith(QLatin1String("/dev/loop"));
-            const bool network = fsType.startsWith(QLatin1String("nfs"))
-                || fsType == QLatin1String("cifs")
-                || fsType.startsWith(QLatin1String("smb"))
-                || fsType == QLatin1String("fuse.sshfs");
-            if (root != QLatin1String("/") && !physical && !network) {
-                continue;
-            }
-            if (fsType == QLatin1String("squashfs") || root.startsWith(QLatin1String("/boot"))) {
+            if (!tfx::core::shouldListVolume(root,
+                                             QString::fromUtf8(volume.device()),
+                                             QString::fromUtf8(volume.fileSystemType()))) {
                 continue;
             }
             DiskEntry entry;

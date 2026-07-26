@@ -34,6 +34,7 @@ public:
     explicit MainWindow(const QString &initialPath,
                         const QString &geometryOverride = QString(),
                         QWidget *parent = nullptr);
+    ~MainWindow() override;
 
 private:
     void closeEvent(QCloseEvent *event) override;

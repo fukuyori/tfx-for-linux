@@ -357,6 +357,9 @@ void MainWindow::showConfigWarnings()
                                           "config.toml に問題があります。直前の値または既定値を使用します:\n\n%1")
                                     .arg(warnings),
                                 QMessageBox::Ok, this);
+    // Warnings embed config.toml content; never let Qt's rich-text
+    // auto-detection interpret it as HTML.
+    box->setTextFormat(Qt::PlainText);
     box->setAttribute(Qt::WA_DeleteOnClose);
     box->show();
 }

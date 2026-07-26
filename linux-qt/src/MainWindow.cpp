@@ -25,6 +25,17 @@
 #include <QVBoxLayout>
 #include <QWindow>
 
+#include <unistd.h>
+
+MainWindow::~MainWindow()
+{
+    // The QSocketNotifier is parented; only the mount-table fd is manual.
+    if (m_mountsFd >= 0) {
+        ::close(m_mountsFd);
+        m_mountsFd = -1;
+    }
+}
+
 MainWindow::MainWindow(const QString &initialPath, const QString &geometryOverride, QWidget *parent)
     : QMainWindow(parent),
       m_treeModel(new QFileSystemModel(this)),

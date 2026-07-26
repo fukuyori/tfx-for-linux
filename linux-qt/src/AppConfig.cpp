@@ -161,11 +161,21 @@ QString AppConfig::configPath()
     return QDir(configDirectory()).filePath("config.toml");
 }
 
+QString AppConfig::configFilePath()
+{
+    return configPath();
+}
+
 QString AppConfig::defaultConfigText()
 {
     return QStringLiteral(
         "version = 1\n"
         "theme = \"dark\"   # dark or light\n"
+        "\n"
+        "[window]\n"
+        "# system = native title bar, integrated = window controls in the menu bar\n"
+        "# (applied on the next launch)\n"
+        "titleBar = \"system\"\n"
         "\n"
         "[font]\n"
         "ui = \"system\"\n"
@@ -510,6 +520,7 @@ void AppConfig::applyValue(const QString &section, const QString &key, const QSt
         const QString text = unquote(value, &ok);
         if (ok) {
             shortcuts.insert(key, normalizedShortcut(text));
+            m_shortcutLines.insert(key, lineNumber);
         } else {
             addWarning(lineNumber, "Invalid shortcut value");
         }
@@ -531,6 +542,25 @@ void AppConfig::applyValue(const QString &section, const QString &key, const QSt
             }
         } else {
             addWarning(lineNumber, QString("Unknown naming key: %1").arg(key));
+        }
+        return;
+    }
+
+    if (section == "window") {
+        bool ok = false;
+        const QString text = unquote(value, &ok);
+        if (!ok) {
+            addWarning(lineNumber, "Invalid window value");
+            return;
+        }
+        if (key == "titleBar") {
+            if (text == "system" || text == "integrated") {
+                window.titleBar = text;
+            } else {
+                addWarning(lineNumber, "Invalid titleBar value (expected system/integrated)");
+            }
+        } else {
+            addWarning(lineNumber, QString("Unknown window key: %1").arg(key));
         }
         return;
     }
@@ -653,7 +683,7 @@ void AppConfig::applyValue(const QString &section, const QString &key, const QSt
         }
         if (key == "name") command.name = text;
         else if (key == "run" || key == "command") command.run = text;
-        else if (key == "shortcut") command.shortcut = normalizedShortcut(text);
+        else if (key == "shortcut") { command.shortcut = normalizedShortcut(text); command.shortcutLine = lineNumber; }
         else if (key == "target") command.target = text.trimmed().toLower();
         else if (key == "selection") command.selection = text.trimmed().toLower();
         else if (key == "shell") command.shell = text;
@@ -676,8 +706,9 @@ void AppConfig::validateShortcutConflicts()
         }
         const QString owner = QString("shortcut.%1").arg(it.key());
         if (ownerByShortcut.contains(it.value())) {
-            addWarning(0, QString("Shortcut conflict: %1 is used by %2 and %3")
-                .arg(it.value(), ownerByShortcut.value(it.value()), owner));
+            addWarning(m_shortcutLines.value(it.key(), 0),
+                       QString("Shortcut conflict: %1 is used by %2 and %3")
+                           .arg(it.value(), ownerByShortcut.value(it.value()), owner));
         } else {
             ownerByShortcut.insert(it.value(), owner);
         }
@@ -689,8 +720,9 @@ void AppConfig::validateShortcutConflicts()
         }
         const QString owner = QString("command.%1").arg(command.name);
         if (ownerByShortcut.contains(command.shortcut)) {
-            addWarning(0, QString("Shortcut conflict: %1 is used by %2 and %3")
-                .arg(command.shortcut, ownerByShortcut.value(command.shortcut), owner));
+            addWarning(command.shortcutLine,
+                       QString("Shortcut conflict: %1 is used by %2 and %3")
+                           .arg(command.shortcut, ownerByShortcut.value(command.shortcut), owner));
         } else {
             ownerByShortcut.insert(command.shortcut, owner);
         }

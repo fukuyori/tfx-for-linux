@@ -2,6 +2,145 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.8.0] - 2026-07-26
+
+Parity with the macOS 0.9.9 network-volume resilience fix, applied to the
+Linux hazards, plus an optional integrated title bar.
+
+### Added
+
+- Optional integrated title bar: `[window] titleBar = "integrated"` hides
+  the native title bar and moves the minimize/maximize/close controls into
+  the menu bar. The empty menu-bar area drags the window (double-click
+  maximizes) via startSystemMove, and window edges resize via
+  startSystemResize, so it works on both X11 and Wayland. The default stays
+  `system` (native title bar); the setting applies on the next launch.
+
+### Changed
+
+- The LEFT/RIGHT badge in the pane header is no longer shown; the title-bar
+  background continues to mark the active pane.
+- Pinned folders now show their directory as well: paths under the home
+  directory start with "~" (e.g. `~/source/cpp/tfx`), the middle is elided
+  when the sidebar is too narrow, and the full path shows in the tooltip.
+- New quick-navigation keys in the file list: `~` jumps to the home
+  directory, `/` to the filesystem root. Both take precedence over
+  type-to-select.
+
+### Fixed
+
+- An unresponsive network mount (NFS/CIFS/sshfs) can no longer freeze the
+  UI through the sidebar: the DISKS volume scan (statfs can block for
+  minutes on a dead mount) now runs on a worker thread, with superseded
+  scans discarded; the current-volume highlight and the folder-tree drop's
+  same-volume detection use string matching against the cached mount roots
+  instead of per-call syscalls. Directory enumeration itself was already
+  off the main thread (QFileSystemModel's gatherer); folder sizes in the
+  Properties dialog are tallied on a worker thread as of 0.7.10.
+- The folder tree's scroll-to-top (0.7.7) now lands reliably: tree rows
+  arrive asynchronously and later insertions shifted the scroll position,
+  so the scroll is re-applied on each relevant directory load until the
+  current folder's own listing has arrived. Selections made inside the
+  tree still keep the tree's scroll position.
+
+## [0.7.11] - 2026-07-26
+
+Parity with tfx for Windows 0.9.10 / macOS 0.9.9: in-app config editing and
+live reload.
+
+### Added
+
+- A settings gear at the end of the toolbar with **Edit Config File...** and
+  **Editor Settings...**; both also live in the File menu. The new
+  `editConfig` shortcut (default `Ctrl+,`) opens `config.toml` directly. The
+  editor command is chosen in Editor Settings (`{path}` expands to the
+  config file, environment variables are expanded, empty falls back to the
+  OS association).
+- `config.toml` changes apply on save: the file is watched
+  (directory-level too, so atomic editor saves are caught) and shortcuts,
+  theme, `[colors]`, `[opacity]`, `[font]`, `[openWith]`, `[preview]`, and
+  `[[commands]]` re-apply live — the menu bar and all config-bound
+  shortcuts are rebuilt. `[startup]` keeps its launch-time semantics.
+- Configuration errors are now listed in a dialog (each entry prefixed with
+  its `config.toml` line number) at startup and after each reload, in
+  addition to the status bar; the app keeps running on the previous or
+  default values.
+
+## [0.7.10] - 2026-07-26
+
+Parity with tfx for Windows 0.9.12 / macOS 0.9.9: a Properties dialog.
+(The header-menu column controls and drag reordering from the same upstream
+releases were already present in the Linux port.)
+
+### Added
+
+- **Properties** at the end of the file context menu (and in the File menu,
+  default shortcut `Alt+Return`, config key `showProperties`): name, type,
+  location, link target, size, permissions (mode string and octal),
+  owner/group, and created/modified/accessed times for the selected item —
+  or for the current folder when nothing is selected. Folder sizes are
+  tallied on a worker thread with a live "Calculating…" placeholder, so a
+  large or slow tree never blocks the UI; the tally stops when the dialog
+  closes. Disabled for multi-selection and inside archives.
+
+## [0.7.9] - 2026-07-26
+
+Parity with tfx for Windows 0.9.13 / macOS 0.9.9: drop onto the folder tree.
+
+### Added
+
+- Files and folders dragged from the file panes (or external apps) can now
+  be dropped onto folder-tree nodes. Dropping on the same volume defaults
+  to Move and across volumes to Copy; Shift forces Move and Ctrl forces
+  Copy. The hovered node is highlighted without being selected (selection
+  would navigate the pane), a collapsed node auto-expands after a short
+  hover, and drops run through the pane's shared pipeline — including the
+  folder-into-itself guard and the overwrite/skip/rename conflict prompt.
+  Tree nodes themselves remain non-draggable.
+
+## [0.7.8] - 2026-07-26
+
+Parity with tfx for Windows 0.9.10/0.9.12 (via macOS 0.9.9): DISKS sidebar
+section and collapsible sidebar sections.
+
+### Added
+
+- A DISKS sidebar section between PINNED and FOLDERS lists every mounted
+  browsable volume (root filesystem, real block devices, network mounts —
+  snap/loop mounts and /boot partitions are skipped) with a thin usage bar.
+  The tooltip shows free/total space, clicking a disk opens its mount point
+  in the active pane, and the volume containing the current folder stays
+  highlighted. The list refreshes automatically on mount/unmount via a
+  poll-free watch on /proc/self/mounts.
+- The PINNED / DISKS / FOLDERS section headers are now clickable and
+  collapse their section; a chevron shows the state, which persists across
+  sessions.
+
+## [0.7.7] - 2026-07-26
+
+Parity with tfx for Windows 0.9.15 / macOS 0.9.10: type-to-select and
+folder-tree navigation refinements.
+
+### Added
+
+- Explorer/Finder-style type-to-select in the file panes. Typing a printable
+  character jumps the selection to the first row whose name starts with it;
+  more characters within one second extend the prefix. Pressing the same
+  single character repeatedly cycles through the rows with that initial,
+  wrapping at the end. A key that matches nothing keeps the current prefix
+  and selection. The active prefix shows as "Find: …" in the pane status
+  line; it resets on navigation. Text fields, the terminal, and shortcuts
+  with modifiers are unaffected.
+
+### Changed
+
+- The folder tree now mirrors the pane's location: navigation arriving from
+  outside the tree (file list, pinned folders, path bar) scrolls the current
+  folder's node to the top of the tree, expands it one level so the listed
+  subfolders are visible, and collapses expanded branches that are off the
+  new path. Clicking a node inside the tree keeps the tree's own scroll
+  position.
+
 ## [0.7.6] - 2026-07-24
 
 ### Changed

@@ -1,6 +1,6 @@
 # tfx for Linux Roadmap
 
-Current version: **0.7.6**
+Current version: **0.8.0**
 
 This roadmap tracks the practical development steps for the Linux Qt port as it
 moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
@@ -283,6 +283,73 @@ Measured before/after; no behavior changes.
   the two panes instead of Qt's arbitrary redistribution. (done)
 - The two file panes share one dock through a splitter, so they always stay
   adjacent and float together as a single unit. (done)
+
+## Planned: parity with tfx for Windows 0.9.12+ and macOS 0.9.9+
+
+Deduplicated union of the upstream changelogs (macOS 0.9.9 itself covers
+Windows 0.9.10–0.9.14 parity). One phase per release.
+
+### 0.7.7 — Type-to-select and folder tree follow-up (Phase 1) (done)
+
+- Explorer/Finder-style type-to-select in the file panes: printable keys
+  build a prefix within a 1-second window; repeating one character cycles
+  through rows with that initial (wrapping); mismatches keep the position;
+  the active prefix shows as "Find: …" in the status bar; reset on
+  navigation. Text fields, terminal, and modifier shortcuts unaffected.
+- Folder tree: navigation arriving from outside the tree scrolls the
+  current folder's node to the top (clicks inside the tree don't jump);
+  the selected node expands one level so the listed subfolders are visible;
+  subtrees off the current path collapse; selection-driven navigation is
+  guarded against feedback loops during model updates.
+
+### 0.7.8 — Sidebar sections (Phase 2) (done)
+
+- DISKS section listing mounted browsable volumes with a usage bar,
+  free/total tooltip, click-to-open in the active pane, current-volume
+  highlight, refresh on mount/unmount (watching /proc/self/mounts).
+- Collapsible PINNED / DISKS / FOLDERS section headers with a state
+  chevron; collapse state persists.
+
+### 0.7.9 — Drop onto the folder tree (Phase 3) (done)
+
+- Files dragged from the panes (or external apps) can be dropped onto
+  tree nodes: same volume defaults to Move, across volumes to Copy, with
+  Shift/Ctrl overrides; dropping onto itself or its own subtree is
+  refused; hovering a collapsed node auto-expands it after a delay; the
+  hovered node highlights without selecting (selection would navigate).
+  Operations run through the existing file-operation queue.
+
+### 0.7.10 — Column controls and properties (Phase 4) (done)
+
+- Right-clicking a file-list column header shows a visibility checklist
+  plus a "Columns…" settings entry; columns reorder by dragging header
+  sections; order persists via the shared column layout.
+- A Properties dialog (default Alt+Enter): name, path, type, size (async
+  for folders), permissions, owner/group, timestamps. Disabled for
+  multi-selection and inside archives.
+
+### 0.7.11 — Config editing and live reload (Phase 5) (done)
+
+- Settings gear menu: "Edit Config File…", "Editor Settings…"; new
+  `editConfig` shortcut (default Ctrl+,). Editor choice persists; falls
+  back to xdg-open.
+- config.toml is watched (directory-level, debounced) and re-applied on
+  save: shortcuts, colors, opacity, fonts, commands, preview settings.
+  `[startup]` keeps launch-time semantics. Config errors show in a dialog
+  with line numbers; the app keeps running on previous values.
+
+### 0.8.0 — Network mount resilience and UI polish (Phase 6) (done)
+
+- Unresponsive network mounts (NFS/CIFS/gvfs) must not freeze the UI:
+  enumeration watchdog with timeout, no main-thread stat calls on paths
+  that can hang. Needs investigation of QFileSystemModel and pane
+  enumeration behavior first.
+
+### Not ported (platform-specific upstream items)
+
+- Windows 0.9.12 right-button-drag fixes (WPF/OLE-specific; Qt has no
+  right-drag convention).
+- Windows 0.9.14 README screenshots (separate docs task if wanted).
 
 ## Next: remaining macOS parity candidates
 

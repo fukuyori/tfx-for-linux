@@ -195,6 +195,11 @@ void FilePane::cutSelected()
     emit statusMessageRequested(UiText::t("Cut selected item(s).", "選択項目をカットしました。"));
 }
 
+void FilePane::dropOntoDirectory(const QList<QUrl> &urls, Qt::DropAction action, const QString &targetDir)
+{
+    performDrop(urls, action, targetDir);
+}
+
 void FilePane::performDrop(const QList<QUrl> &urls, Qt::DropAction action, const QString &targetDir)
 {
     if (urls.isEmpty() || targetDir.isEmpty()) {

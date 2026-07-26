@@ -10,6 +10,8 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QListWidget>
+#include <QMenuBar>
+#include <QMouseEvent>
 #include <QProgressBar>
 #include <QPushButton>
 #include <QShortcut>
@@ -21,11 +23,12 @@
 #include <QToolButton>
 #include <QTreeView>
 #include <QVBoxLayout>
+#include <QWindow>
 
 MainWindow::MainWindow(const QString &initialPath, const QString &geometryOverride, QWidget *parent)
     : QMainWindow(parent),
       m_treeModel(new QFileSystemModel(this)),
-      m_treeView(new QTreeView(this)),
+      m_treeView(new FolderTreeView(this)),
       m_pinnedList(new PinnedListWidget(this)),
       m_pinnedSpacer(new QWidget(this)),
       m_searchEdit(new QComboBox(this)),
@@ -49,6 +52,11 @@ MainWindow::MainWindow(const QString &initialPath, const QString &geometryOverri
     if (m_config.opacity.background < 1.0) {
         setAttribute(Qt::WA_TranslucentBackground);
     }
+    // Window flags must be set before the window is shown.
+    m_integratedTitleBar = m_config.window.titleBar == QLatin1String("integrated");
+    if (m_integratedTitleBar) {
+        setWindowFlags(windowFlags() | Qt::FramelessWindowHint);
+    }
     m_leftPane->setUserCommands(m_config.commands);
     m_rightPane->setUserCommands(m_config.commands);
     m_leftPane->setOpenWithApplications(m_config.openWith);
@@ -67,11 +75,27 @@ MainWindow::MainWindow(const QString &initialPath, const QString &geometryOverri
     auto *sidebarLayout = new QVBoxLayout(m_sidebar);
     sidebarLayout->setContentsMargins(10, 8, 8, 0);
     sidebarLayout->setSpacing(6);
-    auto *pinnedLabel = new QLabel(UiText::t("Pinned", "ピン留め"), m_sidebar);
-    auto *treeLabel = new QLabel(UiText::t("Folders", "フォルダー"), m_sidebar);
+    // Clickable section headers: the chevron in the text shows the collapse
+    // state; the state itself persists with the other view settings.
+    const auto makeSectionHeader = [this](bool *state) {
+        auto *header = new QToolButton(m_sidebar);
+        header->setObjectName("sectionHeader");
+        header->setToolButtonStyle(Qt::ToolButtonTextOnly);
+        header->setAutoRaise(true);
+        header->setCursor(Qt::PointingHandCursor);
+        connect(header, &QToolButton::clicked, this, [this, state]() {
+            *state = !*state;
+            applySidebarSectionStates();
+            if (!m_isRestoringSettings) {
+                saveSettings();
+            }
+        });
+        return header;
+    };
+    m_pinnedHeader = makeSectionHeader(&m_pinnedCollapsed);
+    m_diskHeader = makeSectionHeader(&m_disksCollapsed);
+    m_treeHeader = makeSectionHeader(&m_foldersCollapsed);
     auto *collapseTreeButton = new QToolButton(m_sidebar);
-    pinnedLabel->setObjectName("sectionLabel");
-    treeLabel->setObjectName("sectionLabel");
     collapseTreeButton->setObjectName("toolbarIconButton");
     collapseTreeButton->setText("-");
     collapseTreeButton->setToolTip(UiText::t("Collapse all folders", "すべてのフォルダーを折りたたむ"));
@@ -79,14 +103,17 @@ MainWindow::MainWindow(const QString &initialPath, const QString &geometryOverri
     connect(collapseTreeButton, &QToolButton::clicked, this, &MainWindow::collapseFolderTree);
     auto *treeHeaderLayout = new QHBoxLayout();
     treeHeaderLayout->setContentsMargins(0, 0, 0, 0);
-    treeHeaderLayout->addWidget(treeLabel);
+    treeHeaderLayout->addWidget(m_treeHeader);
     treeHeaderLayout->addStretch(1);
     treeHeaderLayout->addWidget(collapseTreeButton);
-    sidebarLayout->addWidget(pinnedLabel);
+    sidebarLayout->addWidget(m_pinnedHeader);
     sidebarLayout->addWidget(m_pinnedList);
     sidebarLayout->addWidget(m_pinnedSpacer);
+    sidebarLayout->addWidget(m_diskHeader);
+    sidebarLayout->addWidget(m_diskList);
     sidebarLayout->addLayout(treeHeaderLayout);
     sidebarLayout->addWidget(m_treeView, 1);
+    applySidebarSectionStates();
 
     // Each pane lives in a dock widget so it can be rearranged, floated, or
     // hidden. Toggling visibility redistributes space within the window instead
@@ -122,7 +149,8 @@ MainWindow::MainWindow(const QString &initialPath, const QString &geometryOverri
         });
         connect(pane, &FilePane::directoryChanged, this, [this, pane](const QString &path) {
             if (pane == m_activePane) {
-                m_treeView->setCurrentIndex(m_treeModel->index(path));
+                syncFolderTree(path);
+                updateDiskSelection(path);
                 m_terminalPane->setWorkingDirectory(path);
             }
             if (!m_isRestoringSettings) {
@@ -186,38 +214,13 @@ MainWindow::MainWindow(const QString &initialPath, const QString &geometryOverri
     });
 
     buildActions();
-    auto *focusOtherPaneShortcut = new QShortcut(QKeySequence(Qt::Key_Tab), this);
-    connect(focusOtherPaneShortcut, &QShortcut::activated, this, &MainWindow::focusOtherPane);
-    auto *focusPreviousPaneShortcut = new QShortcut(QKeySequence(Qt::SHIFT | Qt::Key_Tab), this);
-    connect(focusPreviousPaneShortcut, &QShortcut::activated, this, &MainWindow::focusOtherPane);
-    auto *togglePreviewSourceShortcut = new QShortcut(QKeySequence(m_config.shortcut("togglePreviewSource", "Ctrl+Shift+R")), this);
-    connect(togglePreviewSourceShortcut, &QShortcut::activated, m_previewPane, &PreviewPane::toggleSourceRendered);
-    auto *openPreviewExternalShortcut = new QShortcut(QKeySequence(m_config.shortcut("openPreviewExternal", "Ctrl+Shift+I")), this);
-    connect(openPreviewExternalShortcut, &QShortcut::activated, m_previewPane, &PreviewPane::openCurrentPreviewExternally);
-
-    // Documented action shortcuts that previously had no key binding.
-    const auto addPaneShortcut = [this](const QString &name, const QString &def, void (FilePane::*slot)()) {
-        auto *sc = new QShortcut(QKeySequence(m_config.shortcut(name, def)), this);
-        connect(sc, &QShortcut::activated, this, [this, slot]() { (activePane()->*slot)(); });
-    };
-    addPaneShortcut("openItem", "Ctrl+O", &FilePane::openSelected);
-    addPaneShortcut("openTerminal", "Ctrl+Shift+T", &FilePane::openTerminalHere);
-    addPaneShortcut("compressToZip", "Ctrl+Alt+Z", &FilePane::compressSelectedItemsToZip);
-    addPaneShortcut("extractZip", "Ctrl+Alt+E", &FilePane::extractSelectedZip);
-    addPaneShortcut("selectAll", "Ctrl+A", &FilePane::selectAllVisibleItems);
-    addPaneShortcut("revealInFinder", "Ctrl+Alt+R", &FilePane::revealSelectionInFileManager);
-    addPaneShortcut("movePasteItems", "Ctrl+Shift+V", &FilePane::movePasteIntoCurrentDirectory);
-
-    auto *swapPanesShortcut = new QShortcut(QKeySequence(m_config.shortcut("swapPanes", "Ctrl+Shift+X")), this);
-    connect(swapPanesShortcut, &QShortcut::activated, this, &MainWindow::swapPanes);
-    auto *focusTerminalShortcut = new QShortcut(QKeySequence(m_config.shortcut("focusTerminalPane", "Ctrl+Alt+J")), this);
-    connect(focusTerminalShortcut, &QShortcut::activated, this, [this]() {
-        setTerminalVisible(true);
-        m_terminalPane->focusTerminal();
-    });
+    setupIntegratedTitleBar();
+    setupConfigShortcuts();
+    setupConfigWatcher();
     setActivePane(m_leftPane);
     m_previewPane->previewPath(initialPath);
     restoreSettings();
+    showConfigWarnings();
 
     auto *versionLabel = new QLabel(QString("v%1").arg(TFX_VERSION), this);
     versionLabel->setObjectName("statusVersion");
@@ -242,6 +245,153 @@ MainWindow::MainWindow(const QString &initialPath, const QString &geometryOverri
         activePane()->focusFileList();
     });
     statusBar()->showMessage(initialPath);
+}
+
+// [window] titleBar = "integrated": the native title bar is hidden, the menu
+// bar doubles as the drag handle (double-click maximizes), and the
+// minimize/maximize/close controls live in the menu bar's corner. Window
+// edges resize via startSystemResize; the status-bar size grip remains.
+void MainWindow::setupIntegratedTitleBar()
+{
+    if (!m_integratedTitleBar) {
+        return;
+    }
+    auto *controls = new QWidget(menuBar());
+    auto *layout = new QHBoxLayout(controls);
+    layout->setContentsMargins(4, 0, 4, 0);
+    layout->setSpacing(2);
+    const auto makeButton = [this, controls](const QString &text, const QString &tip) {
+        auto *button = new QToolButton(controls);
+        button->setObjectName("toolbarIconButton");
+        button->setText(text);
+        button->setToolTip(tip);
+        button->setFixedSize(26, 22);
+        return button;
+    };
+    auto *minimizeButton = makeButton(QStringLiteral("–"), UiText::t("Minimize", "最小化"));
+    connect(minimizeButton, &QToolButton::clicked, this, &QWidget::showMinimized);
+    m_maximizeButton = makeButton(QStringLiteral("□"), UiText::t("Maximize / restore", "最大化 / 元に戻す"));
+    connect(m_maximizeButton, &QToolButton::clicked, this, [this]() {
+        if (isMaximized()) {
+            showNormal();
+        } else {
+            showMaximized();
+        }
+    });
+    auto *closeButton = makeButton(QStringLiteral("✕"), UiText::t("Close", "閉じる"));
+    connect(closeButton, &QToolButton::clicked, this, &QWidget::close);
+    layout->addWidget(minimizeButton);
+    layout->addWidget(m_maximizeButton);
+    layout->addWidget(closeButton);
+    menuBar()->setCornerWidget(controls, Qt::TopRightCorner);
+    controls->show();
+
+    // One application-level filter covers the menu-bar drag area and the
+    // window-edge resize zones of every child widget.
+    qApp->installEventFilter(this);
+}
+
+bool MainWindow::eventFilter(QObject *watched, QEvent *event)
+{
+    if (!m_integratedTitleBar) {
+        return QMainWindow::eventFilter(watched, event);
+    }
+    if (watched == this && event->type() == QEvent::WindowStateChange && m_maximizeButton) {
+        m_maximizeButton->setText(isMaximized() ? QString::fromUtf8("❐") : QStringLiteral("□"));
+        return QMainWindow::eventFilter(watched, event);
+    }
+    if (watched == menuBar()
+        && (event->type() == QEvent::MouseButtonPress || event->type() == QEvent::MouseButtonDblClick)) {
+        auto *mouse = static_cast<QMouseEvent *>(event);
+        if (mouse->button() == Qt::LeftButton
+            && !menuBar()->actionAt(mouse->position().toPoint())) {
+            if (event->type() == QEvent::MouseButtonDblClick) {
+                if (isMaximized()) {
+                    showNormal();
+                } else {
+                    showMaximized();
+                }
+            } else if (windowHandle()) {
+                windowHandle()->startSystemMove();
+            }
+            return true;
+        }
+        return QMainWindow::eventFilter(watched, event);
+    }
+    if (event->type() == QEvent::MouseButtonPress && !isMaximized()) {
+        auto *mouse = static_cast<QMouseEvent *>(event);
+        auto *widget = qobject_cast<QWidget *>(watched);
+        if (mouse->button() == Qt::LeftButton && widget && widget->window() == this
+            && windowHandle()) {
+            const QPoint pos = mapFromGlobal(mouse->globalPosition().toPoint());
+            const int margin = 6;
+            Qt::Edges edges;
+            if (pos.x() <= margin) {
+                edges |= Qt::LeftEdge;
+            }
+            if (pos.x() >= width() - margin) {
+                edges |= Qt::RightEdge;
+            }
+            if (pos.y() <= margin) {
+                edges |= Qt::TopEdge;
+            }
+            if (pos.y() >= height() - margin) {
+                edges |= Qt::BottomEdge;
+            }
+            if (edges) {
+                windowHandle()->startSystemResize(edges);
+                return true;
+            }
+        }
+    }
+    return QMainWindow::eventFilter(watched, event);
+}
+
+// Creates every shortcut whose key comes from config.toml. Called at startup
+// and again on each live config reload (the previous set is deleted first).
+void MainWindow::setupConfigShortcuts()
+{
+    qDeleteAll(m_configShortcuts);
+    m_configShortcuts.clear();
+    const auto add = [this](const QKeySequence &sequence) {
+        auto *shortcut = new QShortcut(sequence, this);
+        m_configShortcuts.append(shortcut);
+        return shortcut;
+    };
+
+    connect(add(QKeySequence(Qt::Key_Tab)), &QShortcut::activated, this, &MainWindow::focusOtherPane);
+    connect(add(QKeySequence(Qt::SHIFT | Qt::Key_Tab)), &QShortcut::activated, this, &MainWindow::focusOtherPane);
+    connect(add(QKeySequence(m_config.shortcut("togglePreviewSource", "Ctrl+Shift+R"))),
+            &QShortcut::activated, m_previewPane, &PreviewPane::toggleSourceRendered);
+    connect(add(QKeySequence(m_config.shortcut("openPreviewExternal", "Ctrl+Shift+I"))),
+            &QShortcut::activated, m_previewPane, &PreviewPane::openCurrentPreviewExternally);
+
+    const auto addPaneShortcut = [this, add](const QString &name, const QString &def, void (FilePane::*slot)()) {
+        connect(add(QKeySequence(m_config.shortcut(name, def))), &QShortcut::activated,
+                this, [this, slot]() { (activePane()->*slot)(); });
+    };
+    addPaneShortcut("openItem", "Ctrl+O", &FilePane::openSelected);
+    addPaneShortcut("openTerminal", "Ctrl+Shift+T", &FilePane::openTerminalHere);
+    addPaneShortcut("compressToZip", "Ctrl+Alt+Z", &FilePane::compressSelectedItemsToZip);
+    addPaneShortcut("extractZip", "Ctrl+Alt+E", &FilePane::extractSelectedZip);
+    addPaneShortcut("selectAll", "Ctrl+A", &FilePane::selectAllVisibleItems);
+    addPaneShortcut("revealInFinder", "Ctrl+Alt+R", &FilePane::revealSelectionInFileManager);
+    addPaneShortcut("movePasteItems", "Ctrl+Shift+V", &FilePane::movePasteIntoCurrentDirectory);
+
+    connect(add(QKeySequence(m_config.shortcut("swapPanes", "Ctrl+Shift+X"))),
+            &QShortcut::activated, this, &MainWindow::swapPanes);
+    connect(add(QKeySequence(m_config.shortcut("focusTerminalPane", "Ctrl+Alt+J"))),
+            &QShortcut::activated, this, [this]() {
+                setTerminalVisible(true);
+                m_terminalPane->focusTerminal();
+            });
+    connect(add(QKeySequence(m_config.shortcut("focusSearch", "Ctrl+F"))),
+            &QShortcut::activated, m_searchEdit, [this]() {
+                m_searchEdit->setFocus();
+                m_searchEdit->lineEdit()->selectAll();
+            });
+    // editConfig is bound through the File menu action (a duplicate QShortcut
+    // would make the key ambiguous and fire neither).
 }
 
 void MainWindow::setIconViewEnabled(bool enabled)

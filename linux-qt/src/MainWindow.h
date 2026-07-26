@@ -17,8 +17,11 @@
 #include <QTreeView>
 #include <QWidget>
 
+class QFileSystemWatcher;
 class QProgressBar;
 class QPushButton;
+class QShortcut;
+class QSocketNotifier;
 class QSplitter;
 class QThread;
 class QLabel;
@@ -34,6 +37,8 @@ public:
 
 private:
     void closeEvent(QCloseEvent *event) override;
+    bool eventFilter(QObject *watched, QEvent *event) override;
+    void setupIntegratedTitleBar();
     void startFileOperation(const QVector<FileOperationRequest> &requests);
     void cancelFileOperation();
     void completeFileOperation(const QStringList &directories, const QString &message, bool continueQueued);
@@ -47,8 +52,26 @@ private:
     void addPinnedFolder(const QString &path);
     void removePinnedFolder(const QString &path);
     void updatePinnedFolderArea();
+    struct DiskEntry
+    {
+        QString root;
+        QString title;
+        QString tooltip;
+        double usage = -1.0;
+    };
+    void refreshDiskList();
+    void applyDiskList(const QList<DiskEntry> &entries);
+    void updateDiskSelection(const QString &path);
+    QString diskRootForPath(const QString &path) const;
+    void applySidebarSectionStates();
     void restoreSettings();
     void saveSettings();
+    void setupConfigShortcuts();
+    void setupConfigWatcher();
+    void reloadConfig();
+    void showConfigWarnings();
+    void openConfigInEditor();
+    void showEditorSettingsDialog();
     void runSearchFromToolbar();
     void rememberSearchTerm(const QString &term);
     void setSplitVisible(bool visible);
@@ -60,6 +83,8 @@ private:
     void setIconViewEnabled(bool enabled);
     void collapseFolderTree();
     void syncIconViewToggle();
+    void syncFolderTree(const QString &path);
+    void collapseTreeBranchesOffPath(const QModelIndex &parent, const QString &targetPath);
     void setActivePane(FilePane *pane);
     void focusOtherPane();
     void swapPanes();
@@ -71,6 +96,39 @@ private:
 
     QFileSystemModel *m_treeModel;
     QTreeView *m_treeView;
+    // True while a navigation originates from a folder-tree click, so the
+    // resulting sync keeps the tree's scroll position instead of jumping.
+    bool m_treeNavigationInProgress = false;
+    // Path whose tree node should sit at the top of the viewport. Async row
+    // insertion (QFileSystemModel loads directories lazily) shifts the
+    // scroll position after the fact, so the scroll is re-applied on each
+    // relevant directoryLoaded until the target's own listing arrives.
+    QString m_pendingTreeScrollPath;
+    // Sidebar sections: DISKS volume list and the collapsible headers.
+    QListWidget *m_diskList = nullptr;
+    QToolButton *m_pinnedHeader = nullptr;
+    QToolButton *m_diskHeader = nullptr;
+    QToolButton *m_treeHeader = nullptr;
+    bool m_pinnedCollapsed = false;
+    bool m_disksCollapsed = false;
+    bool m_foldersCollapsed = false;
+    // Mount-table watch backing the DISKS refresh: /proc/self/mounts signals
+    // mount changes via POLLPRI, which QSocketNotifier surfaces as Exception.
+    QSocketNotifier *m_mountsNotifier = nullptr;
+    QTimer *m_mountsDebounce = nullptr;
+    int m_mountsFd = -1;
+    // Mount roots of the listed disks, for syscall-free volume matching.
+    QStringList m_diskRoots;
+    // Discards results of superseded volume scans.
+    int m_diskScanGeneration = 0;
+    // Integrated title bar ([window] titleBar = "integrated"): the native
+    // title bar is hidden and window controls live in the menu bar.
+    bool m_integratedTitleBar = false;
+    QToolButton *m_maximizeButton = nullptr;
+    // Config-bound shortcuts, recreated on live reload.
+    QList<QShortcut *> m_configShortcuts;
+    QFileSystemWatcher *m_configWatcher = nullptr;
+    QTimer *m_configReloadDebounce = nullptr;
     QListWidget *m_pinnedList;
     QWidget *m_pinnedSpacer;
     QComboBox *m_searchEdit;

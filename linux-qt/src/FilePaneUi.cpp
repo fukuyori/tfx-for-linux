@@ -59,7 +59,10 @@ QWidget *FilePane::createHeaderLayout()
     auto *headerLayout = new QHBoxLayout();
     headerLayout->setContentsMargins(8, 4, 8, 4);
     headerLayout->setSpacing(8);
+    // The LEFT/RIGHT badge is kept as state (active-pane styling hooks) but
+    // no longer shown; the title-bar background marks the active pane.
     headerLayout->addWidget(m_badgeLabel);
+    m_badgeLabel->hide();
 
     // Breadcrumb by default; clicking its empty area switches to the
     // editable path field, which returns on Esc, focus loss, or commit.

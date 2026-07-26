@@ -1,20 +1,33 @@
 #include "FilePane.h"
 #include "FilePaneClipboard.h"
 #include "UiText.h"
+#include "core/FileTypeInfo.h"
 #include "platform/Platform.h"
 
 #include <QApplication>
 #include <QClipboard>
+#include <QDateTime>
+#include <QDialog>
+#include <QDialogButtonBox>
+#include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
+#include <QFormLayout>
 #include <QInputDialog>
+#include <QLabel>
 #include <QLineEdit>
+#include <QLocale>
 #include <QMenu>
 #include <QMessageBox>
 #include <QMimeData>
+#include <QPointer>
 #include <QProcess>
 #include <QPushButton>
+#include <QThread>
 #include <QTimer>
+
+#include <atomic>
+#include <memory>
 
 using namespace tfx::platform;
 
@@ -116,6 +129,11 @@ void FilePane::showFileContextMenu(const QPoint &point)
     menu.addSeparator();
     menu.addAction(UiText::t("Move to Trash", "ゴミ箱へ移動"), this, &FilePane::moveSelectedToTrash)->setEnabled(hasSelection);
 
+    // Group 8 — Properties (single selection only, not inside archives)
+    menu.addSeparator();
+    menu.addAction(UiText::t("Properties", "プロパティ"), this, &FilePane::showProperties)
+        ->setEnabled(m_zipPath.isEmpty() && selectedLocalPaths().size() <= 1);
+
     menu.exec(m_view->viewport()->mapToGlobal(point));
 }
 
@@ -146,6 +164,9 @@ void FilePane::showEmptyAreaContextMenu(const QPoint &point)
     menu.addAction(UiText::t("Open Terminal Here", "ここでターミナルを開く"), this, [this]() {
         emit openTerminalHereRequested(m_currentPath);
     });
+    menu.addSeparator();
+    menu.addAction(UiText::t("Properties", "プロパティ"), this, &FilePane::showProperties)
+        ->setEnabled(m_zipPath.isEmpty());
 
     addUserCommandActions(&menu, false);
 
@@ -293,4 +314,120 @@ void FilePane::selectAllVisibleItems()
 {
     m_view->selectAll();
     updateStatusLine();
+}
+
+// Properties dialog (Windows "Properties" / macOS "Get Info"): metadata for
+// the selected item, or for the current folder when nothing is selected.
+// Folder sizes are tallied on a worker thread so a large or slow tree never
+// blocks the UI; the tally stops when the dialog closes.
+void FilePane::showProperties()
+{
+    if (!m_zipPath.isEmpty()) {
+        emit statusMessageRequested(UiText::t("Properties are unavailable inside archives.",
+                                              "アーカイブ内ではプロパティを表示できません。"));
+        return;
+    }
+    if (selectedLocalPaths().size() > 1) {
+        emit statusMessageRequested(UiText::t("Select a single item to show properties.",
+                                              "プロパティは1項目のみ表示できます。"));
+        return;
+    }
+    const QFileInfo current = currentFileInfo();
+    const QFileInfo info = current.exists() || current.isSymLink()
+        ? current
+        : QFileInfo(m_currentPath);
+
+    auto *dialog = new QDialog(this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->setWindowTitle(UiText::t("Properties", "プロパティ"));
+    dialog->setMinimumWidth(420);
+
+    auto *layout = new QFormLayout(dialog);
+    layout->setLabelAlignment(Qt::AlignRight);
+    const auto addRow = [dialog, layout](const QString &label, const QString &value) {
+        auto *field = new QLabel(value, dialog);
+        field->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        field->setWordWrap(true);
+        layout->addRow(label, field);
+        return field;
+    };
+
+    const QLocale locale;
+    addRow(UiText::t("Name", "名前"),
+           info.fileName().isEmpty() ? info.absoluteFilePath() : info.fileName());
+    addRow(UiText::t("Type", "種類"), tfx::core::englishTypeName(info));
+    addRow(UiText::t("Location", "場所"), info.absolutePath());
+    if (info.isSymLink()) {
+        addRow(UiText::t("Link Target", "リンク先"), info.symLinkTarget());
+    }
+
+    QLabel *sizeField = addRow(UiText::t("Size", "サイズ"), QString());
+    if (info.isDir() && !info.isSymLink()) {
+        sizeField->setText(UiText::t("Calculating...", "計算中..."));
+        auto cancelled = std::make_shared<std::atomic_bool>(false);
+        QObject::connect(dialog, &QObject::destroyed, [cancelled]() { *cancelled = true; });
+        const QString root = info.absoluteFilePath();
+        QPointer<QLabel> field(sizeField);
+        QThread *worker = QThread::create([root, cancelled, field]() {
+            qint64 bytes = 0;
+            qint64 files = 0;
+            qint64 dirs = 0;
+            QDirIterator it(root,
+                            QDir::AllEntries | QDir::Hidden | QDir::System | QDir::NoDotAndDotDot,
+                            QDirIterator::Subdirectories);
+            while (it.hasNext() && !*cancelled) {
+                it.next();
+                const QFileInfo entry = it.fileInfo();
+                if (entry.isDir()) {
+                    ++dirs;
+                } else {
+                    ++files;
+                    bytes += entry.size();
+                }
+            }
+            if (*cancelled) {
+                return;
+            }
+            const QString text = UiText::t("%1 (%2 files, %3 folders)",
+                                           "%1(ファイル %2、フォルダ %3)")
+                                     .arg(tfx::core::sizeString(bytes))
+                                     .arg(files)
+                                     .arg(dirs);
+            QMetaObject::invokeMethod(qApp, [field, text]() {
+                if (field) {
+                    field->setText(text);
+                }
+            }, Qt::QueuedConnection);
+        });
+        QObject::connect(worker, &QThread::finished, worker, &QObject::deleteLater);
+        worker->start();
+    } else {
+        sizeField->setText(QString("%1 (%2)")
+                               .arg(tfx::core::sizeString(info.size()),
+                                    UiText::t("%1 bytes", "%1 バイト").arg(locale.toString(info.size()))));
+    }
+
+    const QFile::Permissions permissions = info.permissions();
+    const auto octalDigit = [permissions](QFile::Permission read, QFile::Permission write,
+                                          QFile::Permission execute) {
+        return (permissions.testFlag(read) ? 4 : 0) + (permissions.testFlag(write) ? 2 : 0)
+            + (permissions.testFlag(execute) ? 1 : 0);
+    };
+    const QString octal = QString::number(octalDigit(QFile::ReadOwner, QFile::WriteOwner, QFile::ExeOwner) * 100
+                                          + octalDigit(QFile::ReadGroup, QFile::WriteGroup, QFile::ExeGroup) * 10
+                                          + octalDigit(QFile::ReadOther, QFile::WriteOther, QFile::ExeOther));
+    addRow(UiText::t("Permissions", "パーミッション"),
+           QString("%1 (%2)").arg(tfx::core::modeString(info), octal));
+    addRow(UiText::t("Owner", "所有者"), QString("%1 / %2").arg(info.owner(), info.group()));
+    if (info.birthTime().isValid()) {
+        addRow(UiText::t("Created", "作成日時"), locale.toString(info.birthTime(), QLocale::ShortFormat));
+    }
+    addRow(UiText::t("Modified", "更新日時"), locale.toString(info.lastModified(), QLocale::ShortFormat));
+    addRow(UiText::t("Accessed", "アクセス日時"), locale.toString(info.lastRead(), QLocale::ShortFormat));
+
+    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close, dialog);
+    QObject::connect(buttons, &QDialogButtonBox::rejected, dialog, &QDialog::reject);
+    QObject::connect(buttons, &QDialogButtonBox::accepted, dialog, &QDialog::accept);
+    layout->addRow(buttons);
+    dialog->show();
 }

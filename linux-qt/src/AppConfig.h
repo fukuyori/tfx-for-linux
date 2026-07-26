@@ -16,6 +16,7 @@ struct UserCommand
     bool requireGit = false;        // show only inside a Git work tree
     bool terminal = false;          // stream output to the terminal Output tab
     QString shell;                  // empty => $SHELL, then /bin/sh
+    int shortcutLine = 0;           // config.toml line of the shortcut key (0 = none)
 
     // Legacy fields kept until the execution model adopts the fields above.
     QString workingDirectory = "{cwd}";
@@ -117,6 +118,13 @@ struct AppNamingConfig
     QString placeholderLanguage = "auto";
 };
 
+struct AppWindowConfig
+{
+    // "system" keeps the native title bar; "integrated" hides it and merges
+    // the window controls into the menu bar. Applied at launch only.
+    QString titleBar = "system";
+};
+
 struct AppOpacityConfig
 {
     double background = 1.0;
@@ -141,6 +149,8 @@ class AppConfig
 {
 public:
     static AppConfig loadOrCreate();
+    // Absolute path of config.toml (for in-app editing and the live-reload watcher).
+    static QString configFilePath();
 
     QString shortcut(const QString &name, const QString &fallback) const;
     QString resolvedUiFontFamily() const;
@@ -152,6 +162,7 @@ public:
     AppFontConfig font;
     AppStartupConfig startup;
     AppNamingConfig naming;
+    AppWindowConfig window;
     AppOpacityConfig opacity;
     AppPreviewConfig preview;
     QHash<QString, QString> shortcuts;
@@ -177,4 +188,6 @@ private:
     void addWarning(int lineNumber, const QString &message);
 
     QStringList m_warnings;
+    // config.toml line of each [shortcuts] assignment, for conflict warnings.
+    QHash<QString, int> m_shortcutLines;
 };

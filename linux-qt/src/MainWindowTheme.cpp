@@ -74,6 +74,13 @@ void MainWindow::applyTerminalTheme()
             font-weight: 500;
             padding: 7px 0 3px 0;
         }
+        QToolButton#sectionHeader {
+            color: #9EABB6;
+            font-weight: 500;
+            border: 0;
+            background: transparent;
+            padding: 7px 0 3px 0;
+        }
         QListWidget, QTreeView {
             background: #171C20;
             color: #D9E1E8;
@@ -396,7 +403,7 @@ void MainWindow::applyTerminalTheme()
                                m_config.font.fileListFamily, m_config.font.fileListSize);
     styleSheet += paneFontRule("QPlainTextEdit#previewCode, QTextBrowser#previewRendered",
                                m_config.font.previewFamily, m_config.font.previewSize);
-    styleSheet += paneFontRule("QTreeView#folderTree, QListWidget#pinnedList",
+    styleSheet += paneFontRule("QTreeView#folderTree, QListWidget#pinnedList, QListWidget#diskList",
                                m_config.font.folderTreeFamily, m_config.font.folderTreeSize);
 
     // Folder-tree, section-header, and status-line colours (config [colors]).
@@ -407,6 +414,7 @@ void MainWindow::applyTerminalTheme()
         "\nQTreeView#folderTree::item:selected:!active,"
         " QListWidget#pinnedList::item:selected:!active { background: %8; color: %3; }"
         "\nQLabel#sectionLabel { color: %4; }"
+        "\nQToolButton#sectionHeader { color: %4; }"
         "\nQLabel#paneStatus { background: %5; color: %6; }"
         "\nQLabel#paneStatus[activePane=\"true\"] { color: %7; }"
         "\nQWidget#paneTitleBar { background: %9; }"
@@ -447,6 +455,8 @@ void MainWindow::applyTerminalTheme()
 
     m_leftPane->setDropTargetColor(m_config.colors.dropTargetBackground);
     m_rightPane->setDropTargetColor(m_config.colors.dropTargetBackground);
+    static_cast<FolderTreeView *>(m_treeView)->dropTargetColor =
+        QColor(m_config.colors.dropTargetBackground);
 
     static_cast<PinnedListWidget *>(m_pinnedList)->dropIndicatorOpacity = m_config.opacity.dropIndicator;
     m_pinnedList->viewport()->update();

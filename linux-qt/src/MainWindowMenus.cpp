@@ -142,6 +142,10 @@ void MainWindow::buildActions()
     addMenuAction(fileMenu, UiText::t("New Folder", "新規フォルダ"), this, [this]() { activePane()->createFolder(); }, QKeySequence(m_config.shortcut("newFolder", "Ctrl+Shift+N")));
     addMenuAction(fileMenu, UiText::t("Rename", "名前を変更"), this, [this]() { activePane()->renameSelected(); }, QKeySequence(m_config.shortcut("rename", "F2")));
     addMenuAction(fileMenu, UiText::t("Move to Trash", "ゴミ箱へ移動"), this, [this]() { activePane()->moveSelectedToTrash(); }, QKeySequence(m_config.shortcut("moveToTrash", "Del")));
+    addMenuAction(fileMenu, UiText::t("Properties", "プロパティ"), this, [this]() { activePane()->showProperties(); }, QKeySequence(m_config.shortcut("showProperties", "Alt+Return")));
+    fileMenu->addSeparator();
+    addMenuAction(fileMenu, UiText::t("Edit Config File...", "設定ファイルを編集..."), this, [this]() { openConfigInEditor(); }, QKeySequence(m_config.shortcut("editConfig", "Ctrl+,")));
+    addMenuAction(fileMenu, UiText::t("Editor Settings...", "エディター設定..."), this, [this]() { showEditorSettingsDialog(); });
     fileMenu->addSeparator();
     addMenuAction(fileMenu, UiText::t("Quit", "終了"), qApp, []() { QApplication::quit(); }, QKeySequence(m_config.shortcut("quit", "Ctrl+Q")));
 
@@ -274,11 +278,6 @@ void MainWindow::buildTopToolbar()
     connect(m_searchEdit, &QComboBox::activated, this, [this](int) {
         runSearchFromToolbar();
     });
-    auto *focusSearchShortcut = new QShortcut(QKeySequence(m_config.shortcut("focusSearch", "Ctrl+F")), this);
-    connect(focusSearchShortcut, &QShortcut::activated, m_searchEdit, [this]() {
-        m_searchEdit->setFocus();
-        m_searchEdit->lineEdit()->selectAll();
-    });
     m_topToolbar->addWidget(m_searchEdit);
     auto *cancelSearchButton = new QToolButton(this);
     cancelSearchButton->setObjectName("toolbarIconButton");
@@ -367,4 +366,21 @@ void MainWindow::buildTopToolbar()
     m_commandOutputButton->setToolTip(UiText::t("Show / hide command output", "コマンド出力を表示 / 非表示"));
     connect(m_commandOutputButton, &QToolButton::toggled, this, &MainWindow::setCommandOutputVisible);
     m_topToolbar->addWidget(m_commandOutputButton);
+
+    // Settings gear: config editing entry points (config.toml itself applies
+    // live via the file watcher).
+    auto *settingsButton = new QToolButton(this);
+    settingsButton->setObjectName("toolbarIconButton");
+    settingsButton->setText(QString::fromUtf8("⚙"));
+    settingsButton->setFixedSize(24, 24);
+    settingsButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
+    settingsButton->setPopupMode(QToolButton::InstantPopup);
+    settingsButton->setToolTip(UiText::t("Settings", "設定"));
+    auto *settingsMenu = new QMenu(settingsButton);
+    settingsMenu->addAction(UiText::t("Edit Config File...", "設定ファイルを編集..."),
+                            this, &MainWindow::openConfigInEditor);
+    settingsMenu->addAction(UiText::t("Editor Settings...", "エディター設定..."),
+                            this, &MainWindow::showEditorSettingsDialog);
+    settingsButton->setMenu(settingsMenu);
+    m_topToolbar->addWidget(settingsButton);
 }

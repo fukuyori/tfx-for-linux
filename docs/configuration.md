@@ -10,6 +10,8 @@ tfx for Linux stores user-editable configuration under:
 
 The main user-editable configuration file is `config.toml`. tfx creates it on startup when it does not already exist. Existing files are not overwritten.
 
+`config.toml` can be opened from the app via the toolbar gear menu ("Edit Config File...", default shortcut `Ctrl+,`); the editor used is chosen in "Editor Settings...". Saves apply immediately: shortcuts, `theme`, `[colors]`, `[opacity]`, `[font]`, `[openWith]`, `[preview]`, and `[[commands]]` reload live. `[startup]` keeps its launch-time semantics. Configuration errors are listed in a dialog with `config.toml` line numbers; the app keeps running on the previous or default values.
+
 Session state such as window placement, last-opened paths, pinned folders, column layout, splitter sizes, and view mode remains app-owned state. Use `config.toml` for hand-written preferences.
 
 ## Current Scope
@@ -18,6 +20,7 @@ Session state such as window placement, last-opened paths, pinned folders, colum
 
 - Top-level `version = 1`
 - Top-level `theme = "dark"` or `theme = "light"`
+- `[window]`
 - `[font]`
 - `[colors]`
 - `[opacity]`
@@ -130,6 +133,24 @@ quit = "ctrl+q"
 # terminal = false
 ```
 
+## Window
+
+`[window]` controls the window chrome:
+
+```toml
+[window]
+titleBar = "system"   # system or integrated
+```
+
+- `system` (default): the native window manager title bar.
+- `integrated`: the title bar is hidden and the minimize/maximize/close
+  controls move into the menu bar. Drag the empty menu-bar area to move the
+  window (double-click maximizes); window edges and the status-bar grip
+  resize.
+
+Unlike the rest of the configuration, `titleBar` is applied at launch —
+changing it takes effect after a restart.
+
 ## Fonts
 
 `[font]` sets the global UI font (`ui`), the monospace family used across the
@@ -217,6 +238,8 @@ warnings and fall back to the defaults.
 | `newFile` / `newFolder` | `Ctrl+N` / `Ctrl+Shift+N` | Create file / folder. |
 | `rename` | `F2` | Rename the selection. |
 | `moveToTrash` | `Del` | Move the selection to Trash. |
+| `showProperties` | `Alt+Return` | Show properties for the selection (or the current folder). |
+| `editConfig` | `Ctrl+,` | Open config.toml in the configured editor. |
 | `compressToZip` / `extractZip` | `Ctrl+Alt+Z` / `Ctrl+Alt+E` | Zip / unzip the selection. |
 | `copyItems` / `cutItems` | `Ctrl+C` / `Ctrl+X` | Copy / cut the selection. |
 | `pasteItems` / `movePasteItems` | `Ctrl+V` / `Ctrl+Shift+V` | Paste (copy) / paste-move. |

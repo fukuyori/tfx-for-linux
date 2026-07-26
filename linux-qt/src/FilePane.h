@@ -1,6 +1,8 @@
 #pragma once
 
+class QAbstractItemView;
 class QFileSystemWatcher;
+class QKeyEvent;
 class QTimer;
 class QStackedWidget;
 class QDirIterator;
@@ -15,6 +17,7 @@ class BreadcrumbBar;
 #include "core/FileOperationWorker.h"
 #include "models/FileSystemProxyModel.h"
 
+#include <QElapsedTimer>
 #include <QFileIconProvider>
 #include <QFileSystemModel>
 #include <QFont>
@@ -58,6 +61,9 @@ public:
     void setOpenWithApplications(const QHash<QString, QString> &applications);
     void setPlaceholderLanguage(const QString &language);
     void runUserCommand(int index);
+    // External drop entry (folder tree): runs the same pipeline as pane
+    // drops, including the self/subtree guard and conflict prompts.
+    void dropOntoDirectory(const QList<QUrl> &urls, Qt::DropAction action, const QString &targetDir);
 
 signals:
     void activated(FilePane *pane);
@@ -108,6 +114,7 @@ public slots:
     void previousTab();
     void revealSelectionInFileManager();
     void openTerminalHere();
+    void showProperties();
     void selectAllVisibleItems();
     void compressSelectedItemsToZip();
     void extractSelectedZip();
@@ -149,6 +156,10 @@ private:
     void selectProxyIndex(const QModelIndex &index);
     bool selectParentEntry();
     void setCurrentIndexForPath(const QString &path);
+
+    // Type-to-select (Explorer/Finder-style keyboard search)
+    bool handleTypeAheadKey(QAbstractItemView *view, const QKeyEvent *event);
+    void resetTypeAhead();
 
     // Search
     void searchStep();
@@ -247,6 +258,12 @@ private:
     QString m_directoryForeground = "#E5EDF3";
     QString m_label;
     QString m_currentPath;
+    // Type-to-select: the active prefix, the elapsed-ms clock backing the
+    // 1-second window, and the timer that restores the status line.
+    QString m_typeAheadPrefix;
+    QElapsedTimer m_typeAheadClock;
+    qint64 m_typeAheadLastMs = -1;
+    QTimer *m_typeAheadStatusTimer = nullptr;
     bool m_showHiddenFiles = false;
     bool m_isActive = false;
     bool m_suppressColumnSave = false;

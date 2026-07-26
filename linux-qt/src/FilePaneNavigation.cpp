@@ -30,6 +30,7 @@ void FilePane::navigateTo(const QString &path, bool recordHistory)
     }
 
     cancelSearch();
+    resetTypeAhead();
     m_zipPath.clear();
     m_zipDir.clear();
     m_zipEntries.clear();

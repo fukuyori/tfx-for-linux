@@ -1,7 +1,7 @@
 # tfx for Linux
 
 **Terminal-inspired interface File eXplorer for Linux**  
-Version: **0.8.2**
+Version: **0.8.3**
 
 English | [Japanese](README.ja.md)
 
@@ -48,6 +48,12 @@ To set the initial window geometry:
 ```
 
 When no folder is specified, the application opens the current working directory.
+
+`tfx` detaches from the terminal at startup, so the shell prompt returns immediately (no `&` needed). To keep it attached — for example to see log output — use:
+
+```sh
+./build/tfx --foreground
+```
 
 ## Tests
 

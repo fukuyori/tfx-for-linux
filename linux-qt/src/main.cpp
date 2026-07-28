@@ -4,8 +4,45 @@
 #include <QDir>
 #include <QIcon>
 
+#include <cstring>
+#include <fcntl.h>
+#include <unistd.h>
+
 int main(int argc, char *argv[])
 {
+    bool foreground = false;
+    for (int i = 1; i < argc; ++i) {
+        if (std::strcmp(argv[i], "-f") == 0 || std::strcmp(argv[i], "--foreground") == 0) {
+            foreground = true;
+            break;
+        }
+    }
+    // Detach from the launching terminal so the shell prompt returns
+    // immediately (as if started with `&`). Must happen before QApplication
+    // exists: forking after Qt opens its display connection is unsafe.
+    if (!foreground) {
+        const pid_t pid = fork();
+        if (pid > 0) {
+            return 0;
+        }
+        if (pid == 0) {
+            // New session: closing the terminal no longer delivers SIGHUP.
+            setsid();
+            // Detached runs must not print Qt runtime warnings over the shell
+            // prompt they just returned; --foreground keeps them visible.
+            const int devNull = ::open("/dev/null", O_RDWR);
+            if (devNull >= 0) {
+                ::dup2(devNull, STDIN_FILENO);
+                ::dup2(devNull, STDOUT_FILENO);
+                ::dup2(devNull, STDERR_FILENO);
+                if (devNull > STDERR_FILENO) {
+                    ::close(devNull);
+                }
+            }
+        }
+        // fork() failed: continue attached to the terminal.
+    }
+
     QApplication app(argc, argv);
     QApplication::setApplicationName("tfx");
     QApplication::setOrganizationName("fukuyori");

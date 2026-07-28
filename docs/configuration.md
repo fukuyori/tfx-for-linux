@@ -197,6 +197,10 @@ Notes:
 option `-g` / `--geometry` uses the same format and takes precedence over
 `config.toml`.
 
+At startup `tfx` forks and detaches from the launching terminal, so the shell
+prompt returns immediately. The command-line option `-f` / `--foreground`
+disables this and keeps `tfx` attached to the terminal.
+
 ## Naming
 
 `[naming] placeholderLanguage` controls generated placeholder names such as

@@ -1,7 +1,7 @@
 # tfx for Linux
 
 **Linux 向け Terminal-inspired interface File eXplorer**  
-Version: **0.8.2**
+Version: **0.8.3**
 
 [English](README.md) | 日本語
 
@@ -48,6 +48,12 @@ scripts/build.sh --run
 ```
 
 フォルダ指定がない場合は、起動時のカレントディレクトリを表示します。
+
+`tfx` は起動時にターミナルから切り離されるため、`&` を付けなくてもすぐにプロンプトが戻ります。ログ出力の確認などでターミナルに繋いだままにする場合は次を使用します:
+
+```sh
+./build/tfx --foreground
+```
 
 ## テスト
 

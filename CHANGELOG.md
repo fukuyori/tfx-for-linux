@@ -2,6 +2,22 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.8.3] - 2026-07-28
+
+### Changed
+
+- `tfx` now forks and detaches from the launching terminal at startup, so the
+  shell prompt returns immediately without appending `&`. Closing the terminal
+  afterwards no longer terminates the application. Detached runs redirect
+  stdin/stdout/stderr to `/dev/null` so Qt runtime warnings (e.g. the benign
+  `qt.qpa.services` portal app-ID message) no longer print over the prompt;
+  use `--foreground` to see them.
+
+### Added
+
+- New command-line option `-f` / `--foreground` keeps `tfx` attached to the
+  terminal (previous behavior), e.g. for reading log output.
+
 ## [0.8.2] - 2026-07-26
 
 Structural refactoring; no user-visible behavior changes.

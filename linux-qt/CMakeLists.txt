@@ -136,9 +136,11 @@ install(FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/../README.md
         ${CMAKE_CURRENT_SOURCE_DIR}/../README.ja.md
         ${CMAKE_CURRENT_SOURCE_DIR}/../CHANGELOG.md
+        ${CMAKE_CURRENT_SOURCE_DIR}/../LICENSE
         ${CMAKE_CURRENT_SOURCE_DIR}/../docs/configuration.md
         ${CMAKE_CURRENT_SOURCE_DIR}/../docs/roadmap.md
         ${CMAKE_CURRENT_SOURCE_DIR}/../docs/packaging.md
+        ${CMAKE_CURRENT_SOURCE_DIR}/../docs/rust-migration-plan.md
         DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/README.md
         DESTINATION ${CMAKE_INSTALL_DOCDIR}

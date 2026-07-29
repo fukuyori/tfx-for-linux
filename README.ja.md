@@ -140,6 +140,12 @@ Linux 版の詳細は [docs/configuration.md](docs/configuration.md) を参照�
 
 [docs/roadmap.md](docs/roadmap.md) を参照してください。
 
+## Rust 移行計画
+
+Qt と機種依存部分を維持しながら、セキュリティと移植性の向上を目的として
+内部処理を Rust へ段階移行する計画は
+[docs/rust-migration-plan.md](docs/rust-migration-plan.md) を参照してください。
+
 ## パッケージング
 
 CMake の install target は実行ファイル、desktop entry、SVG icon、ドキュメントをインストールします。`scripts/build_package.sh` で DEB/RPM/tar.gz パッケージを `dist/` に作成できます。詳細は [docs/packaging.md](docs/packaging.md) を参照してください。
@@ -152,4 +158,4 @@ https://github.com/fukuyori/tfx-for-linux.git
 
 ## ライセンス
 
-Linux 版としてのライセンス表記は未確定です。
+このプロジェクトは [Apache License 2.0](LICENSE) の下で提供されます。

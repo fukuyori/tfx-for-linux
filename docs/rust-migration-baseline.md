@@ -202,6 +202,10 @@ sanitizer、ファズ、Windows、macOSのjobはまだない。
 - path、error、buffer、ownership、thread、callbackを決定する。
 - Rust toolchainの最低対応版を決定する。
 
+初期決定は
+[ADR-0001: Qt/C++とRustの境界にcxxを使用する](adr/0001-rust-cxx-boundary.md)
+を参照する。toolchainの最低対応版はPoCで依存関係を固定した後に確定する。
+
 ### Step 2: `TypeAhead` PoC
 
 - Qt型からFFI型への変換を最小の機能で検証する。

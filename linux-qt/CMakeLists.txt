@@ -138,6 +138,7 @@ install(FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/../CHANGELOG.md
         ${CMAKE_CURRENT_SOURCE_DIR}/../LICENSE
         ${CMAKE_CURRENT_SOURCE_DIR}/../docs/configuration.md
+        ${CMAKE_CURRENT_SOURCE_DIR}/../docs/adr/0001-rust-cxx-boundary.md
         ${CMAKE_CURRENT_SOURCE_DIR}/../docs/roadmap.md
         ${CMAKE_CURRENT_SOURCE_DIR}/../docs/packaging.md
         ${CMAKE_CURRENT_SOURCE_DIR}/../docs/rust-migration-baseline.md

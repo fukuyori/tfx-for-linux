@@ -109,12 +109,12 @@ scripts/benchmark_delimited_text.sh
 | `cargo audit 0.22.2` | 35依存crate、既知脆弱性なし |
 | `cargo deny 0.20.2` | advisories、bans、licenses、sources成功 |
 | C++ adapterのASan、UBSan | path bridge、TypeAhead、DelimitedText成功 |
-| GitHub Actions、sanitizer | ASan、UBSan境界テスト成功、1分9秒 |
-| GitHub Actions、Rust無効 | 成功、1分58秒 |
-| GitHub Actions、Rust有効 | format、lint、監査、build、test、install成功、5分55秒 |
+| GitHub Actions、sanitizer | ASan、UBSan境界テスト成功、1分3秒 |
+| GitHub Actions、Rust無効 | 成功、2分19秒 |
+| GitHub Actions、Rust有効 | format、lint、監査、build、test、install成功、7分1秒 |
 | 動的リンク依存 | Rust 固有の共有ライブラリ追加なし |
 
-GitHub Actionsの最終結果はworkflow dispatch run `30508679923`で確認した。
+GitHub Actionsの最終結果はworkflow dispatch run `30509639442`で確認した。
 初回run `30506757284`で`actions/checkout@v4`のNode.js 20非推奨警告を確認した
 ため、Node.js 24対応の`actions/checkout@v6`へ更新し、後続runで警告が解消した。
 

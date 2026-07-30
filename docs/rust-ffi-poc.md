@@ -90,13 +90,13 @@ cargo deny --manifest-path rust/Cargo.toml --config rust/deny.toml --locked chec
 | `cargo audit 0.22.2` | 35依存crate、既知脆弱性なし |
 | `cargo deny 0.20.2` | advisories、bans、licenses、sources成功 |
 | C++ adapterのASan、UBSan | path bridgeとTypeAhead成功 |
-| GitHub Actions、Rust無効 | 成功、1分42秒 |
-| GitHub Actions、Rust有効 | format、lint、監査、build、test、install成功、7分4秒 |
+| GitHub Actions、Rust無効 | 成功、1分52秒 |
+| GitHub Actions、Rust有効 | format、lint、監査、build、test、install成功、5分38秒 |
 | 動的リンク依存 | Rust 固有の共有ライブラリ追加なし |
 
-GitHub Actionsはworkflow dispatch run `30506757284`で確認した。初回実行で
-`actions/checkout@v4`のNode.js 20非推奨警告を確認したため、Node.js 24対応の
-`actions/checkout@v6`へ更新した。
+GitHub Actionsはworkflow dispatch run `30507151086`で確認した。初回run
+`30506757284`で`actions/checkout@v4`のNode.js 20非推奨警告を確認したため、
+Node.js 24対応の`actions/checkout@v6`へ更新し、再実行で警告が解消した。
 
 未 strip の Release 実行ファイルは Rust 無効時 1,394,824 bytes、Rust 有効時
 6,745,288 bytes だった。Rust 有効時は 5,350,464 bytes 増加している。

@@ -4,6 +4,7 @@ project(tfx-for-linux VERSION 0.8.3 LANGUAGES CXX)
 
 include(GNUInstallDirs)
 include(CTest)
+include(cmake/RustCore.cmake)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -111,6 +112,7 @@ qt_add_resources(tfx "tfx_icons"
 
 target_include_directories(tfx PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(tfx PRIVATE Qt6::Widgets Qt6::DBus)
+tfx_enable_rust_core(tfx)
 
 # Optional: use QTermWidget for an interactive terminal pane when available.
 if(qtermwidget6_FOUND)
@@ -141,6 +143,7 @@ install(FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/../docs/adr/0001-rust-cxx-boundary.md
         ${CMAKE_CURRENT_SOURCE_DIR}/../docs/roadmap.md
         ${CMAKE_CURRENT_SOURCE_DIR}/../docs/packaging.md
+        ${CMAKE_CURRENT_SOURCE_DIR}/../docs/rust-ffi-poc.md
         ${CMAKE_CURRENT_SOURCE_DIR}/../docs/rust-migration-baseline.md
         ${CMAKE_CURRENT_SOURCE_DIR}/../docs/rust-migration-plan.md
         DESTINATION ${CMAKE_INSTALL_DOCDIR})
@@ -250,6 +253,7 @@ if(BUILD_TESTING AND Qt6Test_FOUND)
     )
     target_include_directories(tfx_search_state_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(tfx_search_state_test PRIVATE Qt6::Core Qt6::Test)
+    tfx_enable_rust_core(tfx_search_state_test)
     add_test(NAME search_state COMMAND tfx_search_state_test)
 
     qt_add_executable(tfx_tab_state_test
@@ -279,6 +283,7 @@ if(BUILD_TESTING AND Qt6Test_FOUND)
     )
     target_include_directories(tfx_type_ahead_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(tfx_type_ahead_test PRIVATE Qt6::Core Qt6::Test)
+    tfx_enable_rust_core(tfx_type_ahead_test)
     add_test(NAME type_ahead COMMAND tfx_type_ahead_test)
 
     qt_add_executable(tfx_column_layout_test
@@ -371,6 +376,7 @@ if(BUILD_TESTING AND Qt6Test_FOUND)
     )
     target_include_directories(tfx_file_pane_selection_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(tfx_file_pane_selection_test PRIVATE Qt6::Core Qt6::DBus Qt6::Gui Qt6::Widgets Qt6::Test)
+    tfx_enable_rust_core(tfx_file_pane_selection_test)
     add_test(NAME file_pane_selection COMMAND tfx_file_pane_selection_test)
     set_tests_properties(file_pane_selection PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 

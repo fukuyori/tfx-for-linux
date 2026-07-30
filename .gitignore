@@ -2,6 +2,7 @@
 /build/
 /build-package/
 /dist/
+/rust/target/
 /tfx-qt-build/
 /cmake-build-*/
 /.cache/

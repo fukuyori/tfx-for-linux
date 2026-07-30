@@ -1,0 +1,17 @@
+[package]
+name = "tfx-bridge"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+build = "build.rs"
+
+[lib]
+crate-type = ["rlib", "staticlib"]
+
+[dependencies]
+cxx.workspace = true
+tfx-core = { path = "../tfx-core" }
+
+[build-dependencies]
+cxx-build.workspace = true

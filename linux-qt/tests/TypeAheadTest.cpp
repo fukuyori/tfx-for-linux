@@ -14,6 +14,7 @@ private slots:
     void mismatchKeepsPrefixAndSelection();
     void repeatedInitialCyclesThroughMatchesAndWraps();
     void matchingIsCaseInsensitive();
+    void matchingUsesUnicodeSimpleCaseFolding();
     void emptyListDoesNothing();
 };
 
@@ -67,6 +68,19 @@ void TypeAheadTest::matchingIsCaseInsensitive()
     QCOMPARE(step.row, 1);
     // Cycling with the same initial covers both cases.
     step = typeAheadStep(names, 1, "M", "m");
+    QCOMPARE(step.row, 2);
+}
+
+void TypeAheadTest::matchingUsesUnicodeSimpleCaseFolding()
+{
+    const QStringList names = {
+        QString::fromUtf8("Straße.txt"),
+        QStringLiteral("STRASSE.md"),
+        QString::fromUtf8("日本語.txt"),
+    };
+    TypeAheadStep step = typeAheadStep(names, -1, QString(), QStringLiteral("STRASS"));
+    QCOMPARE(step.row, 1);
+    step = typeAheadStep(names, -1, QString(), QString::fromUtf8("日"));
     QCOMPARE(step.row, 2);
 }
 

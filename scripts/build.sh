@@ -6,6 +6,7 @@ repo_root="$(dirname "$script_dir")"
 build_dir="$repo_root/build"
 build_type="Release"
 build_tests="OFF"
+rust_core="OFF"
 run_after_build=0
 clean_first=0
 
@@ -17,6 +18,7 @@ Options:
   --debug       Build with CMAKE_BUILD_TYPE=Debug
   --release     Build with CMAKE_BUILD_TYPE=Release (default)
   --tests       Also build the Qt Test executables (for ctest)
+  --rust-core   Build with the experimental Rust core enabled
   --clean       Remove the build directory before configuring
   --run [path]  Run ./build/tfx after building, optionally opening path
   -h, --help    Show this help
@@ -39,6 +41,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --tests)
             build_tests="ON"
+            shift
+            ;;
+        --rust-core)
+            rust_core="ON"
             shift
             ;;
         --clean)
@@ -71,7 +77,8 @@ fi
 
 cmake -S "$repo_root/linux-qt" -B "$build_dir" \
     -DCMAKE_BUILD_TYPE="$build_type" \
-    -DBUILD_TESTING="$build_tests"
+    -DBUILD_TESTING="$build_tests" \
+    -DTFX_ENABLE_RUST_CORE="$rust_core"
 cmake --build "$build_dir" --parallel
 
 if [[ "$run_after_build" -eq 1 ]]; then

@@ -114,6 +114,9 @@ Qt 型を認識せず、明示的な入力、結果、エラーを持つライ�
 最初の対象は `TypeAhead` または Git porcelain の解析処理とする。PoC では
 セキュリティ効果よりも、次の技術成立性を確認する。
 
+`TypeAhead` を対象にした現在の検証結果は
+[Rust/C++ FFI TypeAhead PoC](rust-ffi-poc.md)に記録する。
+
 - CMake から Cargo のビルドを実行できる。
 - Rust 静的ライブラリをアプリとテストへリンクできる。
 - C++ と Rust のテストを同じ CI で実行できる。
@@ -240,6 +243,10 @@ docs/rust-migration-plan
 ```text
 spike/rust-ffi-poc
 ```
+
+`spike/rust-ffi-poc` は隔離した技術検証ブランチとして扱い、当面 `main` へ
+マージしない。採用判断後も、このブランチ自体をマージするのではなく、必要な
+変更をレビュー可能な単位で実装ブランチへ移す。
 
 実装例:
 

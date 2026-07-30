@@ -13,9 +13,13 @@ concurrency:
 
 jobs:
   linux-qt:
-    name: Linux Qt
+    name: Linux Qt (Rust core ${{ matrix.rust_core }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        rust_core: ["OFF", "ON"]
 
     steps:
       - name: Checkout
@@ -26,8 +30,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cmake g++ qt6-base-dev
 
+      - name: Check Rust formatting
+        if: matrix.rust_core == 'ON'
+        run: cargo fmt --all --check --manifest-path rust/Cargo.toml
+
+      - name: Lint Rust
+        if: matrix.rust_core == 'ON'
+        run: cargo clippy --workspace --all-targets --all-features --locked --manifest-path rust/Cargo.toml -- -D warnings
+
       - name: Configure
-        run: cmake -S linux-qt -B build
+        run: cmake -S linux-qt -B build -DTFX_ENABLE_RUST_CORE=${{ matrix.rust_core }}
 
       - name: Build
         run: cmake --build build --parallel

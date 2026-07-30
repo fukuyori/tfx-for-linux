@@ -6,6 +6,8 @@ include(GNUInstallDirs)
 include(CTest)
 include(cmake/RustCore.cmake)
 
+option(TFX_BUILD_BENCHMARKS "Build experimental performance benchmarks" OFF)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
@@ -113,6 +115,17 @@ qt_add_resources(tfx "tfx_icons"
 target_include_directories(tfx PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(tfx PRIVATE Qt6::Widgets Qt6::DBus)
 tfx_enable_rust_core(tfx)
+
+if(TFX_BUILD_BENCHMARKS)
+    qt_add_executable(tfx_type_ahead_benchmark
+        benchmarks/TypeAheadBenchmark.cpp
+        src/core/TypeAhead.cpp
+        src/core/TypeAhead.h
+    )
+    target_include_directories(tfx_type_ahead_benchmark PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(tfx_type_ahead_benchmark PRIVATE Qt6::Core)
+    tfx_enable_rust_core(tfx_type_ahead_benchmark)
+endif()
 
 # Optional: use QTermWidget for an interactive terminal pane when available.
 if(qtermwidget6_FOUND)

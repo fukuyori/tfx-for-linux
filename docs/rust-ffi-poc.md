@@ -72,6 +72,15 @@ cargo audit --file rust/Cargo.lock
 cargo deny --manifest-path rust/Cargo.toml --config rust/deny.toml --locked check
 ```
 
+TypeAheadのC++/Rust比較:
+
+```sh
+scripts/benchmark_type_ahead.sh
+```
+
+`TFX_BENCHMARK_NAMES`と`TFX_BENCHMARK_ITERATIONS`で一覧件数と反復回数を
+変更できる。benchmark targetは`TFX_BUILD_BENCHMARKS=ON`の場合だけ生成する。
+
 ## 4. 検証結果
 
 2026-07-30 に Linux x86_64、GCC 15.2、Qt 6 で確認した。
@@ -102,7 +111,28 @@ Node.js 24対応の`actions/checkout@v6`へ更新し、再実行で警告が解�
 6,745,288 bytes だった。Rust 有効時は 5,350,464 bytes 増加している。
 最終評価では配布時の strip、LTO、`panic` 設定を揃えて再計測する。
 
-## 5. 判明した互換性要件
+## 5. 性能評価
+
+Release buildで、一覧末尾の要素に一致する検索を反復した。これは一覧全体を
+走査する条件であり、C++版とRust/cxx版で同じ公開関数を呼び出している。
+
+| 一覧件数 | 反復 | C++、1呼び出し | Rust/cxx、1呼び出し | 比率 |
+|---:|---:|---:|---:|---:|
+| 1,000 | 5,000 | 11,498 ns | 115,116 ns | 10.0倍 |
+| 10,000 | 1,000 | 102,903 ns | 1,096,612 ns | 10.7倍 |
+
+現在のRust adapterはキー入力ごとに全`QStringList`をUTF-8へ変換し、
+`rust::Vec<rust::String>`へコピーする。このコストが支配的である。
+
+`TypeAhead`は外部入力の解析やファイル操作を行わず、Rust化によるセキュリティ
+効果が小さいため、現在のstateless FFI方式は製品向けに採用しない。C++実装を
+維持し、次のRust化候補は入力を1回で渡せるparserか、処理量の大きい機能を
+優先する。
+
+Rustで`TypeAhead`を再検討する場合は、一覧更新時だけRustへ転送するopaque
+indexを設計し、所有権、更新通知、寿命を含む別PoCとして扱う。
+
+## 6. 判明した互換性要件
 
 Qt の case-insensitive 比較は Unicode の full case folding ではなく simple
 case folding 相当として扱う必要がある。例えば `STRASS` は `STRASSE` に
@@ -127,11 +157,11 @@ Rustの`PathBuf`を経由して同一byte列へ戻せることを結合テスト
 処理では`QString`を識別子として使わず、platform adapterまたはRust側がnative
 bytesを保持する必要がある。
 
-## 6. 未完了事項と制約
+## 7. 未完了事項と制約
 
 - 検証対象は Linux のみで、Windows と macOS の CMake/リンカー設定は未確認。
-- キー入力ごとに文字列一覧を UTF-8 へコピーするため、一覧が大きい場合の
-  性能測定が必要。
+- TypeAheadのstateless FFIは性能評価で不採用としたが、PoCコードは比較と
+  境界検証のため`TFX_ENABLE_RUST_CORE`の既定値`OFF`で残している。
 - ASanとUBSanはC++/Qt adapterを検査したが、Rust code自体のsanitizerと
   ファズテストは未実施。
 - Windows UTF-16LE pathは入力検証のみで、Windows上の`PathBuf`往復は未確認。
@@ -139,12 +169,12 @@ bytesを保持する必要がある。
 - Rust エラー時は C++ 実装へフォールバックするが、運用時の通知と
   telemetry 方針は未定。
 
-## 7. 次の判断条件
+## 8. 次の判断条件
 
 この PoC ブランチは `main` へマージしない。製品向け実装を開始する前に、
 少なくとも次を別の検証または設計レビューで完了する。
 
-1. FFI 呼び出しの性能と配布物サイズを許容範囲として定義する。
+1. 次のRust化候補は、入力全体を呼び出しごとにコピーしない境界に限定する。
 2. Windows上でUTF-16LE pathの往復とCMake/MSVCリンクを検証する。
 3. GitHub Actions上でASanとUBSanを継続実行する。
 4. opaque path handleを含むUIとファイル操作の責任範囲を設計する。

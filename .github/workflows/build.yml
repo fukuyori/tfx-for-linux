@@ -61,3 +61,40 @@ jobs:
 
       - name: Install smoke test
         run: cmake --install build --prefix "$RUNNER_TEMP/tfx-install"
+
+  linux-sanitizers:
+    name: Linux Qt Rust boundary (ASan + UBSan)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ qt6-base-dev
+
+      - name: Configure
+        run: >
+          cmake -S linux-qt -B build-sanitize
+          -DBUILD_TESTING=ON
+          -DCMAKE_BUILD_TYPE=Debug
+          -DTFX_ENABLE_RUST_CORE=ON
+          "-DCMAKE_CXX_FLAGS=-fsanitize=address,undefined -fno-omit-frame-pointer"
+          "-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined"
+
+      - name: Build Rust boundary tests
+        run: >
+          cmake --build build-sanitize
+          --target tfx_rust_path_bridge_test tfx_type_ahead_test
+          --parallel
+
+      - name: Test Rust boundary with sanitizers
+        env:
+          ASAN_OPTIONS: detect_leaks=0
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: >
+          ctest --test-dir build-sanitize --output-on-failure
+          -R "^(rust_path_bridge|type_ahead)$"

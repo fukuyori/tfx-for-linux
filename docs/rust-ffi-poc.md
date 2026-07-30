@@ -1,4 +1,4 @@
-# Rust/C++ FFI TypeAhead PoC
+# Rust/C++ FFI PoC
 
 Status: Experimental
 
@@ -11,7 +11,8 @@ Branch: `spike/rust-ffi-poc`
 
 Qt と機種依存処理を C++ に残したまま、Qt 非依存の処理を Rust 静的
 ライブラリへ移せることを確認する。最初の対象には副作用がなく、既存テストで
-動作を比較しやすい `TypeAhead` を選んだ。
+動作を比較しやすい `TypeAhead` を選んだ。次に、移植性の前提となる
+ネイティブパス表現を検証した。
 
 この PoC で確認する項目は次のとおり。
 
@@ -36,7 +37,7 @@ rust/crates/tfx-bridge
   panic の捕捉、FFI 用結果への変換
         |
 rust/crates/tfx-core
-  Qt/OS 非依存の TypeAhead ロジック
+  TypeAhead ロジック、target別のnative PathBuf変換
 ```
 
 Rust コアは Qt 型と OS API に依存しない。CMake オプション
@@ -67,6 +68,8 @@ cargo fmt --all --check --manifest-path rust/Cargo.toml
 cargo clippy --workspace --all-targets --all-features --locked \
   --manifest-path rust/Cargo.toml -- -D warnings
 cargo test --workspace --locked --manifest-path rust/Cargo.toml
+cargo audit --file rust/Cargo.lock
+cargo deny --manifest-path rust/Cargo.toml --config rust/deny.toml --locked check
 ```
 
 ## 4. 検証結果
@@ -75,14 +78,18 @@ cargo test --workspace --locked --manifest-path rust/Cargo.toml
 
 | 検証 | 結果 |
 |---|---|
-| Rust 単体テスト | 9件成功 |
+| Rust 単体テスト | 16件成功 |
 | Debug、Rust 無効、CTest | 14件成功 |
-| Debug、Rust 有効、CTest | 15件成功 |
+| Debug、Rust 有効、CTest | 16件成功 |
+| Release、Rust 有効、CTest | 16件成功 |
 | Release、Rust 有効 | ビルド成功 |
 | Release、`rust_core` と `type_ahead` | 2件成功 |
 | Release インストール | 成功 |
 | `cargo fmt --check` | 成功 |
 | `cargo clippy -D warnings` | 成功 |
+| `cargo audit 0.22.2` | 35依存crate、既知脆弱性なし |
+| `cargo deny 0.20.2` | advisories、bans、licenses、sources成功 |
+| C++ adapterのASan、UBSan | path bridgeとTypeAhead成功 |
 | 動的リンク依存 | Rust 固有の共有ライブラリ追加なし |
 
 未 strip の Release 実行ファイルは Rust 無効時 1,394,824 bytes、Rust 有効時
@@ -100,15 +107,31 @@ Rust 側は `casefold` crate の simple folding を用い、この Qt の動作�
 返すため、サロゲートペアを含む入力でも同じ prefix リセット条件になるよう
 Rust 側で UTF-16 長を使用する。
 
+### ネイティブパス
+
+Linuxでは`NativePath { encoding: UnixBytes, data: Vec<u8> }`を使用し、
+Rust側でNUL、1 MiBを超える入力、実行OSと異なるencodingを拒否する。
+Windows表現はUTF-16LEのbyte列とし、奇数長とNUL code unitを拒否する。
+
+Linux上で`0xFF`を含む実在ファイル名を作成し、C++のnative `QByteArray`から
+Rustの`PathBuf`を経由して同一byte列へ戻せることを結合テストで確認した。
+
+同じpathを`QFile::decodeName()`で`QString`へ変換すると、Qt 6の
+`QFileInfo`から元のファイルを再参照できなかった。完全なbyte fidelityが必要な
+処理では`QString`を識別子として使わず、platform adapterまたはRust側がnative
+bytesを保持する必要がある。
+
 ## 6. 未完了事項と制約
 
 - 検証対象は Linux のみで、Windows と macOS の CMake/リンカー設定は未確認。
 - キー入力ごとに文字列一覧を UTF-8 へコピーするため、一覧が大きい場合の
   性能測定が必要。
-- `cargo audit` と `cargo deny` は環境へ未導入で、脆弱性およびライセンスの
-  自動監査は未実施。
-- ASan、UBSan、ファズテストは未実施。
-- 非 UTF-8 パスを失わない FFI 契約は TypeAhead では検証できない。
+- `cargo audit` と `cargo deny` のCI設定は追加したが、GitHub Actions上の
+  実行結果は未確認。
+- ASanとUBSanはC++/Qt adapterを検査したが、Rust code自体のsanitizerと
+  ファズテストは未実施。
+- Windows UTF-16LE pathは入力検証のみで、Windows上の`PathBuf`往復は未確認。
+- Qt UIで任意の非UTF-8名を識別するopaque path handleは未設計。
 - Rust エラー時は C++ 実装へフォールバックするが、運用時の通知と
   telemetry 方針は未定。
 
@@ -118,7 +141,7 @@ Rust 側で UTF-16 長を使用する。
 少なくとも次を別の検証または設計レビューで完了する。
 
 1. FFI 呼び出しの性能と配布物サイズを許容範囲として定義する。
-2. 非 UTF-8 の Linux パスと Windows のネイティブパスを往復できる API を
-   検証する。
-3. `cargo audit`、`cargo deny`、ASan、UBSan を CI へ組み込む。
-4. Rust 対応対象を副作用の小さい機能単位に分け、独立した実装ブランチとする。
+2. Windows上でUTF-16LE pathの往復とCMake/MSVCリンクを検証する。
+3. GitHub Actions上で依存監査とsanitizerを継続実行する。
+4. opaque path handleを含むUIとファイル操作の責任範囲を設計する。
+5. Rust 対応対象を副作用の小さい機能単位に分け、独立した実装ブランチとする。

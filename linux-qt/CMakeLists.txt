@@ -232,6 +232,15 @@ if(BUILD_TESTING AND Qt6Test_FOUND)
     target_link_libraries(tfx_path_handling_test PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME path_handling COMMAND tfx_path_handling_test)
 
+    if(TFX_ENABLE_RUST_CORE)
+        qt_add_executable(tfx_rust_path_bridge_test
+            tests/RustPathBridgeTest.cpp
+        )
+        target_link_libraries(tfx_rust_path_bridge_test PRIVATE Qt6::Core Qt6::Test)
+        tfx_enable_rust_core(tfx_rust_path_bridge_test)
+        add_test(NAME rust_path_bridge COMMAND tfx_rust_path_bridge_test)
+    endif()
+
     qt_add_executable(tfx_git_service_test
         tests/GitServiceTest.cpp
         src/core/GitService.cpp

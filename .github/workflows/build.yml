@@ -38,6 +38,18 @@ jobs:
         if: matrix.rust_core == 'ON'
         run: cargo clippy --workspace --all-targets --all-features --locked --manifest-path rust/Cargo.toml -- -D warnings
 
+      - name: Install Rust audit tools
+        if: matrix.rust_core == 'ON'
+        run: |
+          cargo install cargo-audit --version 0.22.2 --locked
+          cargo install cargo-deny --version 0.20.2 --locked
+
+      - name: Audit Rust dependencies
+        if: matrix.rust_core == 'ON'
+        run: |
+          cargo audit --file rust/Cargo.lock
+          cargo deny --manifest-path rust/Cargo.toml --config rust/deny.toml --locked check
+
       - name: Configure
         run: cmake -S linux-qt -B build -DTFX_ENABLE_RUST_CORE=${{ matrix.rust_core }}
 

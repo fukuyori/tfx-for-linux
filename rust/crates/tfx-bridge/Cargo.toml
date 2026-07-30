@@ -11,7 +11,7 @@ crate-type = ["rlib", "staticlib"]
 
 [dependencies]
 cxx.workspace = true
-tfx-core = { path = "../tfx-core" }
+tfx-core = { path = "../tfx-core", version = "=0.1.0" }
 
 [build-dependencies]
 cxx-build.workspace = true

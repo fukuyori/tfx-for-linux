@@ -127,7 +127,10 @@ NativePath
 
 C++ adapterの初期変換:
 
-- Linux/macOS: `QFile::encodeName()`の結果をUnix bytesとして渡す。
+- Linux/macOS: `QString`で表現できるpathは`QFile::encodeName()`の結果を
+  Unix bytesとして渡す。
+- OS APIから取得した任意のUnix pathは`QString`へ変換せず、platform
+  adapterがnative `QByteArray`を保持してUnix bytesとして渡す。
 - Windows: `QString`のUTF-16 code unitをWindows形式として渡す。
 
 Rust側:
@@ -139,6 +142,12 @@ Rust側:
 Qtのファイルモデル自体が`QString`を使うため、初期移行だけでUnix上の任意の
 非UTF-8名を完全に扱えるようになるわけではない。初期目標は現行Qt対応範囲を
 劣化させないこととする。
+
+PoCでは、Linux上で`0xFF`を含む実在ファイル名を`QFile::decodeName()`で
+`QString`へ変換すると、同じファイルを`QFileInfo`から再参照できないことを
+確認した。一方、native `QByteArray`を`Vec<u8>`へ変換してRustの`PathBuf`を
+往復する経路では、元のbyte列を保持できた。したがって、完全なbyte fidelityが
+必要な処理で`decodeName -> QString -> encodeName`を往復経路として使用しない。
 
 完全なbyte fidelityが必要になった場合は、Rust側でdirectoryを列挙し、UIには
 表示名とopaque path handleを返す方式を別ADRで検討する。

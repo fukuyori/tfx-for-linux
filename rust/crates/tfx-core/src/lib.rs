@@ -1,9 +1,108 @@
 use casefold::simple_fold;
 
+pub const MAX_NATIVE_PATH_BYTES: usize = 1024 * 1024;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NativePathEncoding {
+    UnixBytes,
+    WindowsUtf16Le,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NativePath {
+    pub encoding: NativePathEncoding,
+    pub data: Vec<u8>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NativePathError {
+    InvalidInput,
+    UnsupportedEncoding,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TypeAheadStep {
     pub row: i32,
     pub prefix: String,
+}
+
+pub fn round_trip_native_path(path: NativePath) -> Result<NativePath, NativePathError> {
+    validate_native_path(&path)?;
+
+    #[cfg(unix)]
+    {
+        use std::ffi::OsString;
+        use std::os::unix::ffi::OsStringExt;
+        use std::path::PathBuf;
+
+        if path.encoding != NativePathEncoding::UnixBytes {
+            return Err(NativePathError::UnsupportedEncoding);
+        }
+
+        let native = PathBuf::from(OsString::from_vec(path.data));
+        return Ok(NativePath {
+            encoding: NativePathEncoding::UnixBytes,
+            data: native.into_os_string().into_vec(),
+        });
+    }
+
+    #[cfg(windows)]
+    {
+        use std::ffi::OsString;
+        use std::os::windows::ffi::{OsStrExt, OsStringExt};
+        use std::path::PathBuf;
+
+        if path.encoding != NativePathEncoding::WindowsUtf16Le {
+            return Err(NativePathError::UnsupportedEncoding);
+        }
+
+        let wide: Vec<u16> = path
+            .data
+            .chunks_exact(2)
+            .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
+            .collect();
+        let native = PathBuf::from(OsString::from_wide(&wide));
+        let data = native
+            .as_os_str()
+            .encode_wide()
+            .flat_map(u16::to_le_bytes)
+            .collect();
+        return Ok(NativePath {
+            encoding: NativePathEncoding::WindowsUtf16Le,
+            data,
+        });
+    }
+
+    #[allow(unreachable_code)]
+    Err(NativePathError::UnsupportedEncoding)
+}
+
+fn validate_native_path(path: &NativePath) -> Result<(), NativePathError> {
+    if path.data.len() > MAX_NATIVE_PATH_BYTES {
+        return Err(NativePathError::InvalidInput);
+    }
+
+    match path.encoding {
+        NativePathEncoding::UnixBytes => {
+            if path.data.contains(&0) {
+                return Err(NativePathError::InvalidInput);
+            }
+        }
+        NativePathEncoding::WindowsUtf16Le => {
+            if path.data.len() % 2 != 0 {
+                return Err(NativePathError::InvalidInput);
+            }
+            if path
+                .data
+                .chunks_exact(2)
+                .any(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]) == 0)
+            {
+                return Err(NativePathError::InvalidInput);
+            }
+        }
+    }
+
+    Ok(())
 }
 
 pub fn type_ahead_step(
@@ -57,7 +156,10 @@ fn fold(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{type_ahead_step, TypeAheadStep};
+    use super::{
+        round_trip_native_path, type_ahead_step, NativePath, NativePathEncoding, NativePathError,
+        TypeAheadStep, MAX_NATIVE_PATH_BYTES,
+    };
 
     fn names(values: &[&str]) -> Vec<String> {
         values.iter().map(|value| (*value).to_owned()).collect()
@@ -137,5 +239,66 @@ mod tests {
         let values = names(&["alpha", "atom"]);
         assert_eq!(type_ahead_step(&values, i32::MAX, "a", "A").row, 0);
         assert_eq!(type_ahead_step(&values, i32::MIN, "a", "A").row, 1);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unix_path_round_trip_preserves_non_utf8_bytes() {
+        let data = b"/tmp/report-\xff.txt".to_vec();
+        assert_eq!(
+            round_trip_native_path(NativePath {
+                encoding: NativePathEncoding::UnixBytes,
+                data: data.clone(),
+            }),
+            Ok(NativePath {
+                encoding: NativePathEncoding::UnixBytes,
+                data,
+            })
+        );
+    }
+
+    #[test]
+    fn native_path_rejects_embedded_nul() {
+        assert_eq!(
+            round_trip_native_path(NativePath {
+                encoding: NativePathEncoding::UnixBytes,
+                data: b"/tmp/a\0b".to_vec(),
+            }),
+            Err(NativePathError::InvalidInput)
+        );
+    }
+
+    #[test]
+    fn windows_path_rejects_odd_byte_count() {
+        assert_eq!(
+            round_trip_native_path(NativePath {
+                encoding: NativePathEncoding::WindowsUtf16Le,
+                data: vec![b'C', 0, b':'],
+            }),
+            Err(NativePathError::InvalidInput)
+        );
+    }
+
+    #[test]
+    fn native_path_rejects_oversized_input() {
+        assert_eq!(
+            round_trip_native_path(NativePath {
+                encoding: NativePathEncoding::UnixBytes,
+                data: vec![b'a'; MAX_NATIVE_PATH_BYTES + 1],
+            }),
+            Err(NativePathError::InvalidInput)
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unix_target_rejects_windows_encoding() {
+        assert_eq!(
+            round_trip_native_path(NativePath {
+                encoding: NativePathEncoding::WindowsUtf16Le,
+                data: vec![b'C', 0, b':', 0],
+            }),
+            Err(NativePathError::UnsupportedEncoding)
+        );
     }
 }

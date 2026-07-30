@@ -96,9 +96,9 @@ OS依存:
 
 | 対象 | Qt依存 | OS依存 | セキュリティ影響 | 既存テスト | 優先度 | 方針 |
 |---|---|---|---|---|---|---|
-| `TypeAhead` | 低 | 低 | 低 | 高 | P0 | 最初のFFI PoC候補 |
+| `TypeAhead` | 低 | 低 | 低 | 高 | P0 | stateless FFIは性能上不採用 |
 | `SearchState` | 低 | 低 | 低 | 高 | P2 | Rustの純粋ロジックへ移行 |
-| `DelimitedText` | 低 | 低 | 中 | 高 | P1 | 上限を維持してRustへ移行 |
+| `DelimitedText` | 低 | 低 | 中 | 高 | P1 | PoC成立、別ブランチで製品化候補 |
 | `PreviewText` | 中 | 中 | 中 | 高 | P1 | 読み込み上限と文字コードを仕様化 |
 | `GitService` | 中 | 中 | 高 | 中 | P1 | 解析とパス検証をRustへ移行 |
 | `TabState` | 中 | 中 | 低 | 高 | P2 | パス抽象の確立後に移行 |
@@ -211,6 +211,7 @@ sanitizer、ファズ、Windows、macOSのjobはまだない。
 - Qt型からFFI型への変換を最小の機能で検証する。
 - C++版とRust版へ同じtest vectorを適用する。
 - Rust無効時にC++版へ戻せることを確認する。
+- stateless FFIは約10倍遅いため製品化せず、境界検証用PoCとして扱う。
 
 ### Step 3: ZIP検査・展開
 
@@ -228,6 +229,7 @@ sanitizer、ファズ、Windows、macOSのjobはまだない。
 ### Step 5: parserと状態管理
 
 - Gitはporcelain `-z`によるbyte-safeな解析を優先検討する。
+- `DelimitedText` PoCは上限付きone-shot境界でC++版と同等性能を確認済み。
 - `DelimitedText`、`PreviewText`、`SearchState`などを順次移行する。
 
 ### Step 6: Platform境界

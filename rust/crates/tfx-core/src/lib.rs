@@ -1,4 +1,11 @@
+mod delimited;
+
 use casefold::simple_fold;
+
+pub use delimited::{
+    parse_delimited, DelimitedError, DelimitedTable, MAX_DELIMITED_CELLS, MAX_DELIMITED_COLUMNS,
+    MAX_DELIMITED_INPUT_BYTES, MAX_DELIMITED_ROWS,
+};
 
 pub const MAX_NATIVE_PATH_BYTES: usize = 1024 * 1024;
 

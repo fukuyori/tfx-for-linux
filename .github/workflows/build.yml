@@ -88,7 +88,7 @@ jobs:
       - name: Build Rust boundary tests
         run: >
           cmake --build build-sanitize
-          --target tfx_rust_path_bridge_test tfx_type_ahead_test
+          --target tfx_rust_path_bridge_test tfx_type_ahead_test tfx_preview_text_test
           --parallel
 
       - name: Test Rust boundary with sanitizers
@@ -97,4 +97,4 @@ jobs:
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
         run: >
           ctest --test-dir build-sanitize --output-on-failure
-          -R "^(rust_path_bridge|type_ahead)$"
+          -R "^(rust_path_bridge|type_ahead|preview_text)$"

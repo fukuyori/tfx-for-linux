@@ -26,6 +26,14 @@ mod ffi {
         error: BridgeErrorCode,
     }
 
+    struct DelimitedResult {
+        cells: Vec<String>,
+        row_lengths: Vec<u32>,
+        rows_truncated: bool,
+        columns_truncated: bool,
+        error: BridgeErrorCode,
+    }
+
     struct TypeAheadResult {
         row: i32,
         prefix: String,
@@ -35,12 +43,68 @@ mod ffi {
     extern "Rust" {
         fn round_trip_native_path(path: NativePath) -> NativePathResult;
 
+        fn parse_delimited(
+            content: String,
+            delimiter: u32,
+            max_rows: i32,
+            max_columns: i32,
+        ) -> DelimitedResult;
+
         fn type_ahead_step(
             names: Vec<String>,
             current_row: i32,
             prefix: String,
             typed: String,
         ) -> TypeAheadResult;
+    }
+}
+
+fn parse_delimited(
+    content: String,
+    delimiter: u32,
+    max_rows: i32,
+    max_columns: i32,
+) -> ffi::DelimitedResult {
+    let Some(delimiter) = char::from_u32(delimiter) else {
+        return delimited_error(ffi::BridgeErrorCode::InvalidInput);
+    };
+    let Ok(max_rows) = usize::try_from(max_rows) else {
+        return delimited_error(ffi::BridgeErrorCode::InvalidInput);
+    };
+    let Ok(max_columns) = usize::try_from(max_columns) else {
+        return delimited_error(ffi::BridgeErrorCode::InvalidInput);
+    };
+
+    match catch_boundary(|| tfx_core::parse_delimited(&content, delimiter, max_rows, max_columns)) {
+        Ok(Ok(table)) => {
+            let mut cells = Vec::new();
+            let mut row_lengths = Vec::with_capacity(table.rows.len());
+            for row in table.rows {
+                row_lengths.push(row.len() as u32);
+                cells.extend(row);
+            }
+            ffi::DelimitedResult {
+                cells,
+                row_lengths,
+                rows_truncated: table.rows_truncated,
+                columns_truncated: table.columns_truncated,
+                error: ffi::BridgeErrorCode::Ok,
+            }
+        }
+        Ok(Err(tfx_core::DelimitedError::InvalidInput)) => {
+            delimited_error(ffi::BridgeErrorCode::InvalidInput)
+        }
+        Err(()) => delimited_error(ffi::BridgeErrorCode::Internal),
+    }
+}
+
+fn delimited_error(error: ffi::BridgeErrorCode) -> ffi::DelimitedResult {
+    ffi::DelimitedResult {
+        cells: Vec::new(),
+        row_lengths: Vec::new(),
+        rows_truncated: false,
+        columns_truncated: false,
+        error,
     }
 }
 
@@ -118,7 +182,7 @@ fn catch_boundary<T>(operation: impl FnOnce() -> T) -> Result<T, ()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{catch_boundary, round_trip_native_path, type_ahead_step};
+    use super::{catch_boundary, parse_delimited, round_trip_native_path, type_ahead_step};
     use crate::ffi::{BridgeErrorCode, NativePath, NativePathEncoding};
 
     #[test]
@@ -159,5 +223,23 @@ mod tests {
         });
         assert_eq!(result.error, BridgeErrorCode::InvalidInput);
         assert!(result.path.data.is_empty());
+    }
+
+    #[test]
+    fn bridge_flattens_delimited_rows() {
+        let result = parse_delimited("a,b\nc,d\n".to_owned(), u32::from(','), 10, 10);
+        assert_eq!(result.error, BridgeErrorCode::Ok);
+        assert_eq!(result.row_lengths, [2, 2]);
+        assert_eq!(result.cells, ["a", "b", "c", "d"]);
+        assert!(!result.rows_truncated);
+        assert!(!result.columns_truncated);
+    }
+
+    #[test]
+    fn bridge_rejects_invalid_delimited_limits() {
+        let result = parse_delimited("a".to_owned(), u32::from(','), -1, 10);
+        assert_eq!(result.error, BridgeErrorCode::InvalidInput);
+        assert!(result.cells.is_empty());
+        assert!(result.row_lengths.is_empty());
     }
 }

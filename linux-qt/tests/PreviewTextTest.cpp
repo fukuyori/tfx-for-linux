@@ -33,6 +33,9 @@ private slots:
     void parseDelimitedHandlesQuoting();
     void parseDelimitedCapsRowsAndColumns();
     void parseDelimitedSkipsEmptyLines();
+    void parseDelimitedHandlesLineEndingsAndMalformedQuotes();
+    void parseDelimitedHandlesSingleColumnsAndUnicode();
+    void parseDelimitedRejectsUnsafeLimits();
 };
 
 void PreviewTextTest::loadTextCappedReadsSmallFilesWhole()
@@ -117,6 +120,45 @@ void PreviewTextTest::parseDelimitedSkipsEmptyLines()
     const DelimitedTable commas = parseDelimited(",\n", ',', 100, 100);
     QCOMPARE(commas.rows.size(), 1);
     QCOMPARE(commas.rows.first().size(), 2);
+}
+
+void PreviewTextTest::parseDelimitedHandlesLineEndingsAndMalformedQuotes()
+{
+    const DelimitedTable table = parseDelimited(
+        "a,b\r\n"
+        "\"line1\r\nline2\",c\r"
+        "\"unterminated,d",
+        ',', 100, 100);
+
+    QCOMPARE(table.rows.size(), 3);
+    QCOMPARE(table.rows.at(0), (QStringList{"a", "b"}));
+    QCOMPARE(table.rows.at(1), (QStringList{"line1\r\nline2", "c"}));
+    QCOMPARE(table.rows.at(2), (QStringList{"unterminated,d"}));
+}
+
+void PreviewTextTest::parseDelimitedHandlesSingleColumnsAndUnicode()
+{
+    const DelimitedTable single = parseDelimited("alpha\n\"\"\n日本語\n", ',', 100, 100);
+    QCOMPARE(single.rows.size(), 3);
+    QCOMPARE(single.rows.at(0), (QStringList{"alpha"}));
+    QCOMPARE(single.rows.at(1), (QStringList{""}));
+    QCOMPARE(single.rows.at(2), (QStringList{QString::fromUtf8("日本語")}));
+
+    const DelimitedTable tabs = parseDelimited("名前\t値\n項目\t42\n", '\t', 100, 100);
+    QCOMPARE(tabs.rows.size(), 2);
+    QCOMPARE(tabs.rows.at(1), (QStringList{QString::fromUtf8("項目"), "42"}));
+}
+
+void PreviewTextTest::parseDelimitedRejectsUnsafeLimits()
+{
+#ifdef TFX_ENABLE_RUST_CORE
+    const DelimitedTable table = parseDelimited("a,b\n", ',', 0, 100);
+    QVERIFY(table.rows.isEmpty());
+    QVERIFY(table.rowsTruncated);
+    QVERIFY(table.columnsTruncated);
+#else
+    QSKIP("Rust input-limit enforcement is disabled");
+#endif
 }
 
 QTEST_GUILESS_MAIN(PreviewTextTest)

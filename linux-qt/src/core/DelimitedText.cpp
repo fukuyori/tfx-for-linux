@@ -1,8 +1,21 @@
 #include "core/DelimitedText.h"
 
+#ifdef TFX_ENABLE_RUST_CORE
+#include "tfx-bridge/src/lib.rs.h"
+
+#include <QByteArray>
+
+#include <cstdint>
+#include <optional>
+#include <utility>
+#endif
+
 namespace tfx::core {
 
-DelimitedTable parseDelimited(const QString &content, QChar delimiter, int maxRows, int maxColumns)
+namespace {
+
+DelimitedTable parseDelimitedCpp(const QString &content, QChar delimiter,
+                                  int maxRows, int maxColumns)
 {
     DelimitedTable table;
     QStringList row;
@@ -73,6 +86,63 @@ DelimitedTable parseDelimited(const QString &content, QChar delimiter, int maxRo
         endRow();
     }
     return table;
+}
+
+#ifdef TFX_ENABLE_RUST_CORE
+rust::String toRustString(const QString &value)
+{
+    const QByteArray utf8 = value.toUtf8();
+    return rust::String(utf8.constData(), static_cast<std::size_t>(utf8.size()));
+}
+
+std::optional<DelimitedTable> fromRustResult(const tfx::rust_bridge::DelimitedResult &result)
+{
+    DelimitedTable table;
+    table.rowsTruncated = result.rows_truncated;
+    table.columnsTruncated = result.columns_truncated;
+
+    std::size_t cellIndex = 0;
+    table.rows.reserve(static_cast<qsizetype>(result.row_lengths.size()));
+    for (const std::uint32_t rowLength : result.row_lengths) {
+        if (rowLength > result.cells.size() - cellIndex) {
+            return std::nullopt;
+        }
+
+        QStringList row;
+        row.reserve(static_cast<qsizetype>(rowLength));
+        for (std::uint32_t column = 0; column < rowLength; ++column) {
+            const rust::String &cell = result.cells[cellIndex++];
+            row.append(QString::fromUtf8(cell.data(), static_cast<qsizetype>(cell.size())));
+        }
+        table.rows.append(std::move(row));
+    }
+    if (cellIndex != result.cells.size()) {
+        return std::nullopt;
+    }
+    return table;
+}
+#endif
+
+}
+
+DelimitedTable parseDelimited(const QString &content, QChar delimiter,
+                               int maxRows, int maxColumns)
+{
+#ifdef TFX_ENABLE_RUST_CORE
+    const tfx::rust_bridge::DelimitedResult result = tfx::rust_bridge::parse_delimited(
+        toRustString(content), delimiter.unicode(), maxRows, maxColumns);
+    if (result.error == tfx::rust_bridge::BridgeErrorCode::Ok) {
+        if (const std::optional<DelimitedTable> table = fromRustResult(result)) {
+            return *table;
+        }
+    } else if (result.error == tfx::rust_bridge::BridgeErrorCode::InvalidInput) {
+        DelimitedTable rejected;
+        rejected.rowsTruncated = true;
+        rejected.columnsTruncated = true;
+        return rejected;
+    }
+#endif
+    return parseDelimitedCpp(content, delimiter, maxRows, maxColumns);
 }
 
 }

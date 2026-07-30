@@ -111,11 +111,12 @@ Qt 型を認識せず、明示的な入力、結果、エラーを持つライ�
 
 目安: 1～2週間
 
-最初の対象は `TypeAhead` または Git porcelain の解析処理とする。PoC では
-セキュリティ効果よりも、次の技術成立性を確認する。
+最初の対象は `TypeAhead` とし、続いて `DelimitedText` parserを対象とする。
+PoC ではセキュリティ効果と、次の技術成立性を確認する。
 
-`TypeAhead` を対象にした現在の検証結果は
-[Rust/C++ FFI TypeAhead PoC](rust-ffi-poc.md)に記録する。
+現在の検証結果は
+[Rust/C++ FFI PoC](rust-ffi-poc.md)に記録する。`TypeAhead`のstateless境界は
+性能上不採用、入力を1回で渡す`DelimitedText`境界は製品向け候補と判定した。
 
 - CMake から Cargo のビルドを実行できる。
 - Rust 静的ライブラリをアプリとテストへリンクできる。
@@ -155,9 +156,9 @@ PoC 用ブランチは実装ブランチと分離し、そのまま製品コー�
 
 候補順:
 
-1. `SearchState`
-2. `TypeAhead`
-3. `DelimitedText`
+1. `DelimitedText`
+2. `SearchState`
+3. `TypeAhead`（opaque indexを設計する場合だけ再評価）
 4. `TabState`
 5. `SidebarLogic`
 6. `GitService` の解析処理

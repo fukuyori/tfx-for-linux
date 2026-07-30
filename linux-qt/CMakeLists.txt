@@ -117,6 +117,15 @@ target_link_libraries(tfx PRIVATE Qt6::Widgets Qt6::DBus)
 tfx_enable_rust_core(tfx)
 
 if(TFX_BUILD_BENCHMARKS)
+    qt_add_executable(tfx_delimited_text_benchmark
+        benchmarks/DelimitedTextBenchmark.cpp
+        src/core/DelimitedText.cpp
+        src/core/DelimitedText.h
+    )
+    target_include_directories(tfx_delimited_text_benchmark PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(tfx_delimited_text_benchmark PRIVATE Qt6::Core)
+    tfx_enable_rust_core(tfx_delimited_text_benchmark)
+
     qt_add_executable(tfx_type_ahead_benchmark
         benchmarks/TypeAheadBenchmark.cpp
         src/core/TypeAhead.cpp
@@ -343,6 +352,7 @@ if(BUILD_TESTING AND Qt6Test_FOUND)
     )
     target_include_directories(tfx_preview_security_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(tfx_preview_security_test PRIVATE Qt6::Core Qt6::DBus Qt6::Gui Qt6::Widgets Qt6::Test)
+    tfx_enable_rust_core(tfx_preview_security_test)
     add_test(NAME preview_security COMMAND tfx_preview_security_test)
     set_tests_properties(preview_security PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
@@ -411,6 +421,7 @@ if(BUILD_TESTING AND Qt6Test_FOUND)
     )
     target_include_directories(tfx_preview_text_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(tfx_preview_text_test PRIVATE Qt6::Core Qt6::Test)
+    tfx_enable_rust_core(tfx_preview_text_test)
     add_test(NAME preview_text COMMAND tfx_preview_text_test)
 elseif(BUILD_TESTING)
     message(STATUS "tfx: Qt Test not found — file operation worker tests disabled")

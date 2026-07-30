@@ -90,7 +90,13 @@ cargo deny --manifest-path rust/Cargo.toml --config rust/deny.toml --locked chec
 | `cargo audit 0.22.2` | 35依存crate、既知脆弱性なし |
 | `cargo deny 0.20.2` | advisories、bans、licenses、sources成功 |
 | C++ adapterのASan、UBSan | path bridgeとTypeAhead成功 |
+| GitHub Actions、Rust無効 | 成功、1分42秒 |
+| GitHub Actions、Rust有効 | format、lint、監査、build、test、install成功、7分4秒 |
 | 動的リンク依存 | Rust 固有の共有ライブラリ追加なし |
+
+GitHub Actionsはworkflow dispatch run `30506757284`で確認した。初回実行で
+`actions/checkout@v4`のNode.js 20非推奨警告を確認したため、Node.js 24対応の
+`actions/checkout@v6`へ更新した。
 
 未 strip の Release 実行ファイルは Rust 無効時 1,394,824 bytes、Rust 有効時
 6,745,288 bytes だった。Rust 有効時は 5,350,464 bytes 増加している。
@@ -126,8 +132,6 @@ bytesを保持する必要がある。
 - 検証対象は Linux のみで、Windows と macOS の CMake/リンカー設定は未確認。
 - キー入力ごとに文字列一覧を UTF-8 へコピーするため、一覧が大きい場合の
   性能測定が必要。
-- `cargo audit` と `cargo deny` のCI設定は追加したが、GitHub Actions上の
-  実行結果は未確認。
 - ASanとUBSanはC++/Qt adapterを検査したが、Rust code自体のsanitizerと
   ファズテストは未実施。
 - Windows UTF-16LE pathは入力検証のみで、Windows上の`PathBuf`往復は未確認。
@@ -142,6 +146,6 @@ bytesを保持する必要がある。
 
 1. FFI 呼び出しの性能と配布物サイズを許容範囲として定義する。
 2. Windows上でUTF-16LE pathの往復とCMake/MSVCリンクを検証する。
-3. GitHub Actions上で依存監査とsanitizerを継続実行する。
+3. GitHub Actions上でASanとUBSanを継続実行する。
 4. opaque path handleを含むUIとファイル操作の責任範囲を設計する。
 5. Rust 対応対象を副作用の小さい機能単位に分け、独立した実装ブランチとする。

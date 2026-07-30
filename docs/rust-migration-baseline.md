@@ -159,7 +159,7 @@ OS依存:
 | R6 | Git quoted pathの不完全な復号 | 中 | quote除去、directory escape検査 | porcelain `-z`とNUL区切り解析を評価 |
 | R7 | 外部ツールのPATH・版・形式差 | 中 | `findExecutable`、timeout | capability検査、Rustライブラリへの置換 |
 | R8 | FFIのpointer・所有権・callback寿命 | 高 | `cxx`、panic封じ込め、境界テスト | callbackとworkerの寿命を検証 |
-| R9 | Rust依存関係の供給網 | 中 | lockfile、`cargo audit`、`cargo deny` | CI結果確認、監査tool更新方針 |
+| R9 | Rust依存関係の供給網 | 中 | lockfile、`cargo audit`、`cargo deny`をCI確認済み | 監査tool更新方針 |
 | R10 | 他OSでのパス・権限・リンク差 | 高 | CMakeの分岐のみ | Platform APIとOS別contract test |
 | R11 | ユーザー設定によるシェル実行 | 高 | quote処理、出力上限、cwd検証 | 信頼境界を明示しPlatform層へ隔離 |
 | R12 | PDFなど複雑なparserの攻撃面 | 中 | 外部プロセスとtimeout | sandboxまたは維持方針を決定 |

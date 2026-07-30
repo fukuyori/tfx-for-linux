@@ -152,4 +152,4 @@ https://github.com/fukuyori/tfx-for-linux.git
 
 ## ライセンス
 
-Linux 版としてのライセンス表記は未確定です。
+本プロジェクトは [Apache License 2.0](LICENSE) の下で公開しています(macOS 版 `tfx` と同じライセンスです)。

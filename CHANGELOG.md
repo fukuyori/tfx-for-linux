@@ -17,6 +17,9 @@ This file records notable changes to `tfx-for-linux`.
 
 - New command-line option `-f` / `--foreground` keeps `tfx` attached to the
   terminal (previous behavior), e.g. for reading log output.
+- `LICENSE` file: the project is now licensed under the Apache License 2.0,
+  matching the original macOS version. The license file is installed with the
+  documentation and declared in the DEB/RPM package metadata.
 
 ## [0.8.2] - 2026-07-26
 

@@ -156,4 +156,5 @@ https://github.com/fukuyori/tfx-for-linux.git
 
 ## License
 
-License information is not yet finalized for this Linux port.
+This project is licensed under the [Apache License 2.0](LICENSE), the same
+license as the original macOS version of `tfx`.

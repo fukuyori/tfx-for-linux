@@ -133,6 +133,7 @@ foreach(tfx_icon_size 32 48 64 128 256)
             RENAME tfx.png)
 endforeach()
 install(FILES
+        ${CMAKE_CURRENT_SOURCE_DIR}/../LICENSE
         ${CMAKE_CURRENT_SOURCE_DIR}/../README.md
         ${CMAKE_CURRENT_SOURCE_DIR}/../README.ja.md
         ${CMAKE_CURRENT_SOURCE_DIR}/../CHANGELOG.md
@@ -162,6 +163,7 @@ set(CPACK_PACKAGE_DESCRIPTION "tfx for Linux is a C++/Qt port of the tfx file ma
 set(CPACK_PACKAGE_VENDOR "fukuyori")
 set(CPACK_PACKAGE_CONTACT "fukuyori <fukuyori.n@gmail.com>")
 set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/fukuyori/tfx")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/../LICENSE")
 set(CPACK_PACKAGE_CHECKSUM SHA256)
 set(CPACK_STRIP_FILES ON)
 # Debian: resolve shared-library dependencies from the built binary; the
@@ -189,6 +191,7 @@ if(NOT TFX_RPM_ARCH)
 endif()
 set(CPACK_RPM_FILE_NAME "tfx-${PROJECT_VERSION}-Linux_${TFX_RPM_ARCH}.rpm")
 set(CPACK_RPM_PACKAGE_GROUP "Applications/File")
+set(CPACK_RPM_PACKAGE_LICENSE "Apache-2.0")
 # tar.gz: the Archive generator uses CPACK_PACKAGE_FILE_NAME; the deb/rpm
 # generators override it with their own *_FILE_NAME set above, so this only
 # affects the tar.gz and its checksum.

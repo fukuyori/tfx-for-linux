@@ -66,6 +66,23 @@ If `desktop-file-validate` is available, the desktop entry can be checked with:
 desktop-file-validate linux-qt/packaging/tfx.desktop
 ```
 
+## Raspberry Pi
+
+The Raspberry Pi scripts limit compiler concurrency to avoid memory and I/O
+pressure on smaller systems. They use one build job by default and do not
+build tests unless `--tests` is specified:
+
+```sh
+scripts/build_rpi.sh --clean
+scripts/build_package_rpi.sh --clean       # DEB + tar.gz on Raspberry Pi OS
+scripts/build_package_rpi.sh --tests       # build and run tests sequentially
+scripts/build_package_rpi.sh --jobs 2      # suitable only when memory permits
+```
+
+Normal builds are written to `build-rpi/`; package builds and their results
+are written to `build-package-rpi/` and `dist-rpi/`. The job count can also be
+set with `TFX_RPI_BUILD_JOBS`.
+
 The build also provides an `uninstall` target after installation:
 
 ```sh

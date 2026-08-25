@@ -158,7 +158,9 @@ void FilePane::setupFileViewConnections()
         saveColumnSettings();
     });
     connect(m_view->horizontalHeader(), &QHeaderView::sortIndicatorChanged, this, [this]() {
-        saveColumnSettings();
+        // Sorting reaches the model through a layout change, and column saves
+        // are suppressed for its duration; persist once that window closes.
+        QTimer::singleShot(0, this, [this]() { saveColumnSettings(); });
     });
 }
 

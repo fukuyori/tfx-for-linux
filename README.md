@@ -1,7 +1,7 @@
 # tfx for Linux
 
 **Terminal-inspired interface File eXplorer for Linux**  
-Version: **0.8.3**
+Version: **0.8.4**
 
 English | [Japanese](README.ja.md)
 
@@ -91,7 +91,12 @@ test for the Linux Qt target.
   context menu actions, and restored tab cleanup
 - File operations: open, open with (native chooser), rename, link, new file/folder, trash, background copy/cut/paste with progress/cancel, copy path; symbolic links are copied as links with their link text preserved; copies keep permissions and modification times
 - Drag-and-drop of files and folders between panes and to/from external file managers (drop onto a folder to move, or hold Ctrl to copy)
-- Drag-and-drop target highlighting and immediate refresh of affected panes
+- Drag-and-drop feedback that names where the drop lands: only folder rows are
+  highlighted, framing the folder's icon and name rather than the whole row
+  (dropping anywhere else goes to the listed folder, shown as a frame around
+  the pane), and a badge by the cursor reads "Move to <folder>" or
+  "Copy to <folder>", following Ctrl as you hold it. Affected panes refresh
+  immediately
 - Conflict handling for paste/drop operations with overwrite, skip, and rename choices and an "Apply to all" checkbox for the rest of the batch; overwrite replaces the existing item atomically so a failed copy never destroys it
 - Clipboard-to-file paste for images, rich/plain text, URLs, CSV, and TSV, plus Paste as Plain Text
 - Recursive subfolder search: type a term and press Enter; results stream into a dedicated view and the search is cancelled when the pane changes folder
@@ -111,8 +116,20 @@ test for the Linux Qt target.
   - Git Status
 
 Column visibility and order can be changed from the file-list header menu. Column order is changed by dragging item names in the settings dialog.
-Clicking column headers sorts the file list and preserves the sort column and
-direction with the column layout.
+Clicking a column title sorts the file list by that column and clicking it again
+reverses the direction; the sorted column is marked with ▲/▼ in its title and
+the sort column and direction are saved with the column layout.
+
+The `..` parent entry stays on the first row whichever key and direction are
+active, and shows only its name — its type, size and timestamps described the
+folder above and were only noise.
+
+`Ctrl+Shift+S` (View ▸ Sort Options..., or the header context menu) opens a
+keyboard-driven sort chooser: Up/Down (or `k`/`j`) or a digit picks the key,
+Space (or Left/Right) flips ascending/descending, Enter applies and Esc cancels.
+Alongside the columns it offers **Natural**, a numeric-aware name order that
+places `file2` before `file10`. The chooser also reaches columns that are
+currently hidden, and works in icon view where there is no header to click.
 
 ## Configuration
 

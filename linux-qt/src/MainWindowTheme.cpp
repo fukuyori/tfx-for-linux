@@ -81,6 +81,42 @@ QString MainWindow::buildThemeStyleSheet() const
             background: #171C20;
             border-right: 1px solid #2A333A;
         }
+        /* The sidebar owns its surface; its views and their scroll viewports
+           would otherwise paint a second layer over it (see the note on
+           QTableView#fileTable). */
+        QTreeView#folderTree,
+        QListWidget#pinnedList,
+        QListWidget#diskList,
+        QTreeView#folderTree > QWidget,
+        QListWidget#pinnedList > QWidget,
+        QListWidget#diskList > QWidget {
+            background: transparent;
+        }
+        QDialog#sortOptionsDialog {
+            background: #11161A;
+            border: 1px solid #2A333A;
+        }
+        QLabel#sortOptionsTitle {
+            color: #63F28D;
+            font-weight: 700;
+            padding-bottom: 2px;
+        }
+        QListWidget#sortOptionsList {
+            background: transparent;
+            color: #9EABB6;
+            outline: 0;
+        }
+        QListWidget#sortOptionsList::item {
+            padding: 3px 4px;
+            border: 0;
+        }
+        QListWidget#sortOptionsList::item:selected {
+            background: transparent;
+            color: #63F28D;
+        }
+        QLabel#sortOptionsHint {
+            color: #9EABB6;
+        }
         QLabel#sectionLabel {
             color: #9EABB6;
             font-weight: 500;
@@ -102,7 +138,11 @@ QString MainWindow::buildThemeStyleSheet() const
             outline: 0;
         }
         QTableView#fileTable {
-            background: #151A1E;
+            /* Transparent, not the panel colour: QWidget#filePane already
+               paints that colour underneath. Painting it again stacks a second
+               translucent layer, and with [opacity] background < 1 the alphas
+               compound until the rows behind the file names look opaque. */
+            background: transparent;
             color: #D9E1E8;
             selection-background-color: #263D4C;
             selection-color: #FFFFFF;
@@ -153,6 +193,16 @@ QString MainWindow::buildThemeStyleSheet() const
         }
         QWidget#filePane[activePane="true"] {
             border: 2px solid #36E67A;
+        }
+        /* Pure containers between the pane and its views: the pane owns the
+           surface, so these must not repaint it (see QTableView#fileTable).
+           The scroll-area viewports count too — they are plain QWidgets and
+           the generic rule above would have them paint the surface again. */
+        QWidget#filePane > QStackedWidget,
+        QSplitter#filePaneSplitter,
+        QTableView#fileTable > QWidget,
+        QListView#fileIcons > QWidget {
+            background: transparent;
         }
         QLabel#paneBadge {
             color: #AEBBC5;
@@ -268,10 +318,24 @@ QString MainWindow::buildThemeStyleSheet() const
             border: 1px solid #2A333A;
         }
         QPlainTextEdit#previewCode, QTextBrowser#previewRendered {
+            /* This is the preview's surface: PreviewPane itself does not paint
+               a background, so the views must keep this colour. */
             background: #151A1E;
             color: #D9E1E8;
             border: 0;
             selection-background-color: #263D4C;
+        }
+        /* Containers and scroll viewports inside the preview: the pane owns the
+           surface, so these must not repaint it. */
+        QWidget#previewPane QStackedWidget,
+        QPlainTextEdit#previewCode > QWidget,
+        QTextBrowser#previewRendered > QWidget {
+            background: transparent;
+        }
+        /* The toolbar's stretch filler would otherwise paint the surface the
+           toolbar itself already paints. */
+        QWidget#toolbarSpacer {
+            background: transparent;
         }
         QLabel#previewTitle {
             color: #9EABB6;
@@ -280,6 +344,13 @@ QString MainWindow::buildThemeStyleSheet() const
         QWidget#terminalPane {
             background: #050607;
             border-top: 1px solid #2A333A;
+        }
+        /* The tab stack and its page are containers around the terminal
+           widget; the pane above already paints the surface, and repainting it
+           here would stack another translucent layer (see QTableView#fileTable). */
+        QWidget#terminalPane QStackedWidget,
+        QWidget#terminalPane QStackedWidget > QWidget {
+            background: transparent;
         }
         QLabel#terminalTitle {
             color: #9EABB6;
@@ -413,7 +484,11 @@ QString MainWindow::buildThemeStyleSheet() const
         "\nQLabel#paneStatus { background: %5; color: %6; }"
         "\nQLabel#paneStatus[activePane=\"true\"] { color: %7; }"
         "\nQWidget#paneTitleBar { background: %9; }"
-        "\nQWidget#paneTitleBar[activePane=\"true\"] { background: %10; }\n")
+        "\nQWidget#paneTitleBar[activePane=\"true\"] { background: %10; }"
+        // The generic QWidget background rule also matches the header's path
+        // container, and Qt then paints it over the title bar; keep it clear
+        // so the configured title-bar colour is the one that shows.
+        "\nQStackedWidget#panePathStack { background: transparent; }\n")
         .arg(m_config.colors.folderTreeForeground,
              m_config.colors.folderTreeSelectedActive,
              m_config.colors.folderTreeSelectedForeground,
@@ -445,6 +520,7 @@ void MainWindow::applyPaneThemeSettings()
     m_leftPane->setFileListFont(fileListFont);
     m_rightPane->setFileListFont(fileListFont);
 
+    m_terminalPane->setBackgroundOpacity(m_config.opacity.background);
     m_terminalPane->setContentFont(TerminalPane::resolveFont(
         m_config.font.terminalFamily,
         m_config.font.terminalSize > 0 ? m_config.font.terminalSize : m_config.font.size));
@@ -472,6 +548,8 @@ void MainWindow::applyPaneThemeSettings()
         QColor(m_config.colors.dropTargetBackground);
 
     static_cast<PinnedListWidget *>(m_pinnedList)->dropIndicatorOpacity = m_config.opacity.dropIndicator;
+    static_cast<PinnedListWidget *>(m_pinnedList)->dropTargetColor =
+        QColor(m_config.colors.dropTargetBackground);
     m_pinnedList->viewport()->update();
 
     m_previewPane->setPreviewConfig(m_config.preview.defaultMode,

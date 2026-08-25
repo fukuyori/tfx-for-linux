@@ -199,6 +199,7 @@ QString AppConfig::defaultConfigText()
         "openPreviewExternal = \"ctrl+shift+i\"\n"
         "toggleSplit = \"ctrl+backslash\"\n"
         "focusSearch = \"ctrl+f\"\n"
+        "sortOptions = \"ctrl+shift+s\"\n"
         "toggleHidden = \"ctrl+shift+.\"\n"
         "goBack = \"alt+left\"\n"
         "goForward = \"alt+right\"\n"
@@ -355,10 +356,6 @@ void AppConfig::applyThemePreset(const QString &name)
     colors.activeBorder = "#0B8F55";
     colors.activeAccent = "#12865A";
     colors.hoverBackground = "#E7EEF4";
-    colors.disabledForeground = "#9AA8B3";
-    colors.scrollbarThumb = "#A9B8C3";
-    colors.scrollbarThumbHovered = "#8FA2AF";
-    colors.scrollbarThumbDragging = "#728A99";
     if (terminalColorScheme.isEmpty()) {
         terminalColorScheme = "BlackOnLightYellow";
     }
@@ -443,10 +440,6 @@ void AppConfig::applyValue(const QString &section, const QString &key, const QSt
         else if (key == "paneBorderActive" || key == "paneBorderKeyboardTarget") colors.activeBorder = color;
         else if (key == "splitHandleActive") colors.activeAccent = color;
         else if (key == "folderTreeBackground") colors.sidebarBackground = color;
-        else if (key == "disabledForeground") colors.disabledForeground = color;
-        else if (key == "scrollbarThumb") colors.scrollbarThumb = color;
-        else if (key == "scrollbarThumbHovered") colors.scrollbarThumbHovered = color;
-        else if (key == "scrollbarThumbDragging") colors.scrollbarThumbDragging = color;
         else if (key == "fileListRowDropTarget") colors.dropTargetBackground = color;
         else if (key == "titleBarBackgroundActive") colors.titleBarActive = color;
         else if (key == "titleBarBackgroundInactive") colors.titleBarInactive = color;
@@ -455,7 +448,6 @@ void AppConfig::applyValue(const QString &section, const QString &key, const QSt
         else if (key == "statusLineForegroundInactive") colors.statusForegroundInactive = color;
         else if (key == "folderTreeForeground") colors.folderTreeForeground = color;
         else if (key == "folderTreeSelectedForeground") colors.folderTreeSelectedForeground = color;
-        else if (key == "folderTreeFolderIcon") colors.folderTreeFolderIcon = color;
         else if (key == "folderTreeSelectedActive") colors.folderTreeSelectedActive = color;
         else if (key == "folderTreeSelectedInactive") colors.folderTreeSelectedInactive = color;
         else if (key == "folderTreeSectionHeader") colors.folderTreeSectionHeader = color;

@@ -106,6 +106,34 @@ void FilePane::setViewMode(bool iconMode)
     }
 }
 
+bool FilePane::acceptsDropOnRow(const QModelIndex &proxyIndex) const
+{
+    if (!proxyIndex.isValid()) {
+        return false;
+    }
+    const QModelIndex source = m_proxyModel->mapToSource(proxyIndex.sibling(proxyIndex.row(), ColumnName));
+    return m_model->fileInfo(source).isDir();
+}
+
+QString FilePane::dropDestinationDirectory(const QModelIndex &proxyIndex) const
+{
+    if (!acceptsDropOnRow(proxyIndex)) {
+        return m_currentPath;
+    }
+    const QModelIndex source = m_proxyModel->mapToSource(proxyIndex.sibling(proxyIndex.row(), ColumnName));
+    const QFileInfo info = m_model->fileInfo(source);
+    // The parent row is a real directory entry ("<dir>/.."); resolve it so the
+    // drop and the label both name the folder above rather than that path.
+    const QString resolved = QDir(info.absoluteFilePath()).canonicalPath();
+    return resolved.isEmpty() ? info.absoluteFilePath() : resolved;
+}
+
+QString FilePane::displayNameForDirectory(const QString &path)
+{
+    const QString name = QFileInfo(path).fileName();
+    return name.isEmpty() ? path : name;
+}
+
 void FilePane::setActive(bool active)
 {
     m_isActive = active;

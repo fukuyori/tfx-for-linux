@@ -291,6 +291,17 @@ void TerminalPane::showEvent(QShowEvent *event)
 #endif
 }
 
+void TerminalPane::setBackgroundOpacity(double level)
+{
+    m_backgroundOpacity = qBound(0.0, level, 1.0);
+#ifdef TFX_HAVE_QTERMWIDGET
+    if (m_term) {
+        m_term->setTerminalOpacity(m_backgroundOpacity);
+        m_term->update();
+    }
+#endif
+}
+
 void TerminalPane::setColorScheme(const QString &name)
 {
 #ifdef TFX_HAVE_QTERMWIDGET
@@ -298,6 +309,10 @@ void TerminalPane::setColorScheme(const QString &name)
         m_colorScheme = name;
         if (m_term) {
             m_term->setColorScheme(name);
+            // Applying a scheme resets the display to the scheme's own opacity,
+            // so the configured one has to be restored right after it.
+            m_term->setTerminalOpacity(m_backgroundOpacity);
+            m_term->update();
         }
     }
 #else
@@ -536,6 +551,9 @@ void TerminalPane::createTermWidget()
     if (!scheme.isEmpty()) {
         m_term->setColorScheme(scheme);
     }
+    // Re-applied here too: a terminal rebuilt after the shell exits would
+    // otherwise come back opaque.
+    m_term->setTerminalOpacity(m_backgroundOpacity);
 
     connect(m_term, &QTermWidget::finished, this, [this]() {
         // The shell exited. QTermWidget cannot restart its session, so discard

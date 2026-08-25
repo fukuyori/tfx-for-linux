@@ -3,6 +3,8 @@
 #include "UiText.h"
 #include "models/ColumnLayout.h"
 #include "models/FileColumns.h"
+#include "core/SortOptions.h"
+#include "views/SortOptionsDialog.h"
 
 #include <QAbstractItemView>
 #include <QAction>
@@ -15,10 +17,12 @@
 #include <QMenu>
 #include <QPushButton>
 #include <QSettings>
+#include <QTimer>
 #include <QSignalBlocker>
 #include <QTableView>
 #include <QVBoxLayout>
 
+using namespace tfx::core;
 using namespace tfx::filepane;
 using namespace tfx::models;
 
@@ -37,6 +41,7 @@ void FilePane::showColumnContextMenu(const QPoint &point)
     }
 
     menu.addSeparator();
+    menu.addAction(UiText::t("Sort Options...", "ソート設定..."), this, &FilePane::showSortOptions);
     menu.addAction(UiText::t("Column Settings...", "表示項目設定..."), this, &FilePane::showColumnSettingsDialog);
     menu.addAction(UiText::t("Reset Columns", "カラムをリセット"), this, &FilePane::resetColumns);
 
@@ -62,6 +67,40 @@ QString FilePane::columnTitle(int column) const
         return UiText::t("Git Status", "Git ステータス");
     default:
         return {};
+    }
+}
+
+void FilePane::applySortKey(SortKey key, Qt::SortOrder order)
+{
+    const SortOption option = sortOptionFor(key);
+    // The natural flag has to land before the sort so the first pass already
+    // uses the right name comparison.
+    m_proxyModel->setNaturalSort(option.natural);
+    m_view->sortByColumn(option.column, order);
+    // Sorting runs through a model layout change, and column saves are
+    // suppressed for its duration; persist once that window closes. Deferring
+    // also covers keys that leave the header indicator untouched, such as
+    // switching between Name and Natural.
+    QTimer::singleShot(0, this, [this]() { saveColumnSettings(); });
+
+    // A hidden column shows no header marker, so the applied key is echoed to
+    // the status line where it is visible either way.
+    emit statusMessageRequested(UiText::t("Sorted by %1 (%2)", "%1 でソート (%2)")
+                                    .arg(sortKeyLabel(key),
+                                         order == Qt::AscendingOrder
+                                             ? UiText::t("ascending", "昇順")
+                                             : UiText::t("descending", "降順")));
+}
+
+void FilePane::showSortOptions()
+{
+    auto *header = m_view->horizontalHeader();
+    const SortKey current = sortKeyFor(normalizedSortColumn(header->sortIndicatorSection()),
+                                       m_proxyModel->naturalSort());
+
+    tfx::views::SortOptionsDialog dialog(current, header->sortIndicatorOrder(), this);
+    if (dialog.exec() == QDialog::Accepted) {
+        applySortKey(dialog.selectedKey(), dialog.selectedOrder());
     }
 }
 
@@ -176,7 +215,7 @@ void FilePane::applyDefaultColumns()
     }
 }
 
-void FilePane::applySharedColumnLayout()
+void FilePane::applySharedColumnLayout(bool restoreSort)
 {
     // Column layout (order/visibility/width) is shared between panes: only the
     // left pane persists it and the right pane mirrors the left, so a single
@@ -212,9 +251,19 @@ void FilePane::applySharedColumnLayout()
     const int sortColumn = normalizedSortColumn(settings.value("sortColumn", ColumnName).toInt());
     const Qt::SortOrder sortOrder = normalizedSortOrder(
         settings.value("sortOrder", static_cast<int>(Qt::AscendingOrder)).toInt());
+    const bool naturalSort = settings.value("naturalSort", false).toBool();
     settings.endGroup();
 
+    if (!restoreSort) {
+        return;
+    }
+
+    m_proxyModel->setNaturalSort(naturalSort);
     m_view->sortByColumn(sortColumn, sortOrder);
+    // The header's signals are blocked for the whole restore, so the view
+    // cannot forward the sort to the model the way a click would; the model
+    // has to be sorted explicitly or the list keeps its previous order.
+    m_proxyModel->sort(sortColumn, sortOrder);
 }
 
 void FilePane::saveColumnSettings()
@@ -245,5 +294,6 @@ void FilePane::saveColumnSettings()
     }
     settings.setValue("sortColumn", header->sortIndicatorSection());
     settings.setValue("sortOrder", static_cast<int>(header->sortIndicatorOrder()));
+    settings.setValue("naturalSort", m_proxyModel->naturalSort());
     settings.endGroup();
 }

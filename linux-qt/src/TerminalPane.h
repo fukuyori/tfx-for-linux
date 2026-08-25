@@ -24,6 +24,10 @@ public:
     void openAt(const QString &path);
     void setContentFont(const QFont &font);
     void setColorScheme(const QString &name);
+    // Background opacity of the terminal itself. QTermWidget paints its colour
+    // scheme opaquely, so without this the terminal stays solid inside an
+    // otherwise translucent window.
+    void setBackgroundOpacity(double level);
 
     // Stream user-command output into the "Output" tab. beginCommandOutput
     // switches to the tab and prints a header; appendCommandOutput adds a chunk
@@ -64,6 +68,7 @@ private:
     QWidget *m_terminalTab = nullptr;
     QVBoxLayout *m_terminalTabLayout = nullptr;
     QTermWidget *m_term = nullptr;
+    double m_backgroundOpacity = 1.0;
     QFont m_font;
     QString m_colorScheme;
     bool m_started = false;

@@ -1,6 +1,6 @@
 # tfx for Linux Roadmap
 
-Current version: **0.8.3**
+Current version: **0.8.4**
 
 This roadmap tracks the practical development steps for the Linux Qt port as it
 moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
@@ -64,12 +64,23 @@ moves toward feature parity with tfx for Windows (0.6.x) and tfx for macOS
 - Folder-tree collapse-all button. (done)
 - Click-to-sort column headers with ascending/descending indicators and saved
   sort state; drag-to-reorder columns remains supported. (done)
+- Sort Options chooser (`Ctrl+Shift+S`) listing the sort keys, including a
+  natural (numeric-aware) name order, and sorting for the synthesised
+  Modified/Mode/Git columns. (done)
 - Markdown rendering improvements: horizontal rules, ordered lists, tables,
   embedding local images as `data:` URLs, and remote-image external button. (done)
 - Preview-pane keyboard shortcuts (source/rendered toggle, open externally). (done)
 - Drag-and-drop refinements: highlight the target row/item, show a pane drop
   border when dragging over empty area, refresh affected panes immediately, and
   avoid snap-back on a successful drop. (done)
+- Drag-and-drop targeting accuracy: highlight only rows that receive the drop
+  (framing the folder's icon and name, not the whole row), fall back to the
+  pane frame for the listed folder, and name the destination and the
+  move/copy action in a badge by the cursor. (done)
+- Translucent window surfaces render at the configured `[opacity] background`
+  instead of compounding it: the file list, preview, toolbar and folder
+  sidebar each paint their surface once. The terminal pane is still opaque —
+  QTermWidget does not honour the request when embedded. (done)
 - Startup visibility options for terminal/preview/folder-tree. (done)
 - Window geometry option (`-g`/`--geometry` and `config.toml`). (done)
 - `[naming]` config for placeholder language (auto/en/ja). (done)

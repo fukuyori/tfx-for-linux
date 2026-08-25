@@ -68,6 +68,7 @@ QWidget *FilePane::createHeaderLayout()
     // editable path field, which returns on Esc, focus loss, or commit.
     m_breadcrumb = new BreadcrumbBar(this);
     m_pathStack = new QStackedWidget(this);
+    m_pathStack->setObjectName("panePathStack");
     m_pathStack->addWidget(m_breadcrumb);
     m_pathStack->addWidget(m_pathEdit);
     m_pathStack->setCurrentWidget(m_breadcrumb);
@@ -109,18 +110,15 @@ void FilePane::setupFileView()
     m_view->setDropIndicatorShown(true);
     m_view->setDragDropMode(QAbstractItemView::DragDrop);
     m_view->setDefaultDropAction(Qt::MoveAction);
-    static_cast<FileTableView *>(m_view)->dropHandler =
+    auto *tableView = static_cast<FileTableView *>(m_view);
+    tableView->dropHandler =
         [this](const QList<QUrl> &urls, Qt::DropAction action, const QModelIndex &target) {
-            QString targetDir = m_currentPath;
-            if (target.isValid()) {
-                const QModelIndex source = m_proxyModel->mapToSource(target.sibling(target.row(), 0));
-                const QFileInfo info = m_model->fileInfo(source);
-                if (info.isDir()) {
-                    targetDir = info.absoluteFilePath();
-                }
-            }
-            performDrop(urls, action, targetDir);
+            performDrop(urls, action, dropDestinationDirectory(target));
         };
+    tableView->acceptsDropOnRow = [this](const QModelIndex &index) { return acceptsDropOnRow(index); };
+    tableView->dropDestinationName = [this](const QModelIndex &index) {
+        return displayNameForDirectory(dropDestinationDirectory(index));
+    };
     m_view->setSortingEnabled(true);
     m_view->sortByColumn(0, Qt::AscendingOrder);
     m_view->setShowGrid(false);
@@ -150,7 +148,7 @@ void FilePane::setupFileView()
 
     const auto beginLayoutChange = [this]() { m_suppressColumnSave = true; };
     const auto endLayoutChange = [this]() {
-        applySharedColumnLayout();
+        applySharedColumnLayout(false);
         normalizeRowSelection();
         QTimer::singleShot(0, this, [this]() { m_suppressColumnSave = false; });
     };
@@ -229,18 +227,15 @@ void FilePane::setupIconView()
     m_iconView->setDragDropMode(QAbstractItemView::DragDrop);
     m_iconView->setDefaultDropAction(Qt::MoveAction);
     m_iconView->installEventFilter(this);
-    static_cast<FileIconView *>(m_iconView)->dropHandler =
+    auto *iconView = static_cast<FileIconView *>(m_iconView);
+    iconView->dropHandler =
         [this](const QList<QUrl> &urls, Qt::DropAction action, const QModelIndex &target) {
-            QString targetDir = m_currentPath;
-            if (target.isValid()) {
-                const QModelIndex source = m_proxyModel->mapToSource(target.sibling(target.row(), 0));
-                const QFileInfo info = m_model->fileInfo(source);
-                if (info.isDir()) {
-                    targetDir = info.absoluteFilePath();
-                }
-            }
-            performDrop(urls, action, targetDir);
+            performDrop(urls, action, dropDestinationDirectory(target));
         };
+    iconView->acceptsDropOnRow = [this](const QModelIndex &index) { return acceptsDropOnRow(index); };
+    iconView->dropDestinationName = [this](const QModelIndex &index) {
+        return displayNameForDirectory(dropDestinationDirectory(index));
+    };
     connect(m_iconView, &QListView::doubleClicked, this, [this](const QModelIndex &index) {
         if (index.isValid()) {
             m_iconView->setCurrentIndex(index);

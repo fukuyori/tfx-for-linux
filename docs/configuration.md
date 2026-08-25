@@ -76,6 +76,7 @@ togglePreviewSource = "ctrl+shift+r"
 openPreviewExternal = "ctrl+shift+i"
 toggleSplit = "ctrl+backslash"
 focusSearch = "ctrl+f"
+sortOptions = "ctrl+shift+s"
 toggleHidden = "ctrl+shift+."
 goBack = "alt+left"
 goForward = "alt+right"
@@ -228,6 +229,7 @@ warnings and fall back to the defaults.
 | --- | --- | --- |
 | `reload` | `F5` | Reload the active pane. |
 | `focusSearch` | `Ctrl+F` | Focus the search field. |
+| `sortOptions` | `Ctrl+Shift+S` | Open the Sort Options chooser for the active pane. |
 | `togglePreview` | `Ctrl+Shift+P` | Show/hide the preview pane. |
 | `togglePreviewSource` | `Ctrl+Shift+R` | Toggle rendered/source in the preview. |
 | `openPreviewExternal` | `Ctrl+Shift+I` | Open the current preview externally. |
@@ -267,7 +269,7 @@ copyPath = "ctrl+shift+c"
 
 Effective on the Linux port:
 
-- `background` — overall window background opacity. Values below `1.0` enable a translucent window surface, so the desktop shows through behind the panes (requires a compositing window manager).
+- `background` — overall window background opacity. Values below `1.0` enable a translucent window surface, so the desktop shows through behind the panes (requires a compositing window manager). The menu bar, toolbar, folder sidebar, file lists, preview and status bar all render at this value. The terminal pane does not: QTermWidget paints its colour scheme opaquely when embedded, so it stays solid.
 - `inactivePane` — opacity applied to the file pane that is not currently active.
 - `disabledItem` — opacity applied to disabled controls and menu items.
 - `dropIndicator` — opacity of the pinned-folder drop insertion indicator.
@@ -339,17 +341,13 @@ Git status badges (colour of the per-row Git status letter):
 - `gitModified` / `gitAdded` / `gitDeleted` / `gitRenamed` / `gitUntracked` /
   `gitIgnored` / `gitConflicted`
 
-Scrollbars and misc:
-
-- `disabledForeground`
-- `scrollbarThumb` / `scrollbarThumbHovered` / `scrollbarThumbDragging`
-
 Notes:
 
 - `paneBorderActive` and `paneBorderKeyboardTarget` currently map to the same
   active-border colour.
-- `folderTreeFolderIcon` (a macOS token) has no effect: the Linux folder tree
-  does not draw folder icons.
+- Scrollbars follow the platform style and are not themed by `[colors]`.
+- Disabled items are dimmed from `fileForeground` through
+  `[opacity] disabledItem` rather than taking a colour of their own.
 
 ## Terminal
 

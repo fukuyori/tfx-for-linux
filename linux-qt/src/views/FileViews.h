@@ -1,5 +1,6 @@
 #pragma once
 
+#include "UiText.h"
 #include "models/FileColumns.h"
 
 #include <QApplication>
@@ -82,6 +83,54 @@ public:
     }
 };
 
+// A drop moves by default and copies while Ctrl is held. The drag feedback and
+// the drop itself both read the modifiers through this, so the label shown
+// during the drag cannot disagree with what the drop performs.
+inline Qt::DropAction dropActionForModifiers(Qt::KeyboardModifiers modifiers)
+{
+    return modifiers.testFlag(Qt::ControlModifier) ? Qt::CopyAction : Qt::MoveAction;
+}
+
+// "→ <folder> へ移動" / "→ <folder> にコピー": the resolved destination, not the
+// row under the cursor, which are different things whenever a file is hovered.
+inline QString dropHintText(const QString &destination, Qt::DropAction action)
+{
+    if (destination.isEmpty()) {
+        return QString();
+    }
+    return action == Qt::CopyAction
+        ? UiText::t("Copy to %1", "%1 にコピー").arg(destination)
+        : UiText::t("Move to %1", "%1 へ移動").arg(destination);
+}
+
+// Badge drawn near the cursor naming the folder the drop will land in.
+inline void paintDropHint(QPainter &painter, const QRect &viewportRect, const QPoint &cursor,
+                          const QString &text, const QColor &accent)
+{
+    if (text.isEmpty()) {
+        return;
+    }
+    const QFontMetrics metrics = painter.fontMetrics();
+    const int padding = 8;
+    QRect box(0, 0, metrics.horizontalAdvance(text) + padding * 2, metrics.height() + padding);
+    box.moveTo(cursor.x() + 16, cursor.y() + 18);
+    // Keep the badge inside the viewport rather than letting it run off the edge.
+    if (box.right() > viewportRect.right() - 4) {
+        box.moveLeft(qMax(4, viewportRect.right() - 4 - box.width()));
+    }
+    if (box.bottom() > viewportRect.bottom() - 4) {
+        box.moveTop(qMax(4, cursor.y() - 18 - box.height()));
+    }
+
+    QColor background = accent.darker(700);
+    background.setAlpha(240);
+    painter.setPen(QPen(accent, 1));
+    painter.setBrush(background);
+    painter.drawRoundedRect(box, 4, 4);
+    painter.setPen(accent.lighter(130));
+    painter.drawText(box, Qt::AlignCenter, text);
+}
+
 // Details (table) view with explicit drag-start, drop routing, multi-selection
 // (Shift range / Ctrl toggle), and persistent row highlight.
 class FileTableView : public QTableView
@@ -92,6 +141,14 @@ public:
     // Invoked on a drop of file URLs: (urls, action, target index under cursor).
     std::function<void(const QList<QUrl> &, Qt::DropAction, const QModelIndex &)> dropHandler;
 
+    // Whether a row can receive a drop, i.e. whether it is a directory. Rows
+    // that cannot are not highlighted: the drop goes to the listed folder, and
+    // framing the row under the cursor would point at the wrong destination.
+    std::function<bool(const QModelIndex &)> acceptsDropOnRow;
+    // Display name of the folder a drop on this row lands in (an invalid index
+    // means the folder being listed).
+    std::function<QString(const QModelIndex &)> dropDestinationName;
+
     // Highlight colour for the in-progress drop target ([colors] fileListRowDropTarget).
     QColor dropTargetColor{QStringLiteral("#63F28D")};
 
@@ -99,7 +156,7 @@ protected:
     void dragEnterEvent(QDragEnterEvent *event) override
     {
         if (event->mimeData()->hasUrls()) {
-            updateDropHighlight(event->position().toPoint());
+            updateDropHighlight(event->position().toPoint(), event->modifiers());
             event->acceptProposedAction();
         } else {
             QTableView::dragEnterEvent(event);
@@ -109,7 +166,7 @@ protected:
     void dragMoveEvent(QDragMoveEvent *event) override
     {
         if (event->mimeData()->hasUrls()) {
-            updateDropHighlight(event->position().toPoint());
+            updateDropHighlight(event->position().toPoint(), event->modifiers());
             event->acceptProposedAction();
         } else {
             QTableView::dragMoveEvent(event);
@@ -129,9 +186,7 @@ protected:
             return;
         }
         const QModelIndex target = indexAt(event->position().toPoint());
-        const Qt::DropAction action = event->modifiers().testFlag(Qt::ControlModifier)
-            ? Qt::CopyAction
-            : Qt::MoveAction;
+        const Qt::DropAction action = dropActionForModifiers(event->modifiers());
         dropHandler(event->mimeData()->urls(), action, target);
         clearDropHighlight();
         event->acceptProposedAction();
@@ -300,9 +355,19 @@ private:
         selectionModel()->select(selection, QItemSelectionModel::ClearAndSelect);
     }
 
-    void updateDropHighlight(const QPoint &pos)
+    void updateDropHighlight(const QPoint &pos, Qt::KeyboardModifiers modifiers)
     {
-        m_dropTarget = indexAt(pos);
+        const QModelIndex hovered = indexAt(pos);
+        // Only a directory receives the drop; over anything else the drop goes
+        // to the listed folder, which the whole-viewport frame stands for.
+        const QModelIndex target = hovered.isValid() && acceptsDropOnRow && acceptsDropOnRow(hovered)
+            ? hovered
+            : QModelIndex();
+        m_dropTarget = target;
+        m_dropCursor = pos;
+        m_dropHint = dropDestinationName
+            ? dropHintText(dropDestinationName(target), dropActionForModifiers(modifiers))
+            : QString();
         m_dropActive = true;
         viewport()->update();
     }
@@ -314,7 +379,43 @@ private:
         }
         m_dropActive = false;
         m_dropTarget = QPersistentModelIndex();
+        m_dropHint.clear();
         viewport()->update();
+    }
+
+    // Rectangle actually covered by a row's icon and name text, asked of the
+    // style so it matches what the delegate paints.
+protected:
+    // Protected so the drop-target measurement can be exercised directly.
+    QRect nameExtent(const QModelIndex &index) const
+    {
+        QRect cell = visualRect(index);
+        if (!index.isValid()) {
+            return cell;
+        }
+        QStyleOptionViewItem option;
+        initViewItemOption(&option);
+        option.rect = cell;
+        option.index = index;
+        option.text = index.data(Qt::DisplayRole).toString();
+        option.features |= QStyleOptionViewItem::HasDisplay;
+        const QIcon icon = qvariant_cast<QIcon>(index.data(Qt::DecorationRole));
+        if (!icon.isNull()) {
+            option.icon = icon;
+            option.decorationSize = iconSize();
+            option.features |= QStyleOptionViewItem::HasDecoration;
+        }
+
+        QRect text = style()->subElementRect(QStyle::SE_ItemViewItemText, &option, this);
+        // subElementRect hands back the whole text slot; trim it to the glyphs
+        // so a short name in a wide column is not framed as if it filled it.
+        const int glyphs = option.fontMetrics.horizontalAdvance(option.text) + 4;
+        text.setWidth(qBound(0, glyphs, text.width()));
+        QRect extent = text;
+        if (!icon.isNull()) {
+            extent |= style()->subElementRect(QStyle::SE_ItemViewItemDecoration, &option, this);
+        }
+        return extent.isEmpty() ? cell : extent;
     }
 
     void paintDropHighlight()
@@ -326,23 +427,27 @@ private:
         painter.setRenderHint(QPainter::Antialiasing);
         const QColor accent = dropTargetColor;
         if (m_dropTarget.isValid()) {
-            QRect rect = visualRect(m_dropTarget);
-            rect.setLeft(0);
-            rect.setRight(viewport()->width() - 1);
+            // Frame the name itself rather than the whole row: a bar spanning
+            // every column reads as "the row is selected" instead of naming the
+            // folder that is about to receive the drop.
+            const QRect rect = nameExtent(m_dropTarget.sibling(m_dropTarget.row(), ColumnName))
+                                   .adjusted(-4, -1, 4, 1);
             QColor fill = accent;
             fill.setAlpha(42);
-            painter.fillRect(rect, fill);
+            painter.setPen(QPen(accent, 2));
+            painter.setBrush(fill);
+            painter.drawRoundedRect(rect, 4, 4);
+            painter.setBrush(Qt::NoBrush);
+        } else {
             QPen pen(accent, 2);
+            pen.setStyle(Qt::DashLine);
             painter.setPen(pen);
-            painter.drawRect(rect.adjusted(1, 1, -2, -2));
-            return;
+            painter.drawRoundedRect(viewport()->rect().adjusted(3, 3, -4, -4), 6, 6);
         }
-        QPen pen(accent, 2);
-        pen.setStyle(Qt::DashLine);
-        painter.setPen(pen);
-        painter.drawRoundedRect(viewport()->rect().adjusted(3, 3, -4, -4), 6, 6);
+        paintDropHint(painter, viewport()->rect(), m_dropCursor, m_dropHint, accent);
     }
 
+private:
     QPixmap dragPixmap() const
     {
         if (!selectionModel() || !model()) {
@@ -425,6 +530,8 @@ private:
 
     QPersistentModelIndex m_pressedIndex;
     QPersistentModelIndex m_dropTarget;
+    QPoint m_dropCursor;
+    QString m_dropHint;
     Qt::KeyboardModifiers m_pressedModifiers;
     QPoint m_pressPos;
     int m_anchorRow = -1;
@@ -443,6 +550,11 @@ public:
     using QListView::QListView;
 
     std::function<void(const QList<QUrl> &, Qt::DropAction, const QModelIndex &)> dropHandler;
+
+    // See FileTableView: highlight only rows that actually receive the drop,
+    // and name the destination while dragging.
+    std::function<bool(const QModelIndex &)> acceptsDropOnRow;
+    std::function<QString(const QModelIndex &)> dropDestinationName;
 
     // Highlight colour for the in-progress drop target ([colors] fileListRowDropTarget).
     QColor dropTargetColor{QStringLiteral("#63F28D")};
@@ -479,7 +591,7 @@ protected:
     void dragEnterEvent(QDragEnterEvent *event) override
     {
         if (event->mimeData()->hasUrls()) {
-            updateDropHighlight(event->position().toPoint());
+            updateDropHighlight(event->position().toPoint(), event->modifiers());
             event->acceptProposedAction();
         } else {
             QListView::dragEnterEvent(event);
@@ -489,7 +601,7 @@ protected:
     void dragMoveEvent(QDragMoveEvent *event) override
     {
         if (event->mimeData()->hasUrls()) {
-            updateDropHighlight(event->position().toPoint());
+            updateDropHighlight(event->position().toPoint(), event->modifiers());
             event->acceptProposedAction();
         } else {
             QListView::dragMoveEvent(event);
@@ -509,9 +621,7 @@ protected:
             return;
         }
         const QModelIndex target = indexAt(event->position().toPoint());
-        const Qt::DropAction action = event->modifiers().testFlag(Qt::ControlModifier)
-            ? Qt::CopyAction
-            : Qt::MoveAction;
+        const Qt::DropAction action = dropActionForModifiers(event->modifiers());
         dropHandler(event->mimeData()->urls(), action, target);
         clearDropHighlight();
         event->acceptProposedAction();
@@ -524,9 +634,17 @@ protected:
     }
 
 private:
-    void updateDropHighlight(const QPoint &pos)
+    void updateDropHighlight(const QPoint &pos, Qt::KeyboardModifiers modifiers)
     {
-        m_dropTarget = indexAt(pos);
+        const QModelIndex hovered = indexAt(pos);
+        const QModelIndex target = hovered.isValid() && acceptsDropOnRow && acceptsDropOnRow(hovered)
+            ? hovered
+            : QModelIndex();
+        m_dropTarget = target;
+        m_dropCursor = pos;
+        m_dropHint = dropDestinationName
+            ? dropHintText(dropDestinationName(target), dropActionForModifiers(modifiers))
+            : QString();
         m_dropActive = true;
         viewport()->update();
     }
@@ -538,6 +656,7 @@ private:
         }
         m_dropActive = false;
         m_dropTarget = QPersistentModelIndex();
+        m_dropHint.clear();
         viewport()->update();
     }
 
@@ -556,16 +675,19 @@ private:
             painter.fillRect(rect, fill);
             painter.setPen(QPen(accent, 2));
             painter.drawRoundedRect(rect, 5, 5);
-            return;
+        } else {
+            QPen pen(accent, 2);
+            pen.setStyle(Qt::DashLine);
+            painter.setPen(pen);
+            painter.drawRoundedRect(viewport()->rect().adjusted(3, 3, -4, -4), 6, 6);
         }
-        QPen pen(accent, 2);
-        pen.setStyle(Qt::DashLine);
-        painter.setPen(pen);
-        painter.drawRoundedRect(viewport()->rect().adjusted(3, 3, -4, -4), 6, 6);
+        paintDropHint(painter, viewport()->rect(), m_dropCursor, m_dropHint, accent);
     }
 
     QPoint m_pressPos;
     QPersistentModelIndex m_dropTarget;
+    QPoint m_dropCursor;
+    QString m_dropHint;
     bool m_pressValid = false;
     bool m_dropActive = false;
 };

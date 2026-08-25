@@ -15,6 +15,7 @@ class BreadcrumbBar;
 
 #include "AppConfig.h"
 #include "core/FileOperationWorker.h"
+#include "core/SortOptions.h"
 #include "models/FileSystemProxyModel.h"
 
 #include <QElapsedTimer>
@@ -56,7 +57,10 @@ public:
     void restoreTabs(const QStringList &paths, int activeIndex);
     void navigateTo(const QString &path, bool recordHistory = true);
     void focusFileList();
-    void applySharedColumnLayout();
+    // restoreSort=false re-applies only order/visibility/width. The model
+    // emits layoutChanged while sorting, and re-reading the stored sort from
+    // there would undo the sort that caused it.
+    void applySharedColumnLayout(bool restoreSort = true);
     void setUserCommands(const QList<UserCommand> &commands);
     void setOpenWithApplications(const QHash<QString, QString> &applications);
     void setPlaceholderLanguage(const QString &language);
@@ -64,6 +68,15 @@ public:
     // External drop entry (folder tree): runs the same pipeline as pane
     // drops, including the self/subtree guard and conflict prompts.
     void dropOntoDirectory(const QList<QUrl> &urls, Qt::DropAction action, const QString &targetDir);
+
+    // Drop targeting, shared by the drag feedback and the drop itself so the
+    // highlight cannot point somewhere the drop will not go. `proxyIndex` is a
+    // row of the file list; an invalid one means "no row under the cursor".
+    bool acceptsDropOnRow(const QModelIndex &proxyIndex) const;
+    QString dropDestinationDirectory(const QModelIndex &proxyIndex) const;
+    // Folder name shown in the drag label; the filesystem root has no basename
+    // of its own, so it keeps its path.
+    static QString displayNameForDirectory(const QString &path);
 
 signals:
     void activated(FilePane *pane);
@@ -108,6 +121,9 @@ public slots:
     void pasteClipboardAsPlainText();
     void copySelectedPaths();
     void showColumnSettingsDialog();
+    void showSortOptions();
+    // Applies a Sort Options key directly, bypassing the dialog.
+    void applySortKey(tfx::core::SortKey key, Qt::SortOrder order);
     void newTab();
     void closeCurrentTab();
     void nextTab();

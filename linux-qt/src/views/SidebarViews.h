@@ -63,6 +63,9 @@ public:
 
     // Opacity of the drop insertion indicator ([opacity] dropIndicator).
     double dropIndicatorOpacity = 0.85;
+    // Insertion-line colour, kept in step with the other views' drop accent
+    // ([colors] fileListRowDropTarget).
+    QColor dropTargetColor{QStringLiteral("#63F28D")};
 
 protected:
     void startDrag(Qt::DropActions supportedActions) override;

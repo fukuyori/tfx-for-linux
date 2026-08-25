@@ -2,6 +2,108 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.8.4] - 2026-08-25
+
+### Added
+
+- A badge next to the cursor during a drag naming the folder the drop lands in
+  and whether it moves or copies, updating as Ctrl is pressed or released.
+- Sort Options chooser, opened with `Ctrl+Shift+S` (also View ▸ Sort Options...
+  and the file-list header context menu): a keyboard-driven popup listing the
+  sort keys with a cursor on the current one. Up/Down (or `k`/`j`) and the
+  digit keys move, Space (or Left/Right) flips ascending/descending, Enter
+  applies and Esc cancels. It reaches hidden columns and works in icon view,
+  where there is no header to click. The popup sizes itself to its longest
+  label, measured after the theme font is applied, so it neither clips the
+  text nor spreads wider than the entries need.
+- `Natural` sort key: numeric-aware name ordering, so `file2` sorts before
+  `file10` instead of after it. The choice is saved with the column layout.
+- New `sortOptions` entry in `[shortcuts]`.
+
+### Fixed
+
+- Drag-and-drop pointed at the wrong destination. The row under the cursor was
+  always framed, but a drop only enters that row when it is a folder —
+  over a file it goes to the folder being listed. Hovering a file therefore
+  drew a box around the file as if it would receive the drop. Only rows that
+  actually take the drop are highlighted now; anything else shows the
+  pane-wide frame that stands for the listed folder. The highlight and the
+  drop are driven by the same targeting functions, so they cannot disagree.
+  In the details view that highlight now frames the folder's icon and name
+  instead of spanning every column, which read as "this row is selected"
+  rather than "this folder receives the drop".
+- With `[opacity] background` below 1, the file list was very nearly opaque
+  while the rest of the window was see-through: the theme's generic `QWidget`
+  background rule has every widget paint the same translucent fill, and the
+  file list sits four widgets deep (pane, view stack, view, scroll viewport),
+  so the alpha compounded — 0.6 became 0.97. Those inner containers are pure
+  containers with no colour of their own, so they no longer repaint the
+  surface the pane already paints. Measured over the whole window, the area
+  behind the file names now renders at exactly the configured opacity, and no
+  region became fully transparent that was not already.
+- The preview pane, the toolbar and the folder sidebar were affected by the
+  same stacking: the preview's view stack and scroll viewport repainted the
+  surface the preview view already paints, the toolbar's stretch filler
+  repainted the toolbar's, and the folder tree, pinned list and disk list each
+  repainted the sidebar's. All three now render at the configured opacity
+  (measured: preview 0.97 → 0.60, toolbar 0.84 → 0.60, sidebar views
+  0.84 → 0.60).
+- The tab stack around the terminal no longer repaints the pane's surface
+  (same stacking problem as the file list). The terminal's own background is
+  now told to follow `[opacity] background` as well, but note that this has no
+  visible effect yet: QTermWidget honours the request when it is a top-level
+  window, and does not when embedded as tfx embeds it, so the terminal still
+  renders opaque.
+- `[colors] titleBarBackgroundActive` / `titleBarBackgroundInactive` had no
+  visible effect across most of the pane header. The theme's generic
+  `QWidget` background rule also matches the header's path container, so Qt
+  marked it as styled and painted the panel background over the title bar —
+  only the few pixels of layout margin kept the configured colour. The
+  container is now cleared explicitly.
+- Sorting did nothing at all once a column layout had been saved — which is
+  every profile that has ever resized or reordered a column. The pane re-reads
+  the stored layout on each model `layoutChanged`, and sorting emits exactly
+  that, so every sort immediately restored the previously stored sort while
+  the in-flight save was suppressed. Layout restores triggered by a model
+  reorganisation no longer touch the sort, and the new sort is persisted once
+  the layout-change window closes.
+- The sort saved with the column layout was not restored on the next launch:
+  the restore path blocks the header's signals, so the view never forwarded
+  the sort to the model. The model is now sorted explicitly during a restore.
+- Sorting by Date Modified, File Mode or Git Status did nothing. Those columns
+  are synthesised past the ones the underlying model provides, so Qt could not
+  resolve a source column to sort on and skipped sorting entirely. Sorting now
+  runs on the name column with the chosen key applied in the comparator.
+- Sorting by Type compared the unrelated source column that happens to share
+  the Type column's index (the file size) instead of the type name.
+- The sorted column had no visible marker: theming `QHeaderView::section`
+  suppresses Qt's native sort arrow, so the sorted column now carries a ▲/▼ in
+  its header title.
+
+### Changed
+
+- Dropping on the `..` row now resolves the parent directory instead of
+  targeting a path ending in `/..`.
+- The pinned-folder insertion line uses the configured
+  `[colors] fileListRowDropTarget` accent like the other views, instead of a
+  hardcoded green.
+- Documentation: `[colors]` no longer lists `disabledForeground`,
+  `scrollbarThumb`, `scrollbarThumbHovered`, `scrollbarThumbDragging` or
+  `folderTreeFolderIcon`. All five were read from `config.toml` but never used
+  by anything, so setting them did nothing. The notes now say what applies
+  instead: scrollbars follow the platform style, and disabled items are dimmed
+  from `fileForeground` via `[opacity] disabledItem`. Their parsing and the
+  unused `AppColors` fields behind them were removed as well; `[colors]`
+  ignores keys it does not know, so existing files keep loading without
+  warnings.
+- The `..` parent entry stays on the first row for every sort key and
+  direction rather than being ordered like a file, and no longer fills in
+  Type/Size/Created/Modified/Mode/Git — those described the folder above and
+  only added noise. Only its name is shown.
+- Rows that compare equal on the sorted column (same size, same timestamp,
+  same mode) now fall back to name order, so the listing is deterministic
+  instead of arbitrary. A size sort also groups directories ahead of files.
+
 ## [0.8.3] - 2026-07-28
 
 ### Changed

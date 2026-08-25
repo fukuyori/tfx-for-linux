@@ -191,6 +191,9 @@ void MainWindow::buildActions()
     m_iconViewAction->setCheckable(true);
     connect(m_iconViewAction, &QAction::toggled, this, &MainWindow::setIconViewEnabled);
 
+    addMenuAction(viewMenu, UiText::t("Sort Options...", "ソート設定..."), this,
+                  [this]() { activePane()->showSortOptions(); },
+                  QKeySequence(m_config.shortcut("sortOptions", "Ctrl+Shift+S")));
     addMenuAction(viewMenu, UiText::t("File List Settings...", "ファイル一覧設定..."), this, [this]() {
         activePane()->showColumnSettingsDialog();
     });
@@ -292,6 +295,7 @@ void MainWindow::buildTopToolbar()
     m_topToolbar->addWidget(cancelSearchButton);
 
     auto *spacer = new QWidget(this);
+    spacer->setObjectName("toolbarSpacer");
     spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     m_topToolbar->addWidget(spacer);
 

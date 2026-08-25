@@ -402,7 +402,8 @@ void MainWindow::setupConfigShortcuts()
                 m_searchEdit->setFocus();
                 m_searchEdit->lineEdit()->selectAll();
             });
-    // editConfig is bound through the File menu action (a duplicate QShortcut
+    // editConfig and sortOptions are bound through their menu actions (a
+    // duplicate QShortcut
     // would make the key ambiguous and fire neither).
 }
 

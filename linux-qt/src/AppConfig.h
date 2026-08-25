@@ -41,10 +41,6 @@ struct AppColors
     QString activeBorder = "#36E67A";
     QString activeAccent = "#63F28D";
     QString hoverBackground = "#1F2830";
-    QString disabledForeground = "#6D7881";
-    QString scrollbarThumb = "#3A454E";
-    QString scrollbarThumbHovered = "#4A5963";
-    QString scrollbarThumbDragging = "#5C7484";
 
     // Drop target
     QString dropTargetBackground = "#63F28D";
@@ -61,7 +57,6 @@ struct AppColors
     // Folder tree
     QString folderTreeForeground = "#C3CDD5";
     QString folderTreeSelectedForeground = "#FFFFFF";
-    QString folderTreeFolderIcon = "#E5B769";
     QString folderTreeSelectedActive = "#31576B";
     QString folderTreeSelectedInactive = "#232C33";
     QString folderTreeSectionHeader = "#8892A0";

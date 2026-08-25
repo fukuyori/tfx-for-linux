@@ -133,7 +133,7 @@ QString AppConfig::shortcut(const QString &name, const QString &fallback) const
 QString AppConfig::resolvedUiFontFamily() const
 {
     if (font.ui == "system") {
-        return "Noto Sans, Yu Gothic UI, Meiryo, sans-serif";
+        return "Noto Sans CJK JP, Noto Sans, Yu Gothic UI, Meiryo, sans-serif";
     }
     return font.ui;
 }
@@ -231,15 +231,15 @@ QString AppConfig::defaultConfigText()
         "# placeholderLanguage = \"auto\"  # auto, en, or ja\n"
         "\n"
         "# [opacity]\n"
-        "# background = 0.40     # ウィンドウ背景の不透明度 (0.0=透明, 1.0=不透明)\n"
+        "# background = 0.65     # ウィンドウ背景の不透明度 (0.0=透明, 1.0=不透明)\n"
         "# inactivePane = 0.5    # 非アクティブペインの不透明度\n"
         "# disabledItem = 0.45   # 無効な項目の不透明度\n"
         "\n"
         "# [colors]\n"
-        "# fileListBackground = \"#151A1E\"\n"
-        "# fileForeground = \"#D9E1E8\"\n"
-        "# directoryForeground = \"#E5EDF3\"\n"
-        "# paneBorderKeyboardTarget = \"#36E67A\"\n"
+        "# fileListBackground = \"#1E1E28\"\n"
+        "# fileForeground = \"#F2F2F2\"\n"
+        "# directoryForeground = \"#FFFFFF\"\n"
+        "# paneBorderKeyboardTarget = \"#AAAAAA\"\n"
         "\n"
         "# [terminal]\n"
         "# colorScheme = \"DarkPastels\"   # built-in QTermWidget scheme (sets background/foreground)\n"

@@ -2,6 +2,56 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.8.5] - 2026-08-25
+
+### Fixed
+
+- The file list measured text elision with the monospace family while the
+  stylesheet painted it with the UI family, so names could be elided at the
+  wrong width. Both now use the same face.
+- Dock title rows (the "Folder", "Preview" and "Terminal" headers) painted
+  nothing at all: they have no style of their own, so in a translucent window
+  they were fully see-through holes rather than window chrome. They now use the
+  window-chrome colour and render at `[opacity] background` like the menu bar.
+  Measured over the whole window, fully transparent pixels drop from 23,175 to
+  88 — and those 88 are the rounded corners of the file pane, which are meant
+  to show through.
+- Frameless windows (`[window] titleBar = "integrated"`) gave no sign of where
+  the resize zone was: the band is now 8px instead of 6px and the pointer turns
+  into a resize cursor over it, so the window edges — the bottom one included —
+  can be grabbed without hunting for them.
+
+### Changed
+
+- File-list icons are drawn by tfx instead of taken from the desktop icon
+  theme: a filled folder and an outlined page in prism-fm's shapes, tinted with
+  `[colors] directoryForeground` / `fileForeground`. The list now looks the same
+  on every icon theme, follows the palette, and the same glyphs are used in the
+  search results and the ZIP browser. The icon sits centred in a fixed 32px slot
+  at the start of the name cell, the way prism-fm lays its icon column out.
+- The default theme was reworked to follow prism-fm: translucent surfaces
+  (`[opacity] background` now defaults to `0.65`), a UI sans-serif face instead
+  of monospace for the menus, file lists and folder tree, 8px rounded corners on
+  panes, menus, tabs and input fields, thin rounded scrollbars,
+  hairline separators in place of full borders, small muted section headers, and
+  a neutral grey selection. Monospace is kept for the terminal pane and the
+  preview's source view. Existing `[colors]`, `[font]` and `[opacity]` overrides
+  keep working, so a `config.toml` that pins colours will still show them.
+- Nine colours were hardcoded in the theme and ignored `[colors]` entirely:
+  the selected pane tab, the terminal action buttons (background, border, hover
+  and pressed states), the splitter handle and window separator, the separator
+  hover, and the breadcrumb separator glyph. They now resolve through the
+  configured tokens like everything else. The only literal left is the active
+  pane badge's text colour, a contrast constant for a widget that is not shown.
+- The file-list selection and hover colours now come from `[colors]`
+  (`fileListRowSelected`, `fileListRowHovered`, `fileListRowSelectedForeground`).
+  The row delegate painted hardcoded values, so those three settings had no
+  effect on the rows themselves.
+- `PreviewPane` now paints its own background. It has always had a stylesheet
+  rule, but Qt ignores backgrounds on a plain QWidget subclass unless
+  `WA_StyledBackground` is set, so its children painted the surface individually
+  and showed up as lighter blocks in a translucent window.
+
 ## [0.8.4] - 2026-08-25
 
 ### Added

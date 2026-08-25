@@ -71,7 +71,9 @@ void AppConfigTest::invalidThemeFallsBackToDarkAndWarns()
     const AppConfig config = AppConfig::loadOrCreate();
 
     QCOMPARE(config.theme.name, QString("dark"));
-    QCOMPARE(config.colors.panelBackground, QString("#151A1E"));
+    // Compared against the built-in default rather than a literal, so a
+    // palette change does not turn into a fallback-behaviour failure.
+    QCOMPARE(config.colors.panelBackground, AppColors().panelBackground);
     QVERIFY(config.warningText().contains("Invalid theme value"));
 }
 
@@ -127,7 +129,9 @@ void AppConfigTest::malformedConfigFallsBackToDefaults()
 
     // Defaults survive: dark palette and no crash.
     QCOMPARE(config.theme.name, QString("dark"));
-    QCOMPARE(config.colors.panelBackground, QString("#151A1E"));
+    // Compared against the built-in default rather than a literal, so a
+    // palette change does not turn into a fallback-behaviour failure.
+    QCOMPARE(config.colors.panelBackground, AppColors().panelBackground);
 }
 
 void AppConfigTest::windowTitleBarParsesAndValidates()

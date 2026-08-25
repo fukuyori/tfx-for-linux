@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(tfx-for-linux VERSION 0.8.4 LANGUAGES CXX)
+project(tfx-for-linux VERSION 0.8.5 LANGUAGES CXX)
 
 include(GNUInstallDirs)
 include(CTest)
@@ -57,6 +57,8 @@ qt_add_executable(tfx
     src/models/FileSystemProxyModel.h
     src/views/BreadcrumbBar.cpp
     src/views/BreadcrumbBar.h
+    src/views/FileIcons.cpp
+    src/views/FileIcons.h
     src/views/FileViews.cpp
     src/views/SidebarViews.cpp
     src/views/SidebarViews.h
@@ -324,6 +326,8 @@ if(BUILD_TESTING AND Qt6Test_FOUND)
 
     qt_add_executable(tfx_file_views_selection_test
         tests/FileViewsSelectionTest.cpp
+        src/views/FileIcons.cpp
+        src/views/FileIcons.h
         src/views/FileViews.cpp
         src/views/FileViews.h
         src/UiText.cpp
@@ -356,6 +360,8 @@ if(BUILD_TESTING AND Qt6Test_FOUND)
         src/controllers/GitStatusController.cpp
         src/models/ColumnLayout.cpp
         src/models/FileSystemProxyModel.cpp
+        src/views/FileIcons.cpp
+        src/views/FileIcons.h
         src/views/FileViews.cpp
         src/views/SortOptionsDialog.cpp
         src/views/SortOptionsDialog.h
@@ -405,6 +411,8 @@ if(BUILD_TESTING AND Qt6Test_FOUND)
         src/controllers/GitStatusController.cpp
         src/models/ColumnLayout.cpp
         src/models/FileSystemProxyModel.cpp
+        src/views/FileIcons.cpp
+        src/views/FileIcons.h
         src/views/FileViews.cpp
         src/views/SortOptionsDialog.cpp
         src/views/SortOptionsDialog.h
@@ -454,6 +462,8 @@ if(BUILD_TESTING AND Qt6Test_FOUND)
         src/controllers/GitStatusController.cpp
         src/models/ColumnLayout.cpp
         src/models/FileSystemProxyModel.cpp
+        src/views/FileIcons.cpp
+        src/views/FileIcons.h
         src/views/FileViews.cpp
         src/views/SortOptionsDialog.cpp
         src/views/SortOptionsDialog.h
@@ -503,6 +513,8 @@ if(BUILD_TESTING AND Qt6Test_FOUND)
         src/controllers/GitStatusController.cpp
         src/models/ColumnLayout.cpp
         src/models/FileSystemProxyModel.cpp
+        src/views/FileIcons.cpp
+        src/views/FileIcons.h
         src/views/FileViews.cpp
         src/views/SortOptionsDialog.cpp
         src/views/SortOptionsDialog.h

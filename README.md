@@ -1,11 +1,21 @@
 # tfx for Linux
 
 **Terminal-inspired interface File eXplorer for Linux**  
-Version: **0.8.4**
+Version: **0.8.5**
 
 English | [Japanese](README.ja.md)
 
-`tfx-for-linux` is a C++/Qt port of `tfx`, focused on a terminal-like file manager experience for Linux desktops.
+`tfx-for-linux` is a C++/Qt port of `tfx`: a keyboard-centric two-pane file manager for Linux desktops.
+
+The default theme is translucent and rounded, in the spirit of
+[prism-fm](https://github.com/fukuyori/prism-fm) — a dark surface the desktop
+shows through, a UI sans-serif face, generous row spacing and neutral greys for
+selection, and file-list icons drawn by tfx itself — a filled folder and an
+outlined page, centred in their own slot and tinted from `[colors]` — so the
+list looks the same whatever icon theme the desktop uses. Monospace is kept
+where it carries meaning: the terminal pane and the preview's source view. Everything remains overridable through `[colors]`,
+`[font]` and `[opacity]` in `config.toml`; set `[opacity] background = 1.0` for a
+solid window.
 
 This repository contains only the Linux Qt implementation. The original macOS SwiftUI project files are intentionally excluded.
 

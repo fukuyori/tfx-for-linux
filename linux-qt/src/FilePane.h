@@ -50,6 +50,9 @@ public:
     void setActive(bool active);
     void setFileListFont(const QFont &font);
     void setThemeColors(const QString &fileForeground, const QString &directoryForeground);
+    // Selected/hover row colours for the file-list delegate ([colors]).
+    void setRowColors(const QString &selectedBackground, const QString &hoverBackground,
+                      const QString &selectedForeground);
     void setGitStatusColors(const QHash<QString, QString> &labelColors);
     void setDropTargetColor(const QString &color);
     QStringList tabPaths() const;

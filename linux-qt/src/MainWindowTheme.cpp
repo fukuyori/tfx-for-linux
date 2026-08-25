@@ -34,52 +34,83 @@ QString MainWindow::buildThemeStyleSheet() const
         QMainWindow, QWidget {
             background: #151A1E;
             color: #D9E1E8;
-            font-family: __MONO_FONT__;
+            font-family: __UI_FONT__;
             font-size: 12px;
         }
-        QMenuBar, QMenu {
+        QMenuBar { background: #11161A; color: #D9E1E8; border: 0; }
+        QMenuBar::item { padding: 5px 10px; border-radius: 6px; }
+        QMenuBar::item:selected { background: #1F2830; }
+        QMenu {
             background: #11161A;
             color: #D9E1E8;
             border: 1px solid #2A333A;
+            border-radius: 8px;
+            padding: 6px;
         }
-        QMenu::item { padding: 5px 22px 5px 18px; }
+        QMenu::item {
+            padding: 7px 24px 7px 20px;
+            border-radius: 6px;
+        }
         QMenu::item:selected { background: #243947; color: #FFFFFF; }
         QMenu::separator {
             height: 1px;
-            background: #4A5963;
-            margin: 5px 8px;
+            background: #2A333A;
+            margin: 6px 10px;
         }
         QToolBar#topToolbar {
             background: #151A1E;
             border: 0;
-            border-bottom: 1px solid #293137;
-            padding: 4px 8px;
-            spacing: 5px;
+            padding: 7px 10px;
+            spacing: 7px;
         }
         QLineEdit#pathEdit {
             background: #0F1418;
             color: #D9E1E8;
             border: 1px solid #2A333A;
-            border-radius: 0;
-            padding: 5px 10px;
-            font-weight: 700;
+            border-radius: 8px;
+            padding: 7px 12px;
+            font-weight: 500;
         }
         QComboBox#searchEdit,
         QComboBox#searchEdit QLineEdit {
             background: #10161A;
             color: #D9E1E8;
             border: 1px solid #2A333A;
-            border-radius: 0;
-            padding: 5px 9px;
+            border-radius: 8px;
+            padding: 7px 11px;
             selection-background-color: #243947;
         }
         QComboBox#searchEdit::drop-down {
             border: 0;
             width: 18px;
         }
+        /* Dock title rows have no style of their own, so with a translucent
+           window they painted nothing at all and showed as holes. Giving them
+           the window-chrome colour puts them at the configured opacity like
+           the menu bar. */
+        QDockWidget {
+            color: #9EABB6;
+            border: 0;
+        }
+        QDockWidget::title {
+            background: #11161A;
+            padding: 6px 10px;
+            border: 0;
+            text-align: left;
+        }
+        QDockWidget::close-button, QDockWidget::float-button {
+            background: transparent;
+            border: 0;
+            border-radius: 4px;
+            padding: 1px;
+        }
+        QDockWidget::close-button:hover, QDockWidget::float-button:hover {
+            background: #1F2830;
+        }
         QWidget#sidebar {
             background: #171C20;
-            border-right: 1px solid #2A333A;
+            border: 0;
+            padding: 4px;
         }
         /* The sidebar owns its surface; its views and their scroll viewports
            would otherwise paint a second layer over it (see the note on
@@ -117,17 +148,37 @@ QString MainWindow::buildThemeStyleSheet() const
         QLabel#sortOptionsHint {
             color: #9EABB6;
         }
+        QScrollBar:vertical, QScrollBar:horizontal {
+            background: transparent;
+            border: 0;
+            margin: 0;
+        }
+        QScrollBar:vertical { width: 10px; }
+        QScrollBar:horizontal { height: 10px; }
+        QScrollBar::handle:vertical, QScrollBar::handle:horizontal {
+            background: #2A333A;
+            border-radius: 5px;
+            min-height: 28px;
+            min-width: 28px;
+        }
+        QScrollBar::handle:hover { background: #1F2830; }
+        QScrollBar::add-line, QScrollBar::sub-line {
+            width: 0; height: 0; border: 0; background: transparent;
+        }
+        QScrollBar::add-page, QScrollBar::sub-page { background: transparent; }
         QLabel#sectionLabel {
             color: #9EABB6;
-            font-weight: 500;
-            padding: 7px 0 3px 0;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 14px 6px 6px 6px;
         }
         QToolButton#sectionHeader {
             color: #9EABB6;
-            font-weight: 500;
+            font-size: 11px;
+            font-weight: 600;
             border: 0;
             background: transparent;
-            padding: 7px 0 3px 0;
+            padding: 14px 6px 6px 6px;
         }
         QListWidget, QTreeView {
             background: #171C20;
@@ -136,6 +187,10 @@ QString MainWindow::buildThemeStyleSheet() const
             selection-color: #FFFFFF;
             border: 0;
             outline: 0;
+        }
+        QListWidget::item, QTreeView::item {
+            border-radius: 6px;
+            padding: 1px 4px;
         }
         QTableView#fileTable {
             /* Transparent, not the panel colour: QWidget#filePane already
@@ -150,6 +205,10 @@ QString MainWindow::buildThemeStyleSheet() const
             outline: 0;
             gridline-color: #293137;
         }
+        QTableView#fileTable::item {
+            padding: 0px 6px;
+            margin: 0;
+        }
         QTableView#fileTable::item:selected,
         QTableView#fileTable::item:selected:active,
         QTableView#fileTable::item:selected:!active {
@@ -159,40 +218,41 @@ QString MainWindow::buildThemeStyleSheet() const
         QTableView#fileTable::item:hover {
             background: #1F2830;
         }
+        QHeaderView { background: transparent; border: 0; }
         QHeaderView::section {
-            background: #10161A;
+            background: transparent;
             color: #B9C4CC;
             border: 0;
-            border-top: 1px solid #2A333A;
             border-bottom: 1px solid #2A333A;
-            border-right: 1px solid #2A333A;
-            padding: 4px 9px;
-            font-weight: 500;
+            padding: 7px 10px;
+            font-size: 11px;
+            font-weight: 600;
         }
         QTabBar#paneTabs {
-            background: #151A1E;
-            border-bottom: 1px solid #2A333A;
-            min-height: 21px;
+            background: transparent;
+            border: 0;
+            min-height: 26px;
         }
         QTabBar#paneTabs::tab {
             background: transparent;
             color: #9EABB6;
-            border: 1px solid transparent;
-            border-radius: 2px;
-            padding: 2px 10px;
-            margin: 1px 2px 1px 0;
+            border: 0;
+            border-radius: 8px;
+            padding: 4px 12px;
+            margin: 3px 3px 3px 0;
         }
+        QTabBar#paneTabs::tab:hover { background: #1F2830; }
         QTabBar#paneTabs::tab:selected {
             color: #D9E1E8;
-            border-color: #364149;
             background: #10161A;
         }
         QWidget#filePane {
             background: #151A1E;
             border: 1px solid #2A333A;
+            border-radius: 8px;
         }
         QWidget#filePane[activePane="true"] {
-            border: 2px solid #36E67A;
+            border: 1px solid #36E67A;
         }
         /* Pure containers between the pane and its views: the pane owns the
            surface, so these must not repaint it (see QTableView#fileTable).
@@ -207,10 +267,10 @@ QString MainWindow::buildThemeStyleSheet() const
         QLabel#paneBadge {
             color: #AEBBC5;
             background: transparent;
-            border: 1px solid #38434B;
-            border-radius: 2px;
-            padding: 2px 9px;
-            font-weight: 700;
+            border: 1px solid #2A333A;
+            border-radius: 6px;
+            padding: 3px 10px;
+            font-weight: 600;
         }
         QLabel#paneBadge[activePane="true"] {
             color: #04140A;
@@ -240,7 +300,7 @@ QString MainWindow::buildThemeStyleSheet() const
             text-decoration: underline;
         }
         QLabel#breadcrumbSeparator {
-            color: #5B6770;
+            color: #9EABB6;
             font-weight: 600;
         }
         QLabel#breadcrumbStatic {
@@ -279,24 +339,24 @@ QString MainWindow::buildThemeStyleSheet() const
         }
         QToolButton:hover, QPushButton:hover {
             background: #1F2830;
-            border-color: #4A5963;
+            border-color: #2A333A;
         }
         QToolButton#toolbarIconButton:checked,
         QToolButton#previewSourceToggle:checked {
             background: #263D4C;
-            border-color: #5C7484;
+            border-color: #243947;
             color: #FFFFFF;
         }
         QSplitter::handle {
-            background: #222A30;
+            background: #20272D;
         }
         QMainWindow::separator {
-            background: #222A30;
+            background: #20272D;
             width: 7px;
             height: 7px;
         }
         QMainWindow::separator:hover {
-            background: #5C7484;
+            background: #243947;
         }
         QSplitter#fileSplitter::handle {
             background: #20272D;
@@ -318,9 +378,9 @@ QString MainWindow::buildThemeStyleSheet() const
             border: 1px solid #2A333A;
         }
         QPlainTextEdit#previewCode, QTextBrowser#previewRendered {
-            /* This is the preview's surface: PreviewPane itself does not paint
-               a background, so the views must keep this colour. */
-            background: #151A1E;
+            /* QWidget#previewPane paints the surface, so the views stay clear
+               (see the note on QTableView#fileTable). */
+            background: transparent;
             color: #D9E1E8;
             border: 0;
             selection-background-color: #263D4C;
@@ -338,8 +398,10 @@ QString MainWindow::buildThemeStyleSheet() const
             background: transparent;
         }
         QLabel#previewTitle {
+            background: transparent;
             color: #9EABB6;
             font-weight: 600;
+            padding: 4px 2px;
         }
         QWidget#terminalPane {
             background: #050607;
@@ -377,8 +439,8 @@ QString MainWindow::buildThemeStyleSheet() const
             color: #D9E1E8;
         }
         QToolButton#terminalActionButton {
-            background: #1B232A;
-            border: 1px solid #37434C;
+            background: #10161A;
+            border: 1px solid #2A333A;
             border-radius: 3px;
             color: #D9E1E8;
             padding: 2px 8px;
@@ -387,11 +449,11 @@ QString MainWindow::buildThemeStyleSheet() const
             font-weight: 600;
         }
         QToolButton#terminalActionButton:hover {
-            background: #26313A;
-            border-color: #4A5963;
+            background: #1F2830;
+            border-color: #2A333A;
         }
         QToolButton#terminalActionButton:pressed {
-            background: #304049;
+            background: #243947;
         }
         QToolButton#terminalCloseButton {
             background: transparent;
@@ -449,6 +511,7 @@ QString MainWindow::buildThemeStyleSheet() const
     styleSheet.replace("#63F28D", m_config.colors.activeAccent);
     styleSheet.replace("#1F2830", m_config.colors.hoverBackground);
     styleSheet.replace("#20272D", m_config.colors.splitHandleIdle);
+    styleSheet.replace("__UI_FONT__", m_config.resolvedUiFontFamily());
     styleSheet.replace("__MONO_FONT__", m_config.resolvedMonoFontFamily());
     styleSheet.replace("font-size: 12px;", QString("font-size: %1px;").arg(m_config.font.size));
     if (m_config.opacity.disabledItem < 1.0) {
@@ -459,18 +522,21 @@ QString MainWindow::buildThemeStyleSheet() const
             .arg(withAlpha(m_config.colors.foreground, m_config.opacity.disabledItem));
     }
 
-    const auto paneFontRule = [this](const QString &selector, const QString &family, int size) {
-        const QString resolvedFamily = family.isEmpty() ? m_config.resolvedMonoFontFamily() : family;
+    const auto paneFontRule = [this](const QString &selector, const QString &family, int size,
+                                     bool monospacedFallback = true) {
+        const QString fallback = monospacedFallback ? m_config.resolvedMonoFontFamily()
+                                                    : m_config.resolvedUiFontFamily();
+        const QString resolvedFamily = family.isEmpty() ? fallback : family;
         const int resolvedSize = size > 0 ? size : m_config.font.size;
         return QString("\n%1 { font-family: %2; font-size: %3px; }\n")
             .arg(selector, resolvedFamily).arg(resolvedSize);
     };
     styleSheet += paneFontRule("QTableView#fileTable, QListView#fileIcons",
-                               m_config.font.fileListFamily, m_config.font.fileListSize);
+                               m_config.font.fileListFamily, m_config.font.fileListSize, false);
     styleSheet += paneFontRule("QPlainTextEdit#previewCode, QTextBrowser#previewRendered",
                                m_config.font.previewFamily, m_config.font.previewSize);
     styleSheet += paneFontRule("QTreeView#folderTree, QListWidget#pinnedList, QListWidget#diskList",
-                               m_config.font.folderTreeFamily, m_config.font.folderTreeSize);
+                               m_config.font.folderTreeFamily, m_config.font.folderTreeSize, false);
 
     // Folder-tree, section-header, and status-line colours (config [colors]).
     styleSheet += QString(
@@ -509,8 +575,10 @@ QString MainWindow::buildThemeStyleSheet() const
 // badge colors, and drop-indicator colors.
 void MainWindow::applyPaneThemeSettings()
 {
+    // Must match the family the stylesheet gives the file list, or the elision
+    // metrics below are measured with a different face than the one painted.
     const QString family = m_config.font.fileListFamily.isEmpty()
-        ? m_config.resolvedMonoFontFamily()
+        ? m_config.resolvedUiFontFamily()
         : m_config.font.fileListFamily;
     const int pixelSize = m_config.font.fileListSize > 0
         ? m_config.font.fileListSize
@@ -527,6 +595,10 @@ void MainWindow::applyPaneThemeSettings()
     m_terminalPane->setColorScheme(m_config.terminalColorScheme);
     m_leftPane->setThemeColors(m_config.colors.foreground, m_config.colors.directoryForeground);
     m_rightPane->setThemeColors(m_config.colors.foreground, m_config.colors.directoryForeground);
+    for (FilePane *pane : {m_leftPane, m_rightPane}) {
+        pane->setRowColors(m_config.colors.selectedBackground, m_config.colors.hoverBackground,
+                           m_config.colors.selectedForeground);
+    }
 
     // Git status badge colours, keyed by the single-letter porcelain label.
     const QHash<QString, QString> gitColors = {

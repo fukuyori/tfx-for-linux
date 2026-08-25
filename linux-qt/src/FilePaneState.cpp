@@ -134,6 +134,24 @@ QString FilePane::displayNameForDirectory(const QString &path)
     return name.isEmpty() ? path : name;
 }
 
+void FilePane::setRowColors(const QString &selectedBackground, const QString &hoverBackground,
+                            const QString &selectedForeground)
+{
+    const QList<QAbstractItemView *> views = {m_view, m_iconView, m_searchView};
+    for (QAbstractItemView *view : views) {
+        if (!view) {
+            continue;
+        }
+        // FileItemDelegate has no Q_OBJECT macro, so qobject_cast is unavailable.
+        if (auto *delegate = dynamic_cast<FileItemDelegate *>(view->itemDelegate())) {
+            delegate->selectedBackground = QColor(selectedBackground);
+            delegate->hoverBackground = QColor(hoverBackground);
+            delegate->selectedForeground = QColor(selectedForeground);
+            view->viewport()->update();
+        }
+    }
+}
+
 void FilePane::setActive(bool active)
 {
     m_isActive = active;

@@ -176,6 +176,10 @@ PreviewPane::PreviewPane(QWidget *parent)
       m_openExternal(new QToolButton(this))
 {
     setObjectName("previewPane");
+    // Without this Qt ignores the stylesheet background on a QWidget subclass,
+    // leaving the pane's children to paint the surface individually — which
+    // stacks translucent layers and shows up as lighter blocks.
+    setAttribute(Qt::WA_StyledBackground, true);
     setMinimumWidth(240);
     m_title->setTextInteractionFlags(Qt::TextSelectableByMouse);
     m_title->setWordWrap(true);

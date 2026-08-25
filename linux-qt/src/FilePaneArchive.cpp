@@ -1,4 +1,5 @@
 #include "FilePane.h"
+#include "views/FileIcons.h"
 #include "UiText.h"
 #include "core/FileOperations.h"
 #include "platform/Platform.h"
@@ -95,8 +96,8 @@ void FilePane::populateZipView()
 {
     m_zipModel->removeRows(0, m_zipModel->rowCount());
 
-    const QIcon folderIcon = m_iconProvider.icon(QFileIconProvider::Folder);
-    const QIcon fileIcon = m_iconProvider.icon(QFileIconProvider::File);
+    const QIcon folderIcon = tfx::views::folderIcon(QColor(m_directoryForeground));
+    const QIcon fileIcon = tfx::views::fileIcon(QColor(m_fileForeground));
     auto *up = new QStandardItem(folderIcon, "..");
     up->setData("..", Qt::UserRole);
     up->setData(true, Qt::UserRole + 1);

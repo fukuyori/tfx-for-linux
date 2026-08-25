@@ -1,4 +1,5 @@
 #include "FilePane.h"
+#include "views/FileIcons.h"
 #include "FilePaneSearchRoles.h"
 #include "UiText.h"
 #include "core/FileTypeInfo.h"
@@ -31,20 +32,10 @@ constexpr int SearchMaxDepth = 128;
 
 QIcon FilePane::cachedFileIcon(const QFileInfo &info)
 {
-    if (info.isDir()) {
-        if (m_cachedFolderIcon.isNull()) {
-            m_cachedFolderIcon = m_iconProvider.icon(QFileIconProvider::Folder);
-        }
-        return m_cachedFolderIcon;
-    }
-    const QString key = info.suffix().toLower();
-    const auto cached = m_iconCacheByExtension.constFind(key);
-    if (cached != m_iconCacheByExtension.constEnd()) {
-        return *cached;
-    }
-    const QIcon icon = m_iconProvider.icon(info);
-    m_iconCacheByExtension.insert(key, icon);
-    return icon;
+    // Same glyphs as the file list (see views/FileIcons): one look regardless
+    // of the desktop icon theme, tinted with the configured foregrounds.
+    return info.isDir() ? tfx::views::folderIcon(QColor(m_directoryForeground))
+                        : tfx::views::fileIcon(QColor(m_fileForeground));
 }
 
 void FilePane::startSearch(const QString &term)

@@ -1,11 +1,13 @@
 # tfx for Linux
 
 **Linux 向け Terminal-inspired interface File eXplorer**  
-Version: **0.8.4**
+Version: **0.8.5**
 
 [English](README.md) | 日本語
 
-`tfx-for-linux` は、`tfx` の C++/Qt による Linux 版実装です。ターミナル風の見た目と、ファイル操作に集中しやすい 2 ペイン型ファイルマネージャを目指しています。
+`tfx-for-linux` は、`tfx` の C++/Qt による Linux 版実装です。キーボード操作を中心に据えた 2 ペイン型ファイルマネージャです。
+
+既定テーマは [prism-fm](https://github.com/fukuyori/prism-fm) に倣った半透明・角丸のデザインです。デスクトップが透けて見える暗い面、UI 用サンセリフ体、ゆったりした行間、選択はニュートラルなグレーで表現します。ファイル一覧のアイコンは tfx が自前で描画し(塗りのフォルダと線画のページ)、専用スロットの中央に配置して `[colors]` の色で着色します。デスクトップのアイコンテーマに関係なく同じ見た目になります。等幅フォントは意味のある箇所(ターミナルペイン、プレビューのソース表示)に限って使用します。配色・フォント・透過はすべて `config.toml` の `[colors]` / `[font]` / `[opacity]` で上書きできます。不透明なウィンドウにする場合は `[opacity] background = 1.0` を指定してください。
 
 このリポジトリには Linux Qt 版のみを含めます。元の macOS SwiftUI 版のプロジェクトファイルは含めません。
 

@@ -127,7 +127,7 @@ void FilePane::setupFileView()
     // fragment plus an ellipsis; elide at the column edge instead.
     m_view->setWordWrap(false);
     m_view->setEditTriggers(QAbstractItemView::EditKeyPressed);
-    m_view->setIconSize(QSize(18, 18));
+    m_view->setIconSize(QSize(20, 20));
     m_view->setItemDelegate(new FileItemDelegate(m_view));
     m_view->horizontalHeader()->setStretchLastSection(false);
     m_view->horizontalHeader()->setMinimumSectionSize(24);

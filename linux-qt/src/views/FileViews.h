@@ -43,15 +43,30 @@ QItemSelection rowSelection(const QModelIndex &index);
 QModelIndexList selectedRowIndexes(const QItemSelectionModel *selectionModel, int column = 0);
 
 // Item delegate that paints the persistent selected-row / hover highlight.
+// Width of the icon slot at the start of the name cell.
+inline constexpr int kIconSlotWidth = 32;
+
 class FileItemDelegate : public QStyledItemDelegate
 {
 public:
     using QStyledItemDelegate::QStyledItemDelegate;
 
+    // Row colours come from [colors]; the delegate paints the row itself, so
+    // the stylesheet rules for ::item cannot reach it.
+    QColor selectedBackground{QStringLiteral("#31576B")};
+    QColor hoverBackground{QStringLiteral("#1F2830")};
+    QColor selectedForeground{QStringLiteral("#FFFFFF")};
+
     void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override
     {
         QStyleOptionViewItem adjusted(option);
         initStyleOption(&adjusted, index);
+        // prism-fm gives the icon a fixed 32px slot of its own and centres the
+        // glyph in it; Qt otherwise butts the icon against the text.
+        if (index.column() == ColumnName && !adjusted.icon.isNull()) {
+            adjusted.decorationAlignment = Qt::AlignCenter;
+            adjusted.decorationSize = QSize(kIconSlotWidth, adjusted.decorationSize.height());
+        }
         // Elide with the metrics of the font that is actually painted;
         // stale widget metrics over-shorten long names.
         adjusted.fontMetrics = QFontMetrics(adjusted.font);
@@ -69,13 +84,13 @@ public:
         const bool hovered = adjusted.state.testFlag(QStyle::State_MouseOver);
         if (selected || hovered) {
             painter->save();
-            painter->fillRect(adjusted.rect, selected ? QColor("#31576B") : QColor("#1F2830"));
+            painter->fillRect(adjusted.rect, selected ? selectedBackground : hoverBackground);
             painter->restore();
             adjusted.backgroundBrush = Qt::NoBrush;
         }
         if (selected) {
-            adjusted.palette.setColor(QPalette::Text, QColor("#FFFFFF"));
-            adjusted.palette.setColor(QPalette::HighlightedText, QColor("#FFFFFF"));
+            adjusted.palette.setColor(QPalette::Text, selectedForeground);
+            adjusted.palette.setColor(QPalette::HighlightedText, selectedForeground);
             adjusted.state &= ~QStyle::State_Selected;
         }
 

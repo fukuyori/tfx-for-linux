@@ -39,6 +39,8 @@ public:
 private:
     void closeEvent(QCloseEvent *event) override;
     bool eventFilter(QObject *watched, QEvent *event) override;
+    Qt::Edges resizeEdgesAt(const QPoint &pos) const;
+    void applyResizeCursor(Qt::Edges edges);
     void setupIntegratedTitleBar();
     void startFileOperation(const QVector<FileOperationRequest> &requests);
     void cancelFileOperation();
@@ -130,6 +132,8 @@ private:
     QToolButton *m_maximizeButton = nullptr;
     // Config-bound shortcuts, recreated on live reload.
     QList<QShortcut *> m_configShortcuts;
+    // Resize-zone cursor state for the frameless (integrated title bar) window.
+    Qt::Edges m_resizeCursorEdges;
     QFileSystemWatcher *m_configWatcher = nullptr;
     QTimer *m_configReloadDebounce = nullptr;
     QListWidget *m_pinnedList;

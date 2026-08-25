@@ -26,43 +26,45 @@ struct UserCommand
 
 struct AppColors
 {
-    QString appBackground = "#151A1E";
-    QString panelBackground = "#151A1E";
-    QString sidebarBackground = "#171C20";
-    QString inputBackground = "#10161A";
-    QString terminalBackground = "#050607";
-    QString foreground = "#D9E1E8";
-    QString directoryForeground = "#E5EDF3";
-    QString secondaryForeground = "#9EABB6";
-    QString headerForeground = "#B9C4CC";
-    QString selectedBackground = "#31576B";
+    // Palette modelled on prism-fm: dark blue-grey surfaces meant to be seen
+    // through, neutral greys for selection, and text as tints of white.
+    QString appBackground = "#1E1E28";
+    QString panelBackground = "#1E1E28";
+    QString sidebarBackground = "#2D2D3C";
+    QString inputBackground = "#3C3C50";
+    QString terminalBackground = "#14141C";
+    QString foreground = "#F2F2F2";
+    QString directoryForeground = "#FFFFFF";
+    QString secondaryForeground = "#B3B3B3";
+    QString headerForeground = "#8C8C99";
+    QString selectedBackground = "#646478";
     QString selectedForeground = "#FFFFFF";
-    QString border = "#2A333A";
-    QString activeBorder = "#36E67A";
-    QString activeAccent = "#63F28D";
-    QString hoverBackground = "#1F2830";
+    QString border = "#45454F";
+    QString activeBorder = "#AAAAAA";
+    QString activeAccent = "#AAAAAA";
+    QString hoverBackground = "#4B4B5A";
 
     // Drop target
-    QString dropTargetBackground = "#63F28D";
+    QString dropTargetBackground = "#64FF96";
 
     // Pane title bar
-    QString titleBarActive = "#1C2329";
-    QString titleBarInactive = "#151A1E";
+    QString titleBarActive = "#3C3C50";
+    QString titleBarInactive = "#1E1E28";
 
     // Status line
-    QString statusBackground = "#151A1E";
-    QString statusForegroundActive = "#B9C4CC";
-    QString statusForegroundInactive = "#6D7881";
+    QString statusBackground = "#1E1E28";
+    QString statusForegroundActive = "#F2F2F2";
+    QString statusForegroundInactive = "#8C8C99";
 
     // Folder tree
-    QString folderTreeForeground = "#C3CDD5";
+    QString folderTreeForeground = "#B3B3B3";
     QString folderTreeSelectedForeground = "#FFFFFF";
-    QString folderTreeSelectedActive = "#31576B";
-    QString folderTreeSelectedInactive = "#232C33";
-    QString folderTreeSectionHeader = "#8892A0";
+    QString folderTreeSelectedActive = "#646478";
+    QString folderTreeSelectedInactive = "#3C3C50";
+    QString folderTreeSectionHeader = "#8C8C99";
 
     // Split handle
-    QString splitHandleIdle = "#20272D";
+    QString splitHandleIdle = "#2D2D3C";
 
     // Git status badges
     QString gitModified = "#E2C08D";
@@ -70,7 +72,7 @@ struct AppColors
     QString gitDeleted = "#D48A8A";
     QString gitRenamed = "#8DB0E2";
     QString gitUntracked = "#8AC7A0";
-    QString gitIgnored = "#6D7881";
+    QString gitIgnored = "#8C8C99";
     QString gitConflicted = "#E28D8D";
 };
 
@@ -83,7 +85,7 @@ struct AppFontConfig
 {
     QString ui = "system";
     QString mono = "monospace";
-    int size = 12;
+    int size = 13;
 
     // Optional per-pane overrides. Empty family / size 0 means inherit the
     // global mono family / size above.
@@ -122,7 +124,7 @@ struct AppWindowConfig
 
 struct AppOpacityConfig
 {
-    double background = 1.0;
+    double background = 0.65;
     double inactivePane = 1.0;
     double disabledItem = 1.0;
     double headerSecondary = 0.75;

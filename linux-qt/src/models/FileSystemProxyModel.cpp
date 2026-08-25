@@ -4,6 +4,7 @@
 #include "core/FileOperations.h"
 #include "core/FileTypeInfo.h"
 #include "core/SortOptions.h"
+#include "views/FileIcons.h"
 
 #include <QColor>
 #include <QDateTime>
@@ -154,7 +155,10 @@ QVariant FileSystemProxyModel::data(const QModelIndex &index, int role) const
     }
 
     if (role == Qt::DecorationRole && index.column() == ColumnName) {
-        return fsModel->data(sourceNameIndex, role);
+        // Drawn here rather than taken from the desktop icon theme, so the list
+        // keeps one look and follows [colors] like the rest of the row.
+        return info.isDir() ? tfx::views::folderIcon(QColor(m_directoryForeground))
+                            : tfx::views::fileIcon(QColor(m_fileForeground));
     }
 
     if (role == Qt::EditRole && index.column() == ColumnName) {

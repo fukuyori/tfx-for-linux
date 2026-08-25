@@ -330,33 +330,86 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
         }
         return QMainWindow::eventFilter(watched, event);
     }
+    auto *widget = qobject_cast<QWidget *>(watched);
+    const bool inThisWindow = widget && widget->window() == this;
+
+    if (event->type() == QEvent::MouseMove && inThisWindow && !isMaximized()) {
+        auto *mouse = static_cast<QMouseEvent *>(event);
+        if (mouse->buttons() == Qt::NoButton) {
+            // Without a frame the edges look like ordinary content, so the
+            // cursor has to say where the resize zone is.
+            applyResizeCursor(resizeEdgesAt(mapFromGlobal(mouse->globalPosition().toPoint())));
+        }
+    }
+    if (event->type() == QEvent::Leave && watched == this) {
+        applyResizeCursor(Qt::Edges());
+    }
+
     if (event->type() == QEvent::MouseButtonPress && !isMaximized()) {
         auto *mouse = static_cast<QMouseEvent *>(event);
-        auto *widget = qobject_cast<QWidget *>(watched);
-        if (mouse->button() == Qt::LeftButton && widget && widget->window() == this
-            && windowHandle()) {
-            const QPoint pos = mapFromGlobal(mouse->globalPosition().toPoint());
-            const int margin = 6;
-            Qt::Edges edges;
-            if (pos.x() <= margin) {
-                edges |= Qt::LeftEdge;
-            }
-            if (pos.x() >= width() - margin) {
-                edges |= Qt::RightEdge;
-            }
-            if (pos.y() <= margin) {
-                edges |= Qt::TopEdge;
-            }
-            if (pos.y() >= height() - margin) {
-                edges |= Qt::BottomEdge;
-            }
+        if (mouse->button() == Qt::LeftButton && inThisWindow && windowHandle()) {
+            const Qt::Edges edges = resizeEdgesAt(mapFromGlobal(mouse->globalPosition().toPoint()));
             if (edges) {
+                applyResizeCursor(Qt::Edges());
                 windowHandle()->startSystemResize(edges);
                 return true;
             }
         }
     }
     return QMainWindow::eventFilter(watched, event);
+}
+
+// Edges the pointer is close enough to for a resize. The band is wider than a
+// window-manager frame because there is no frame to aim at.
+Qt::Edges MainWindow::resizeEdgesAt(const QPoint &pos) const
+{
+    constexpr int margin = 8;
+    Qt::Edges edges;
+    if (pos.x() >= -margin && pos.x() <= margin) {
+        edges |= Qt::LeftEdge;
+    }
+    if (pos.x() >= width() - margin && pos.x() <= width() + margin) {
+        edges |= Qt::RightEdge;
+    }
+    if (pos.y() >= -margin && pos.y() <= margin) {
+        edges |= Qt::TopEdge;
+    }
+    if (pos.y() >= height() - margin && pos.y() <= height() + margin) {
+        edges |= Qt::BottomEdge;
+    }
+    // Only report edges when the pointer is actually inside the window band.
+    if (pos.x() < -margin || pos.y() < -margin
+        || pos.x() > width() + margin || pos.y() > height() + margin) {
+        return Qt::Edges();
+    }
+    return edges;
+}
+
+void MainWindow::applyResizeCursor(Qt::Edges edges)
+{
+    if (edges == m_resizeCursorEdges) {
+        return;
+    }
+    if (m_resizeCursorEdges) {
+        QApplication::restoreOverrideCursor();
+    }
+    m_resizeCursorEdges = edges;
+    if (!edges) {
+        return;
+    }
+    Qt::CursorShape shape = Qt::SizeVerCursor;
+    const bool left = edges.testFlag(Qt::LeftEdge);
+    const bool right = edges.testFlag(Qt::RightEdge);
+    const bool top = edges.testFlag(Qt::TopEdge);
+    const bool bottom = edges.testFlag(Qt::BottomEdge);
+    if ((left && top) || (right && bottom)) {
+        shape = Qt::SizeFDiagCursor;
+    } else if ((right && top) || (left && bottom)) {
+        shape = Qt::SizeBDiagCursor;
+    } else if (left || right) {
+        shape = Qt::SizeHorCursor;
+    }
+    QApplication::setOverrideCursor(QCursor(shape));
 }
 
 // Creates every shortcut whose key comes from config.toml. Called at startup

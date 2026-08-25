@@ -108,15 +108,15 @@ quit = "ctrl+q"
 # placeholderLanguage = "auto"
 
 # [opacity]
-# background = 0.40     # window background opacity (0.0 = transparent, 1.0 = opaque)
+# background = 0.65     # window background opacity (0.0 = transparent, 1.0 = opaque)
 # inactivePane = 0.5    # opacity of the inactive file pane
 # disabledItem = 0.45   # opacity of disabled items
 
 # [colors]
-# fileListBackground = "#151A1E"
-# fileForeground = "#D9E1E8"
-# directoryForeground = "#E5EDF3"
-# paneBorderKeyboardTarget = "#36E67A"
+# fileListBackground = "#1E1E28"
+# fileForeground = "#F2F2F2"
+# directoryForeground = "#FFFFFF"
+# paneBorderKeyboardTarget = "#AAAAAA"
 
 # [terminal]
 # app = "x-terminal-emulator"
@@ -179,6 +179,11 @@ Notes:
 - For the terminal, prefer a strictly monospaced family (for Nerd Fonts, the
   "... Nerd Font Mono" variant) so TUI applications keep their column
   alignment. Icon glyphs in the non-Mono variants occupy more than one cell.
+- `terminalSize` is in **points**; every other size here is in **pixels**. The
+  same number therefore renders larger in the terminal than in the file list.
+- `mono` is the fallback for the preview and the terminal only. The menus, file
+  list and folder tree follow `ui` unless `fileList` / `folderTree` name a
+  family of their own.
 - The file-list font is applied as a widget font so text elision uses the
   same metrics as the painted glyphs.
 
@@ -266,6 +271,9 @@ copyPath = "ctrl+shift+c"
 ## Opacity
 
 `[opacity]` controls window and pane transparency. Each value is a decimal between `0.0` (fully transparent) and `1.0` (fully opaque).
+
+The default theme ships translucent (`background = 0.65`). Set it to `1.0` for a
+solid window, which is also what you get without a compositing window manager.
 
 Effective on the Linux port:
 

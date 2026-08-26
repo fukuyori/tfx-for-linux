@@ -2,6 +2,28 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.8.6] - 2026-08-26
+
+### Fixed
+
+- `[startup] rightFolder` / `rightFolders` had no effect. They were applied
+  before the saved tabs were restored, and restoring a tab navigates the pane,
+  so the previous session's folder always overwrote the configured one. They
+  are now applied after the tabs, matching how the command-line folder is
+  applied to the left pane. When neither key resolves to an existing directory
+  the right pane still keeps its restored folder.
+- An unrecognised key under `[startup]` — a misspelling such as `rightfolders`
+  — was ignored silently. It now produces the same `config.toml:<line>` warning
+  as the other sections.
+
+### Documentation
+
+- `docs/configuration.md` documented `rightFolder` / `rightFolders` in a single
+  line. The `[startup]` section now covers both keys with examples, states that
+  `rightFolders` is checked first and `rightFolder` is the fallback, that the
+  configured folder overrides the restored session, and that there is no
+  `leftFolder` key.
+
 ## [0.8.5] - 2026-08-25
 
 ### Fixed

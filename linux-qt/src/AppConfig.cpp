@@ -2,6 +2,7 @@
 
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QRegularExpression>
 #include <QStandardPaths>
 #include <QTextStream>
@@ -312,6 +313,21 @@ QStringList AppConfig::parseStringArray(const QString &value, bool *ok)
     return values;
 }
 
+QString AppStartupConfig::resolvedRightFolder() const
+{
+    // rightFolders wins over rightFolder: it exists so a config can list
+    // fallbacks for machines where the preferred folder is missing.
+    for (const QString &path : rightFolders) {
+        if (QFileInfo(path).isDir()) {
+            return path;
+        }
+    }
+    if (!rightFolder.isEmpty() && QFileInfo(rightFolder).isDir()) {
+        return rightFolder;
+    }
+    return {};
+}
+
 QString AppConfig::expandPath(QString path)
 {
     if (path == "~") {
@@ -505,6 +521,8 @@ void AppConfig::applyValue(const QString &section, const QString &key, const QSt
             }
             return;
         }
+        addWarning(lineNumber, QString("Unknown startup key: %1").arg(key));
+        return;
     }
 
     if (section == "shortcuts") {

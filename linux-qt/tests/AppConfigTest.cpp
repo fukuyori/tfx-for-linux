@@ -4,6 +4,7 @@
 
 #include <QDir>
 #include <QFile>
+#include <QScopeGuard>
 #include <QTemporaryDir>
 #include <QTextStream>
 
@@ -35,6 +36,8 @@ private slots:
     void malformedConfigFallsBackToDefaults();
     void windowTitleBarParsesAndValidates();
     void shortcutConflictWarnsWithLineNumber();
+    void startupRightFoldersExpandAndResolveInOrder();
+    void unknownStartupKeyWarnsWithLineNumber();
 };
 
 void AppConfigTest::lightThemeAppliesPaletteAndColorOverrides()
@@ -171,6 +174,64 @@ void AppConfigTest::shortcutConflictWarnsWithLineNumber()
     QVERIFY(config.warningText().contains("Shortcut conflict"));
     // The warning carries the config.toml line of the conflicting entry.
     QVERIFY(config.warningText().contains("config.toml:"));
+}
+
+void AppConfigTest::startupRightFoldersExpandAndResolveInOrder()
+{
+    QTemporaryDir temp;
+    QVERIFY(temp.isValid());
+    qputenv("XDG_CONFIG_HOME", temp.path().toUtf8());
+    // expandPath() resolves `~` against HOME, so point HOME at the temp tree.
+    const QByteArray originalHome = qgetenv("HOME");
+    qputenv("HOME", temp.path().toUtf8());
+    const auto restoreHome = qScopeGuard([&] { qputenv("HOME", originalHome); });
+    QVERIFY(QDir().mkpath(QDir(temp.path()).filePath("Documents")));
+
+    QVERIFY(writeConfig(temp.path(),
+                        "version = 1\n"
+                        "[startup]\n"
+                        "rightFolder = \"~/Pictures\"\n"
+                        "rightFolders = [\"~/Downloads\", \"~/Documents\"]\n"));
+    AppConfig config = AppConfig::loadOrCreate();
+    QVERIFY(config.warningText().isEmpty());
+    // `~` is expanded at parse time for both keys.
+    QCOMPARE(config.startup.rightFolder, QDir(temp.path()).filePath("Pictures"));
+    QCOMPARE(config.startup.rightFolders,
+             QStringList({QDir(temp.path()).filePath("Downloads"),
+                          QDir(temp.path()).filePath("Documents")}));
+    // ~/Downloads does not exist, so the next listed folder wins.
+    QCOMPARE(config.startup.resolvedRightFolder(), QDir(temp.path()).filePath("Documents"));
+
+    // Without a usable rightFolders entry, rightFolder is the fallback.
+    QVERIFY(writeConfig(temp.path(),
+                        "version = 1\n"
+                        "[startup]\n"
+                        "rightFolder = \"~/Documents\"\n"
+                        "rightFolders = [\"~/Downloads\"]\n"));
+    config = AppConfig::loadOrCreate();
+    QCOMPARE(config.startup.resolvedRightFolder(), QDir(temp.path()).filePath("Documents"));
+
+    // Nothing resolves: the caller keeps the restored session path.
+    QVERIFY(writeConfig(temp.path(),
+                        "version = 1\n"
+                        "[startup]\n"
+                        "rightFolders = [\"~/Downloads\"]\n"));
+    config = AppConfig::loadOrCreate();
+    QVERIFY(config.startup.resolvedRightFolder().isEmpty());
+}
+
+void AppConfigTest::unknownStartupKeyWarnsWithLineNumber()
+{
+    QTemporaryDir temp;
+    QVERIFY(temp.isValid());
+    qputenv("XDG_CONFIG_HOME", temp.path().toUtf8());
+    QVERIFY(writeConfig(temp.path(),
+                        "version = 1\n"
+                        "[startup]\n"
+                        "rightfolders = [\"~/Downloads\"]\n"));
+    const AppConfig config = AppConfig::loadOrCreate();
+    QVERIFY(config.warningText().contains("config.toml:3"));
+    QVERIFY(config.warningText().contains("Unknown startup key: rightfolders"));
 }
 
 QTEST_GUILESS_MAIN(AppConfigTest)

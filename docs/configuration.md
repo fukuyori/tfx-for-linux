@@ -197,7 +197,32 @@ Notes:
 
 `[startup] folderTree` accepts `show`, `hide`, or `restore`.
 
-`rightFolder` and `rightFolders` accept absolute paths or `~`-expanded paths. When `rightFolders` is used, the first valid folder is used for the right pane.
+`[startup] rightFolder` sets the folder the **right** pane opens at. It accepts
+an absolute path or a `~`-prefixed one, which is expanded against `$HOME`:
+
+```toml
+[startup]
+rightFolder = "~/Downloads"
+```
+
+`[startup] rightFolders` is a list of candidates for the same purpose. The first
+entry that exists as a directory is used, so one config file can cover machines
+that do not all have the same folders:
+
+```toml
+[startup]
+rightFolders = ["~/Downloads", "~/Documents", "/srv/share"]
+```
+
+Both keys may be set together. `rightFolders` is checked first and wins when any
+of its entries resolves; `rightFolder` is the fallback. If nothing resolves —
+every listed folder is missing, or neither key is set — the right pane keeps the
+folder it had when tfx last exited.
+
+Note that these keys override the restored session: they are applied after the
+saved tabs are restored, so the right pane opens at the configured folder on
+every launch. There is no `leftFolder`; the left pane opens the folder given on
+the command line, or the current working directory.
 
 `geometry` accepts `WIDTHxHEIGHT` or `WIDTHxHEIGHT+X+Y`. The command-line
 option `-g` / `--geometry` uses the same format and takes precedence over

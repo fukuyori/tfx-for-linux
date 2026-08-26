@@ -129,16 +129,7 @@ void MainWindow::restoreSettings()
     m_dockTerminal->setVisible(terminalVisible);
     m_dockCommandOutput->setVisible(commandOutputVisible);
 
-    QString rightDirectory = settings.value("Panes/rightDirectory", m_rightPane->currentPath()).toString();
-    if (!m_config.startup.rightFolder.isEmpty()) {
-        rightDirectory = m_config.startup.rightFolder;
-    }
-    for (const QString &path : m_config.startup.rightFolders) {
-        if (QFileInfo(path).isDir()) {
-            rightDirectory = path;
-            break;
-        }
-    }
+    const QString rightDirectory = settings.value("Panes/rightDirectory", m_rightPane->currentPath()).toString();
     if (QFileInfo(rightDirectory).isDir()) {
         m_rightPane->navigateTo(rightDirectory, false);
     }
@@ -148,6 +139,12 @@ void MainWindow::restoreSettings()
     m_rightPane->restoreTabs(
         settings.value("Tabs/rightPaths").toStringList(),
         settings.value("Tabs/rightActiveIndex", 0).toInt());
+    // restoreTabs() navigates to the restored tab, so the configured startup
+    // folders have to be applied after it or the session path would win.
+    const QString startupRightFolder = m_config.startup.resolvedRightFolder();
+    if (!startupRightFolder.isEmpty()) {
+        m_rightPane->navigateTo(startupRightFolder, false);
+    }
     if (QFileInfo(m_initialPath).isDir()) {
         m_leftPane->navigateTo(m_initialPath, false);
     }

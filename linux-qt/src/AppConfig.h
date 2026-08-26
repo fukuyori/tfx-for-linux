@@ -108,6 +108,11 @@ struct AppStartupConfig
     QString geometry;
     QString rightFolder;
     QStringList rightFolders;
+
+    // First existing folder in `rightFolders`, else `rightFolder` when it is a
+    // directory. Empty when nothing is configured or nothing resolves, which
+    // leaves the right pane on its restored session path.
+    QString resolvedRightFolder() const;
 };
 
 struct AppNamingConfig

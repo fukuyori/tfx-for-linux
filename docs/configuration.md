@@ -215,13 +215,27 @@ rightFolders = ["~/Downloads", "~/Documents", "/srv/share"]
 ```
 
 Both keys may be set together. `rightFolders` is checked first and wins when any
-of its entries resolves; `rightFolder` is the fallback. If nothing resolves —
-every listed folder is missing, or neither key is set — the right pane keeps the
-folder it had when tfx last exited.
+of its entries resolves; `rightFolder` is the fallback.
 
-Note that these keys override the restored session: they are applied after the
-saved tabs are restored, so the right pane opens at the configured folder on
-every launch. There is no `leftFolder`; the left pane opens the folder given on
+If nothing resolves — every listed folder is missing, or neither key is set —
+the right pane opens **the same folder as the left pane**, so a split starts on
+the folder you are actually looking at. In short:
+
+| `[startup]` | Left pane | Right pane |
+| --- | --- | --- |
+| `rightFolder` / `rightFolders` set and resolvable | command-line folder, else the current working directory | the configured folder |
+| not set, or no configured folder exists | same as above | the same folder as the left pane |
+
+The same rule is applied every time the split is turned back on, not only at
+launch. Hiding the right pane and showing it again reopens it at the configured
+folder, or at whatever the left pane is showing at that moment.
+
+**The right pane never resumes where it left off.** Its folder is decided by the
+table above and nothing else: it does not restore the folder it was in when tfx
+last exited, its tabs are not saved between sessions, and its Back/Forward
+history is cleared whenever it reopens. Only the left pane resumes a session.
+
+There is no `leftFolder` key — the left pane always opens the folder given on
 the command line, or the current working directory.
 
 `geometry` accepts `WIDTHxHEIGHT` or `WIDTHxHEIGHT+X+Y`. The command-line

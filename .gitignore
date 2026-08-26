@@ -50,3 +50,5 @@ Makefile
 !/docs/configuration.md
 !/scripts/
 !/scripts/build_package.sh
+!/images/
+!/images/*.png

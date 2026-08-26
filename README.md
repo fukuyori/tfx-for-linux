@@ -1,11 +1,16 @@
 # tfx for Linux
 
 **Terminal-inspired interface File eXplorer for Linux**  
-Version: **0.8.6**
+Version: **0.8.7**
 
 English | [Japanese](README.ja.md)
 
 `tfx-for-linux` is a C++/Qt port of `tfx`: a keyboard-centric two-pane file manager for Linux desktops.
+
+<p align="center">
+  <img src="images/screenshot.png" width="880"
+       alt="tfx showing a single file pane with the folder sidebar, breadcrumb path and Name/Size/Modified/Mode columns">
+</p>
 
 The default theme is translucent and rounded, in the spirit of
 [prism-fm](https://github.com/fukuyori/prism-fm) — a dark surface the desktop
@@ -18,6 +23,39 @@ where it carries meaning: the terminal pane and the preview's source view. Every
 solid window.
 
 This repository contains only the Linux Qt implementation. The original macOS SwiftUI project files are intentionally excluded.
+
+## Screenshots
+
+<table>
+  <tr>
+    <td width="50%">
+      <img src="images/screenshot1.png"
+           alt="Two file panes side by side, each row of a modified file marked M in the Git status column">
+      <br><sub><b>Split panes.</b> Both sides list the same folder, with the Git
+      status column marking modified files.</sub>
+    </td>
+    <td width="50%">
+      <img src="images/screenshot2.png"
+           alt="Two file panes with the preview pane open on the right, showing an image's metadata and a thumbnail">
+      <br><sub><b>Preview pane.</b> Name, type, size, date and path for the
+      selection, with a live thumbnail underneath.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <img src="images/screenshot3.png"
+           alt="A file pane above an embedded terminal running a shell in the pane's folder">
+      <br><sub><b>Terminal pane.</b> A real interactive shell whose working
+      directory follows the active pane.</sub>
+    </td>
+    <td width="50%">
+      <img src="images/screenshot4.png"
+           alt="The same window rendered in an amber and brown palette instead of the default grey">
+      <br><sub><b>Fully themeable.</b> The same window after changing
+      <code>[colors]</code> in <code>config.toml</code>.</sub>
+    </td>
+  </tr>
+</table>
 
 ## Requirements
 
@@ -86,7 +124,12 @@ test for the Linux Qt target.
 - Dockable panes: the sidebar, both file panes, the preview, and the terminal can be rearranged, floated, or tabbed; toggling visibility splits the current window instead of resizing it
 - Range selection (click then Shift+click), toggle selection (Ctrl+click), and rubber-band selection by dragging from the empty area
 - Clickable breadcrumb path in the pane header (each segment navigates to that ancestor; clicking the empty area switches to the editable path field)
-- Startup path handling: the left pane opens the command-line folder, or the current working directory when no folder is specified
+- Startup path handling: the left pane opens the command-line folder, or the
+  current working directory when no folder is specified; the right pane opens
+  `[startup] rightFolder` / `rightFolders`, or the left pane's folder when
+  neither is configured. The same rule applies every time the split is turned
+  back on — the right pane never resumes where it left off, so its tabs and
+  Back/Forward history are not carried over
 - Startup visibility control for preview, terminal, and folder sidebar
 - Startup window geometry via `--geometry` or `[startup] geometry`
 - Preview pane with source/rendered switching, an external image viewer button, and a multi-selection summary

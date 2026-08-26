@@ -60,6 +60,12 @@ bool parseWindowGeometry(const QString &text, ParsedGeometry *geometry)
 }
 }
 
+QString MainWindow::rightPaneStartupDirectory() const
+{
+    const QString configured = m_config.startup.resolvedRightFolder();
+    return configured.isEmpty() ? m_leftPane->currentPath() : configured;
+}
+
 void MainWindow::restoreSettings()
 {
     m_isRestoringSettings = true;
@@ -129,25 +135,16 @@ void MainWindow::restoreSettings()
     m_dockTerminal->setVisible(terminalVisible);
     m_dockCommandOutput->setVisible(commandOutputVisible);
 
-    const QString rightDirectory = settings.value("Panes/rightDirectory", m_rightPane->currentPath()).toString();
-    if (QFileInfo(rightDirectory).isDir()) {
-        m_rightPane->navigateTo(rightDirectory, false);
-    }
+    // Only the left pane resumes its session. The right pane never reopens
+    // where it left off, so it has no tabs to restore either.
     m_leftPane->restoreTabs(
         settings.value("Tabs/leftPaths").toStringList(),
         settings.value("Tabs/leftActiveIndex", 0).toInt());
-    m_rightPane->restoreTabs(
-        settings.value("Tabs/rightPaths").toStringList(),
-        settings.value("Tabs/rightActiveIndex", 0).toInt());
-    // restoreTabs() navigates to the restored tab, so the configured startup
-    // folders have to be applied after it or the session path would win.
-    const QString startupRightFolder = m_config.startup.resolvedRightFolder();
-    if (!startupRightFolder.isEmpty()) {
-        m_rightPane->navigateTo(startupRightFolder, false);
-    }
     if (QFileInfo(m_initialPath).isDir()) {
         m_leftPane->navigateTo(m_initialPath, false);
     }
+    m_rightPane->clearHistory();
+    m_rightPane->navigateTo(rightPaneStartupDirectory(), false);
 
     const QStringList pinnedPaths = settings.value("Sidebar/pinnedFolders").toStringList();
     if (!pinnedPaths.isEmpty()) {
@@ -231,12 +228,12 @@ void MainWindow::saveSettings()
     settings.setValue("View/leftIconMode", m_leftPane->isIconMode());
     settings.setValue("View/rightIconMode", m_rightPane->isIconMode());
     settings.setValue("Panes/activePane", activePane() == m_rightPane ? "RIGHT" : "LEFT");
-    settings.setValue("Panes/leftDirectory", m_leftPane->currentPath());
-    settings.setValue("Panes/rightDirectory", m_rightPane->currentPath());
     settings.setValue("Tabs/leftPaths", m_leftPane->tabPaths());
-    settings.setValue("Tabs/rightPaths", m_rightPane->tabPaths());
     settings.setValue("Tabs/leftActiveIndex", m_leftPane->activeTabIndex());
-    settings.setValue("Tabs/rightActiveIndex", m_rightPane->activeTabIndex());
+    // The right pane's tabs are deliberately not persisted: it always opens on
+    // rightPaneStartupDirectory(), so saved tabs would only be stale clutter.
+    settings.remove("Tabs/rightPaths");
+    settings.remove("Tabs/rightActiveIndex");
     QStringList searchHistory;
     for (int index = 0; index < m_searchEdit->count(); ++index) {
         searchHistory << m_searchEdit->itemText(index);

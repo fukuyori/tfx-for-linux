@@ -76,6 +76,14 @@ void MainWindow::setSplitVisible(bool visible)
     const bool opening = visible && m_rightPane->isHidden();
     if (opening) {
         m_rightPane->applySharedColumnLayout();
+        // Reopening the split is a fresh start, exactly like launching tfx: the
+        // right pane goes to the configured startup folder, or follows the left
+        // pane when none is configured. Where it was before the split closed is
+        // never reused, so its history goes too.
+        if (!m_isRestoringSettings) {
+            m_rightPane->clearHistory();
+            m_rightPane->navigateTo(rightPaneStartupDirectory(), false);
+        }
     }
     m_rightPane->setVisible(visible);
     if (opening) {

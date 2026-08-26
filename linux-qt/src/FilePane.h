@@ -58,6 +58,9 @@ public:
     QStringList tabPaths() const;
     int activeTabIndex() const;
     void restoreTabs(const QStringList &paths, int activeIndex);
+    // Drops the back/forward stacks. The right pane calls this whenever it is
+    // (re)opened so Back never walks into folders from before the split closed.
+    void clearHistory();
     void navigateTo(const QString &path, bool recordHistory = true);
     void focusFileList();
     // restoreSort=false re-applies only order/visibility/width. The model

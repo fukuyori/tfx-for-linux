@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(tfx-for-linux VERSION 0.8.6 LANGUAGES CXX)
+project(tfx-for-linux VERSION 0.8.7 LANGUAGES CXX)
 
 include(GNUInstallDirs)
 include(CTest)

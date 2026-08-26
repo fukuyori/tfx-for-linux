@@ -88,6 +88,12 @@ void FilePane::goUp()
     }
 }
 
+void FilePane::clearHistory()
+{
+    m_backStack.clear();
+    m_forwardStack.clear();
+}
+
 void FilePane::goBack()
 {
     if (m_backStack.isEmpty()) {

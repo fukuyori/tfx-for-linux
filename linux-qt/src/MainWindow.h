@@ -71,6 +71,10 @@ private:
     void applySidebarSectionStates();
     void restoreSettings();
     void saveSettings();
+    // Folder the right pane opens at, both at startup and every time the split
+    // is turned back on: [startup] rightFolder/rightFolders when either names an
+    // existing directory, otherwise whatever the left pane is showing.
+    QString rightPaneStartupDirectory() const;
     void setupConfigShortcuts();
     void setupConfigWatcher();
     void reloadConfig();

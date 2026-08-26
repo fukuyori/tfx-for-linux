@@ -2,6 +2,32 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.8.7] - 2026-08-26
+
+### Changed
+
+- The right pane's folder now follows one rule with two cases:
+  `[startup] rightFolder` / `rightFolders` when either resolves to an existing
+  directory, and otherwise the folder the left pane is showing. It is applied
+  at launch and again every time the split is turned back on, so reopening the
+  split lands on the folder the user is actually working in instead of wherever
+  the right pane happened to be beforehand.
+- The right pane no longer resumes any previous state. Its tabs are not saved
+  between sessions (`Tabs/rightPaths` / `Tabs/rightActiveIndex` are removed from
+  the session settings), and its Back/Forward history is cleared each time it
+  reopens. Only the left pane resumes a session.
+- `Panes/leftDirectory` / `Panes/rightDirectory` are no longer written to the
+  session settings. Neither was read any more once the startup folders took
+  over, so they were dead state.
+
+### Documentation
+
+- Both READMEs now open with a screenshot of the default theme and carry a
+  Screenshots section covering split panes with Git status, the preview pane,
+  the terminal pane, and a recoloured window. `images/*.png` had been excluded
+  by `.gitignore` (it targeted the old macOS project's assets) and is now kept
+  so the images resolve on GitHub.
+
 ## [0.8.6] - 2026-08-26
 
 ### Fixed

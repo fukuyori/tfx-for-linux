@@ -53,12 +53,6 @@ void FilePane::restoreTabs(const QStringList &paths, int activeIndex)
 
 void FilePane::newTab()
 {
-    const int existing = tabIndexForPath(m_currentPath);
-    if (existing >= 0) {
-        m_tabBar->setCurrentIndex(existing);
-        return;
-    }
-
     const int index = m_tabBar->addTab(tabTitleForPath(m_currentPath));
     m_tabBar->setTabData(index, m_currentPath);
     m_tabBar->setTabToolTip(index, m_currentPath);
@@ -186,19 +180,6 @@ void FilePane::updateCurrentTabPath(const QString &path)
         index = m_tabBar->addTab(tabTitleForPath(path));
         m_tabBar->setCurrentIndex(index);
     }
-    const int existing = tabIndexForPath(normalized);
-    if (existing >= 0 && existing != index) {
-        const int removed = index;
-        m_tabBar->blockSignals(true);
-        m_tabBar->removeTab(removed);
-        m_tabBar->blockSignals(false);
-        const int adjustedExisting = existing > removed ? existing - 1 : existing;
-        m_tabBar->setCurrentIndex(adjustedExisting);
-        updateTabCloseButtons();
-        emit tabsChanged();
-        return;
-    }
-
     m_tabBar->setTabText(index, tabTitleForPath(normalized));
     m_tabBar->setTabData(index, normalized);
     m_tabBar->setTabToolTip(index, normalized);

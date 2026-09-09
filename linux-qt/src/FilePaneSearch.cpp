@@ -35,7 +35,7 @@ QIcon FilePane::cachedFileIcon(const QFileInfo &info)
     // Same glyphs as the file list (see views/FileIcons): one look regardless
     // of the desktop icon theme, tinted with the configured foregrounds.
     return info.isDir() ? tfx::views::folderIcon(QColor(m_directoryForeground))
-                        : tfx::views::fileIcon(QColor(m_fileForeground));
+                        : tfx::views::fileIcon(info.fileName(), QColor(m_fileForeground));
 }
 
 void FilePane::startSearch(const QString &term)

@@ -1,4 +1,5 @@
 #include "MainWindow.h"
+#include "TrashDialog.h"
 #include "views/SidebarViews.h"
 #include "UiText.h"
 #include "core/SidebarLogic.h"
@@ -18,6 +19,10 @@
 #include <QHeaderView>
 #include <QLocale>
 #include <QMenu>
+#include <QMenuBar>
+#include <QShortcut>
+#include <QSplitter>
+#include <QStackedWidget>
 #include <QMimeData>
 #include <QPainter>
 #include <QPointer>
@@ -41,6 +46,46 @@ QString pinnedDisplayPath(const QString &path)
 {
     return tfx::core::pinnedDisplayPath(path, QDir::homePath());
 }
+}
+
+void MainWindow::openTrash()
+{
+    if (!m_trashView) {
+        m_trashView = new TrashDialog(m_fileAreaStack, true);
+        m_fileAreaStack->addWidget(m_trashView);
+        connect(m_trashView, &TrashDialog::restored, this, &MainWindow::reloadChangedDirectories);
+        connect(m_trashView, &QDialog::rejected, this, [this]() { setTrashVisible(false); });
+    } else {
+        m_trashView->refresh();
+    }
+    QFont font(m_config.font.fileListFamily.isEmpty()
+                   ? m_config.resolvedUiFontFamily() : m_config.font.fileListFamily);
+    font.setPixelSize(m_config.font.fileListSize > 0 ? m_config.font.fileListSize : m_config.font.size);
+    m_trashView->setFileListAppearance(m_config.colors, font);
+    setTrashVisible(true);
+    m_trashView->setFocus();
+}
+
+void MainWindow::setTrashVisible(bool visible)
+{
+    m_trashVisible = visible;
+    m_fileAreaStack->setCurrentWidget(visible ? static_cast<QWidget *>(m_trashView) : m_paneSplitter);
+    // Commands for normal file selections must not act on the hidden panes.
+    m_paneSplitter->setEnabled(!visible);
+    m_topToolbar->setEnabled(!visible);
+    for (QAction *action : menuBar()->findChildren<QAction *>()) {
+        if (action->menu() || action->property("availableInTrash").toBool()) continue;
+        if (visible) {
+            if (!action->property("enabledBeforeTrash").isValid())
+                action->setProperty("enabledBeforeTrash", action->isEnabled());
+            action->setEnabled(false);
+        } else if (action->property("enabledBeforeTrash").isValid()) {
+            action->setEnabled(action->property("enabledBeforeTrash").toBool());
+            action->setProperty("enabledBeforeTrash", QVariant());
+        }
+    }
+    for (auto *shortcut : m_configShortcuts) shortcut->setEnabled(!visible);
+    if (!visible) activePane()->focusFileList();
 }
 
 
@@ -160,6 +205,7 @@ void MainWindow::buildFolderSidebar(const QString &initialPath)
         QDir::home().filePath("Documents"),
         QDir::home().filePath("Downloads"),
         QDir::home().filePath("Pictures"),
+        QStringLiteral("trash:///"),
     };
     for (const QString &path : pinnedPaths) {
         addPinnedFolder(path);
@@ -214,7 +260,12 @@ void MainWindow::buildFolderSidebar(const QString &initialPath)
         }
     };
     connect(m_pinnedList, &QListWidget::itemClicked, this, [this](QListWidgetItem *item) {
-        activePane()->navigateTo(item->data(Qt::UserRole).toString());
+        const QString path = item->data(Qt::UserRole).toString();
+        if (path == QLatin1String("trash:///")) {
+            openTrash();
+        } else {
+            activePane()->navigateTo(path);
+        }
     });
     m_pinnedList->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(m_pinnedList, &QListWidget::customContextMenuRequested, this, [this](const QPoint &point) {
@@ -224,6 +275,11 @@ void MainWindow::buildFolderSidebar(const QString &initialPath)
         }
         const QString path = item->data(Qt::UserRole).toString();
         QMenu menu(this);
+        if (path == QLatin1String("trash:///")) {
+            menu.addAction(UiText::t("Open Trash", "ゴミ箱を開く"), this, &MainWindow::openTrash);
+            menu.exec(m_pinnedList->viewport()->mapToGlobal(point));
+            return;
+        }
         menu.addAction(UiText::t("Open", "開く"), this, [this, path]() {
             activePane()->navigateTo(path);
         });
@@ -402,21 +458,23 @@ void MainWindow::applySidebarSectionStates()
 
 void MainWindow::addPinnedFolder(const QString &path)
 {
+    const bool isTrash = path == QLatin1String("trash:///");
     const QFileInfo info(path);
-    if (!info.isDir()) {
+    if (!isTrash && !info.isDir()) {
         return;
     }
-    const QString cleanPath = info.canonicalFilePath().isEmpty() ? info.absoluteFilePath() : info.canonicalFilePath();
+    const QString cleanPath = isTrash ? path
+        : (info.canonicalFilePath().isEmpty() ? info.absoluteFilePath() : info.canonicalFilePath());
     for (int row = 0; row < m_pinnedList->count(); ++row) {
         if (m_pinnedList->item(row)->data(Qt::UserRole).toString() == cleanPath) {
             return;
         }
     }
 
-    auto *item = new QListWidgetItem(pinnedDisplayPath(cleanPath));
+    auto *item = new QListWidgetItem(isTrash ? UiText::t("Trash", "ゴミ箱") : pinnedDisplayPath(cleanPath));
     item->setSizeHint(QSize(0, 18));
     item->setData(Qt::UserRole, cleanPath);
-    item->setToolTip(cleanPath);
+    item->setToolTip(isTrash ? UiText::t("Open Trash", "ゴミ箱を開く") : cleanPath);
     m_pinnedList->addItem(item);
     updatePinnedFolderArea();
     if (!m_isRestoringSettings) {

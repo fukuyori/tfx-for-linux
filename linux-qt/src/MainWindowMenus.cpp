@@ -25,6 +25,7 @@ QAction *addMenuAction(QMenu *menu,
                        const QKeySequence &shortcut = QKeySequence())
 {
     auto *action = menu->addAction(text);
+    if (receiver == qApp) action->setProperty("availableInTrash", true);
     if (!shortcut.isEmpty()) {
         action->setShortcut(shortcut);
     }
@@ -138,6 +139,7 @@ QIcon toolbarIcon(const QString &kind, const QColor &color)
 void MainWindow::buildActions()
 {
     auto *fileMenu = menuBar()->addMenu(UiText::t("File", "ファイル"));
+    addMenuAction(fileMenu, UiText::t("Open Trash", "ゴミ箱を開く"), this, [this]() { openTrash(); });
     addMenuAction(fileMenu, UiText::t("New File", "新規ファイル"), this, [this]() { activePane()->createFile(); }, QKeySequence(m_config.shortcut("newFile", "Ctrl+N")));
     addMenuAction(fileMenu, UiText::t("New Folder", "新規フォルダ"), this, [this]() { activePane()->createFolder(); }, QKeySequence(m_config.shortcut("newFolder", "Ctrl+Shift+N")));
     addMenuAction(fileMenu, UiText::t("Rename", "名前を変更"), this, [this]() { activePane()->renameSelected(); }, QKeySequence(m_config.shortcut("rename", "F2")));

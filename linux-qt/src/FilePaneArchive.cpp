@@ -97,7 +97,6 @@ void FilePane::populateZipView()
     m_zipModel->removeRows(0, m_zipModel->rowCount());
 
     const QIcon folderIcon = tfx::views::folderIcon(QColor(m_directoryForeground));
-    const QIcon fileIcon = tfx::views::fileIcon(QColor(m_fileForeground));
     auto *up = new QStandardItem(folderIcon, "..");
     up->setData("..", Qt::UserRole);
     up->setData(true, Qt::UserRole + 1);
@@ -125,7 +124,7 @@ void FilePane::populateZipView()
                 m_zipModel->appendRow({item, new QStandardItem(UiText::t("Folder", "フォルダ"))});
             }
         } else {
-            auto *item = new QStandardItem(fileIcon, rest);
+            auto *item = new QStandardItem(tfx::views::fileIcon(rest, QColor(m_fileForeground)), rest);
             item->setData(entry, Qt::UserRole);
             item->setData(false, Qt::UserRole + 1);
             const QString suffix = QFileInfo(rest).suffix();

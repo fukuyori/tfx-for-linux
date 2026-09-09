@@ -158,7 +158,7 @@ QVariant FileSystemProxyModel::data(const QModelIndex &index, int role) const
         // Drawn here rather than taken from the desktop icon theme, so the list
         // keeps one look and follows [colors] like the rest of the row.
         return info.isDir() ? tfx::views::folderIcon(QColor(m_directoryForeground))
-                            : tfx::views::fileIcon(QColor(m_fileForeground));
+                            : tfx::views::fileIcon(info.fileName(), QColor(m_fileForeground));
     }
 
     if (role == Qt::EditRole && index.column() == ColumnName) {

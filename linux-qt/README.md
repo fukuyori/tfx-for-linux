@@ -1,8 +1,10 @@
 # tfx for Linux Qt
 
-Version: **0.6.2**
+Version: **0.8.8**
 
 This directory contains the C++/Qt 6 Widgets implementation of `tfx-for-linux`.
+
+Qt 6 Widgets / DBus and QTermWidget 6 are required. See [Requirements](../README.md#requirements) for dependency installation instructions.
 
 ## Build
 
@@ -35,7 +37,7 @@ ctest --test-dir build --output-on-failure
 - Markdown preview with GitHub-style tables and local image embedding
 - Built-in command pane
 - Restored window size, pane visibility, splitter sizes, tabs, and file-list columns
-- Multi-tab panes with close buttons, duplicate-tab suppression, tab context
+- Multi-tab panes with close buttons, support for multiple tabs of the same folder, tab context
   menu actions, and restored tab cleanup
 - `config.toml` settings including light/dark theme presets and window/pane transparency (`[opacity]`)
 - User-defined commands with `[[commands]]`

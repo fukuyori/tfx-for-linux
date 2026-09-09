@@ -44,6 +44,8 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+bash "$script_dir/check_dependencies.sh" ON
+
 if [[ ${#generators[@]} -eq 0 ]]; then
     command -v dpkg-deb >/dev/null 2>&1 && generators+=("DEB")
     command -v rpmbuild >/dev/null 2>&1 && generators+=("RPM")

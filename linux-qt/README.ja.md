@@ -1,8 +1,10 @@
 # tfx for Linux Qt
 
-Version: **0.6.2**
+Version: **0.8.8**
 
 このディレクトリは、`tfx-for-linux` の C++/Qt 6 Widgets 実装です。
+
+Qt 6 Widgets / DBus と QTermWidget 6 が必須です。依存パッケージの導入手順は[必要環境](../README.ja.md#必要環境)を参照してください。
 
 ## ビルド
 
@@ -35,7 +37,7 @@ ctest --test-dir build --output-on-failure
 - GitHub 形式のテーブルとローカル画像埋め込みに対応した Markdown プレビュー
 - 内蔵コマンドペイン
 - ウインドウサイズ、表示状態、splitter 幅、タブ、ファイル一覧表示項目の復元
-- 閉じるボタン、重複タブ抑制、タブ用コンテキストメニュー、復元タブの
+- 閉じるボタン、同じフォルダの複数タブ表示、タブ用コンテキストメニュー、復元タブの
   正規化を備えた複数タブペイン
 - light/dark テーマプリセットとウインドウ/ペインの透過（`[opacity]`）を含む `config.toml` 設定
 - `[[commands]]` によるユーザー定義コマンド

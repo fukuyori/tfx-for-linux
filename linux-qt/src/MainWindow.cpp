@@ -18,6 +18,7 @@
 #include <QShortcut>
 #include <QSignalBlocker>
 #include <QSplitter>
+#include <QStackedWidget>
 #include <QStatusBar>
 #include <QTimer>
 #include <QToolBar>
@@ -145,7 +146,10 @@ MainWindow::MainWindow(const QString &initialPath, const QString &geometryOverri
     m_paneSplitter->setChildrenCollapsible(false);
     m_paneSplitter->addWidget(m_leftPane);
     m_paneSplitter->addWidget(m_rightPane);
-    m_dockFilePanes = makeDock("dockFilePanes", QString(), m_paneSplitter);
+    m_fileAreaStack = new QStackedWidget(this);
+    m_fileAreaStack->setObjectName("fileAreaStack");
+    m_fileAreaStack->addWidget(m_paneSplitter);
+    m_dockFilePanes = makeDock("dockFilePanes", QString(), m_fileAreaStack);
     m_dockPreview = makeDock("dockPreview", UiText::t("Preview", "プレビュー"), m_previewPane);
     m_dockTerminal = makeDock("dockTerminal", UiText::t("Terminal", "ターミナル"), m_terminalPane);
     m_dockCommandOutput = makeDock("dockCommandOutput", UiText::t("Command Output", "コマンド出力"), m_commandOutputPane);
@@ -160,6 +164,7 @@ MainWindow::MainWindow(const QString &initialPath, const QString &geometryOverri
             m_terminalPane->setWorkingDirectory(activatedPane->currentPath());
         });
         connect(pane, &FilePane::directoryChanged, this, [this, pane](const QString &path) {
+            if (m_trashVisible) setTrashVisible(false);
             if (pane == m_activePane) {
                 syncFolderTree(path);
                 updateDiskSelection(path);
@@ -420,6 +425,7 @@ void MainWindow::setupConfigShortcuts()
     m_configShortcuts.clear();
     const auto add = [this](const QKeySequence &sequence) {
         auto *shortcut = new QShortcut(sequence, this);
+        shortcut->setEnabled(!m_trashVisible);
         m_configShortcuts.append(shortcut);
         return shortcut;
     };

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(tfx-for-linux VERSION 0.8.7 LANGUAGES CXX)
+project(tfx-for-linux VERSION 0.8.8 LANGUAGES CXX)
 
 include(GNUInstallDirs)
 include(CTest)
@@ -10,7 +10,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets DBus)
-find_package(qtermwidget6 QUIET)
+find_package(qtermwidget6 REQUIRED)
 if(BUILD_TESTING)
     find_package(Qt6 QUIET COMPONENTS Test)
 endif()
@@ -24,6 +24,10 @@ else()
 endif()
 
 qt_add_executable(tfx
+    src/core/Trash.cpp
+    src/core/Trash.h
+    src/TrashDialog.cpp
+    src/TrashDialog.h
     src/core/DelimitedText.cpp
     src/core/DelimitedText.h
     src/core/FileOperations.cpp
@@ -118,14 +122,9 @@ qt_add_resources(tfx "tfx_icons"
 target_include_directories(tfx PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(tfx PRIVATE Qt6::Widgets Qt6::DBus)
 
-# Optional: use QTermWidget for an interactive terminal pane when available.
-if(qtermwidget6_FOUND)
-    target_link_libraries(tfx PRIVATE qtermwidget6)
-    target_compile_definitions(tfx PRIVATE TFX_HAVE_QTERMWIDGET)
-    message(STATUS "tfx: QTermWidget found — interactive terminal enabled")
-else()
-    message(STATUS "tfx: QTermWidget not found — using the simple command pane")
-endif()
+target_link_libraries(tfx PRIVATE qtermwidget6)
+target_compile_definitions(tfx PRIVATE TFX_HAVE_QTERMWIDGET)
+message(STATUS "tfx: QTermWidget found — interactive terminal enabled")
 target_compile_definitions(tfx PRIVATE TFX_VERSION="${PROJECT_VERSION}")
 
 install(TARGETS tfx RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
@@ -205,6 +204,33 @@ set(CPACK_PACKAGE_FILE_NAME "tfx-${PROJECT_VERSION}-Linux_${TFX_RPM_ARCH}")
 include(CPack)
 
 if(BUILD_TESTING AND Qt6Test_FOUND)
+    qt_add_executable(tfx_file_icons_test tests/FileIconsTest.cpp src/views/FileIcons.cpp)
+    target_include_directories(tfx_file_icons_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(tfx_file_icons_test PRIVATE Qt6::Widgets Qt6::Test)
+    add_test(NAME file_icons COMMAND tfx_file_icons_test)
+    set_tests_properties(file_icons PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+    qt_add_executable(tfx_trash_test
+        tests/TrashTest.cpp
+        src/core/Trash.cpp
+        src/core/Trash.h
+    )
+    target_include_directories(tfx_trash_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(tfx_trash_test PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME trash COMMAND tfx_trash_test)
+
+    qt_add_executable(tfx_trash_dialog_test
+        tests/TrashDialogTest.cpp
+        src/views/FileIcons.cpp
+        src/TrashDialog.cpp
+        src/TrashDialog.h
+        src/core/Trash.cpp
+        src/UiText.cpp
+    )
+    target_include_directories(tfx_trash_dialog_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(tfx_trash_dialog_test PRIVATE Qt6::Widgets Qt6::Test)
+    add_test(NAME trash_dialog COMMAND tfx_trash_dialog_test)
+    set_tests_properties(trash_dialog PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
     qt_add_executable(tfx_file_operation_worker_test
         tests/FileOperationWorkerTest.cpp
         src/core/FileOperationWorker.cpp

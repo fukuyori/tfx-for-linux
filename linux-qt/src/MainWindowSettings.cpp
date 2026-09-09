@@ -154,6 +154,9 @@ void MainWindow::restoreSettings()
         }
         updatePinnedFolderArea();
     }
+    // Existing settings predate the built-in trash entry. Keep it visible and
+    // preserve its saved position when it is already present.
+    addPinnedFolder(QStringLiteral("trash:///"));
     const QStringList searchHistory = settings.value("Search/history").toStringList();
     m_searchEdit->clear();
     for (const QString &term : searchHistory) {
@@ -315,6 +318,8 @@ void MainWindow::reloadConfig()
     sync(m_commandOutputAction, m_dockCommandOutput->isVisible());
     sync(m_hiddenAction, m_showHiddenFiles);
     syncIconViewToggle();
+
+    if (m_trashVisible) openTrash();
 
     // An atomic save replaced the file node, which drops it from the watcher.
     const QString configFile = AppConfig::configFilePath();

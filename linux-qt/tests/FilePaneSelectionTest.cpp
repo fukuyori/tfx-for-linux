@@ -30,6 +30,7 @@ private slots:
     void pressOnSelectedRowKeepsMultiSelectionForDrag();
     void pressAfterModelRefreshKeepsMultiSelection();
     void strictSelectedRowsRestoredAfterRefresh();
+    void newTabsNavigateIndependentlyAndRestore();
 
 private:
     QTableView *fileView() const;
@@ -43,6 +44,31 @@ private:
 void FilePaneSelectionTest::initTestCase()
 {
     QStandardPaths::setTestModeEnabled(true);
+}
+
+void FilePaneSelectionTest::newTabsNavigateIndependentlyAndRestore()
+{
+    const QString original = m_pane->currentPath();
+    QCOMPARE(m_pane->tabPaths().size(), 1);
+    m_pane->newTab();
+    QCOMPARE(m_pane->tabPaths(), QStringList({original, original}));
+    QCOMPARE(m_pane->activeTabIndex(), 1);
+    m_pane->navigateTo(m_dir->filePath("folder1"));
+    const QString folder = m_pane->currentPath();
+    QCOMPARE(m_pane->tabPaths(), QStringList({original, folder}));
+    m_pane->previousTab();
+    QCOMPARE(m_pane->currentPath(), original);
+    m_pane->nextTab();
+    QCOMPARE(m_pane->currentPath(), folder);
+    m_pane->navigateTo(original);
+    QCOMPARE(m_pane->tabPaths(), QStringList({original, original}));
+    m_pane->restoreTabs(m_pane->tabPaths(), 1);
+    QCOMPARE(m_pane->tabPaths(), QStringList({original, original}));
+    QCOMPARE(m_pane->activeTabIndex(), 1);
+    m_pane->closeCurrentTab();
+    QCOMPARE(m_pane->tabPaths(), QStringList({original}));
+    m_pane->closeCurrentTab();
+    QCOMPARE(m_pane->tabPaths().size(), 1);
 }
 
 void FilePaneSelectionTest::init()

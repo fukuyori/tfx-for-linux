@@ -5,11 +5,14 @@
 
 class QFileInfo;
 
-// File-list icons drawn in the prism-fm style: a filled folder and an outlined
-// page, tinted with the list's own foreground colours. Drawing them here rather
-// than taking the desktop theme's icons keeps the list consistent with
-// [colors] and identical across icon themes.
+// File-category icons inspired by prism-fm, drawn with Qt and tinted with
+// the list foreground colours. Shared by normal, search, archive, and trash
+// views; independent of the desktop icon theme.
 namespace tfx::views {
+
+enum class FileIconKind { File, Folder, Image, Video, Audio, Pdf, Spreadsheet, Presentation, Document, Text, Code, Markup, Data, Script, Database, Font, Archive, Disk, Executable, Library, Key, Threed };
+FileIconKind fileIconKind(const QString &name);
+QIcon fileIcon(const QString &name, const QColor &color);
 
 QIcon folderIcon(const QColor &color);
 QIcon fileIcon(const QColor &color);

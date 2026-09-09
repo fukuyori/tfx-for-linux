@@ -13,7 +13,7 @@ class TabStateTest : public QObject
 
 private slots:
     void normalizesRestoredTabPaths();
-    void removesDuplicateRestoredTabPaths();
+    void preservesDuplicateRestoredTabPaths();
     void clampsActiveTabIndex();
 };
 
@@ -41,10 +41,11 @@ void TabStateTest::normalizesRestoredTabPaths()
     QCOMPARE(normalized, QStringList({
         QFileInfo(one).canonicalFilePath(),
         QFileInfo(two).canonicalFilePath(),
+        QFileInfo(one).canonicalFilePath(),
     }));
 }
 
-void TabStateTest::removesDuplicateRestoredTabPaths()
+void TabStateTest::preservesDuplicateRestoredTabPaths()
 {
     QTemporaryDir temp;
     QVERIFY(temp.isValid());
@@ -64,7 +65,9 @@ void TabStateTest::removesDuplicateRestoredTabPaths()
 
     QCOMPARE(normalized, QStringList({
         QFileInfo(one).canonicalFilePath(),
+        QFileInfo(one).canonicalFilePath(),
         QFileInfo(two).canonicalFilePath(),
+        QFileInfo(one).canonicalFilePath(),
     }));
 }
 

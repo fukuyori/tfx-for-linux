@@ -25,6 +25,8 @@ class QSocketNotifier;
 class QSplitter;
 class QThread;
 class QLabel;
+class QStackedWidget;
+class TrashDialog;
 
 class MainWindow : public QMainWindow
 {
@@ -49,6 +51,8 @@ private:
     int queuedFileOperationCount() const;
     void updateFileOperationSummary(int completed = -1, int total = -1);
     void buildActions();
+    void openTrash();
+    void setTrashVisible(bool visible);
     void buildTopToolbar();
     void buildFolderSidebar(const QString &initialPath);
     void applyTerminalTheme();
@@ -177,6 +181,9 @@ private:
     QDockWidget *m_dockSidebar = nullptr;
     QDockWidget *m_dockFilePanes = nullptr;
     QSplitter *m_paneSplitter = nullptr;
+    QStackedWidget *m_fileAreaStack = nullptr;
+    TrashDialog *m_trashView = nullptr;
+    bool m_trashVisible = false;
     QDockWidget *m_dockPreview = nullptr;
     QDockWidget *m_dockTerminal = nullptr;
     QDockWidget *m_dockCommandOutput = nullptr;

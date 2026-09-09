@@ -16,7 +16,7 @@ QStringList normalizedTabPaths(const QStringList &paths)
     QStringList normalized;
     for (const QString &path : paths) {
         const QString canonical = normalizedTabPath(path);
-        if (!canonical.isEmpty() && !normalized.contains(canonical)) {
+        if (!canonical.isEmpty()) {
             normalized.append(canonical);
         }
     }

@@ -2,6 +2,27 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.8.8] - 2026-09-09
+
+### Added
+
+- Trash access from the pinned list, displayed in the file list area with
+  restoration and confirmed permanent deletion from the context menu.
+- File-type icons inspired by prism-fm, shared by file lists, search results,
+  ZIP contents, and trash, using the configured foreground colours.
+- Build dependency checks that compile and link a probe before building.
+
+### Fixed
+
+- New Tab now creates a tab for the current folder. Tabs for the same folder
+  remain separate during navigation and session restoration.
+- Trash rows use the configured file-list colours, selection highlight, and font.
+
+### Changed
+
+- QTermWidget 6 is required. README dependency instructions and CI dependencies
+  now include the packages needed for the interactive terminal.
+
 ## [0.8.7] - 2026-08-26
 
 ### Changed

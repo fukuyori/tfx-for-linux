@@ -15,6 +15,7 @@ jobs:
   linux-qt:
     name: Linux Qt
     runs-on: ubuntu-latest
+    container: ubuntu:26.04
     timeout-minutes: 20
 
     steps:
@@ -23,8 +24,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake g++ qt6-base-dev
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y git cmake g++ qt6-base-dev libqtermwidget6-2-dev libutf8proc-dev
 
       - name: Configure
         run: cmake -S linux-qt -B build

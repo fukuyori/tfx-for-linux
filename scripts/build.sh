@@ -65,6 +65,8 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+bash "$script_dir/check_dependencies.sh" "$build_tests"
+
 if [[ "$clean_first" -eq 1 ]]; then
     rm -rf "$build_dir"
 fi

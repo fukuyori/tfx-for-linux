@@ -1,7 +1,7 @@
 # tfx for Linux
 
 **Terminal-inspired interface File eXplorer for Linux**  
-Version: **0.8.7**
+Version: **0.8.8**
 
 English | [Japanese](README.ja.md)
 
@@ -62,9 +62,20 @@ This repository contains only the Linux Qt implementation. The original macOS Sw
 - Linux
 - CMake 3.20 or later
 - C++17 compiler
-- Qt 6 Widgets
+- Qt 6 Widgets / DBus
+- QTermWidget 6
+
+Install the required development packages on Ubuntu 26.04:
+
+```sh
+sudo apt-get install -y cmake g++ qt6-base-dev libqtermwidget6-2-dev libutf8proc-dev
+```
+
+QTermWidget 6 is required for the interactive terminal. CMake configuration fails if it is missing. `libutf8proc-dev` is needed to link QTermWidget. Package names and availability vary by distribution.
 
 ## Build
+
+The build scripts first check dependencies by compiling and linking a small probe. If a dependency is missing, they print diagnostics and an installation command, then stop before building the application or removing files with `--clean`.
 
 ```sh
 scripts/build.sh
@@ -103,6 +114,14 @@ When no folder is specified, the application opens the current working directory
 ./build/tfx --foreground
 ```
 
+File icons use extension-based categories inspired by `prism-fm`, including images, video, audio, PDF, spreadsheets, documents, code, and archives. Normal lists, search results, ZIP contents, and trash share these icons and use the configured file-list colours.
+
+## Trash
+
+Switch the file list area to trash with **Trash** in the sidebar’s pinned list or **File → Open Trash**. It shows original names, locations, and deletion dates. Select one or more items and choose **Restore to Original Location** to restore them. The context menu offers **Restore to Original Location** and **Delete Permanently**. Permanent deletion requires confirmation and cannot be undone. **Refresh** reloads the list. Select a normal folder or choose **Close** to return. The trash list uses the file list’s configured colours, selection colours, and font.
+
+The list includes trash in the home location and on mounted volumes. Restoration never overwrites existing files. Missing parent directories or moves across filesystems produce an error and leave the item in the trash. Items with missing or invalid metadata are shown as **Cannot restore**.
+
 ## Tests
 
 ```sh
@@ -136,11 +155,11 @@ test for the Linux Qt target.
 - Preview keyboard shortcuts for source/rendered switching and opening the current preview externally
 - Markdown preview with GitHub-style tables and local image embedding
 - Browse ZIP archives as folders (navigate in, open/extract entries)
-- Interactive terminal pane (QTermWidget) whose working directory follows the active pane; falls back to a simple command pane when unavailable. The cwd sync button resolves the active tmux pane's directory when tmux is running inside the terminal
+- Interactive terminal pane (QTermWidget) whose working directory follows the active pane. The cwd sync button resolves the active tmux pane's directory when tmux is running inside the terminal
 - User-editable `config.toml` created under `~/.config/tfx/`, including window/pane transparency, per-pane fonts, and the terminal colour scheme
 - User-defined `[[commands]]` for the context menu/menu bar, token expansion, shortcut conflict warnings, and the Command Output dock
 - Window, dock layout, pane visibility, tab, and column setting restoration
-- Multi-tab file panes with close buttons, duplicate-tab suppression, tab
+- Multi-tab file panes with close buttons, support for multiple tabs of the same folder, tab
   context menu actions, and restored tab cleanup
 - File operations: open, open with (native chooser), rename, link, new file/folder, trash, background copy/cut/paste with progress/cancel, copy path; symbolic links are copied as links with their link text preserved; copies keep permissions and modification times
 - Drag-and-drop of files and folders between panes and to/from external file managers (drop onto a folder to move, or hold Ctrl to copy)

@@ -53,6 +53,7 @@ MainWindow::MainWindow(const QString &initialPath, const QString &geometryOverri
       m_rightPane(new FilePane("RIGHT", QDir::homePath(), this)),
       m_activePane(m_leftPane),
       m_previewPane(new PreviewPane(this)),
+      m_quickPreview(new QuickPreviewOverlay(this)),
       m_terminalPane(new TerminalPane(this)),
       m_commandOutputPane(new CommandOutputPane(this)),
       m_config(AppConfig::loadOrCreate()),
@@ -86,8 +87,8 @@ MainWindow::MainWindow(const QString &initialPath, const QString &geometryOverri
 
     m_sidebar->setObjectName("sidebar");
     auto *sidebarLayout = new QVBoxLayout(m_sidebar);
-    sidebarLayout->setContentsMargins(10, 8, 8, 0);
-    sidebarLayout->setSpacing(6);
+    sidebarLayout->setContentsMargins(8, 4, 8, 0);
+    sidebarLayout->setSpacing(4);
     // Clickable section headers: the chevron in the text shows the collapse
     // state; the state itself persists with the other view settings.
     const auto makeSectionHeader = [this](bool *state) {
@@ -158,7 +159,24 @@ MainWindow::MainWindow(const QString &initialPath, const QString &geometryOverri
     m_dockTerminal->hide();
     m_dockCommandOutput->hide();
 
+    m_quickPreview->setParent(m_dockFilePanes);
+    connect(m_quickPreview, &QuickPreviewOverlay::openRequested, this, [this]() {
+        activePane()->openQuickPreviewSelection();
+    });
+    connect(m_quickPreview, &QuickPreviewOverlay::dismissed, this, [this]() {
+        activePane()->focusFileList();
+    });
     const auto wirePane = [this](FilePane *pane) {
+        connect(pane, &FilePane::quickPreviewRequested, this, [this, pane]() {
+            setActivePane(pane);
+            m_quickPreview->present(pane->quickPreviewPaths());
+        });
+        const auto refreshQuickPreview = [this, pane]() {
+            if (m_quickPreview->isVisible() && pane == m_activePane)
+                m_quickPreview->previewPaths(pane->quickPreviewPaths());
+        };
+        connect(pane, &FilePane::selectionPreviewRequested, this, refreshQuickPreview);
+        connect(pane, &FilePane::multiSelectionPreviewRequested, this, refreshQuickPreview);
         connect(pane, &FilePane::activated, this, [this](FilePane *activatedPane) {
             setActivePane(activatedPane);
             m_terminalPane->setWorkingDirectory(activatedPane->currentPath());
@@ -433,9 +451,15 @@ void MainWindow::setupConfigShortcuts()
     connect(add(QKeySequence(Qt::Key_Tab)), &QShortcut::activated, this, &MainWindow::focusOtherPane);
     connect(add(QKeySequence(Qt::SHIFT | Qt::Key_Tab)), &QShortcut::activated, this, &MainWindow::focusOtherPane);
     connect(add(QKeySequence(m_config.shortcut("togglePreviewSource", "Ctrl+Shift+R"))),
-            &QShortcut::activated, m_previewPane, &PreviewPane::toggleSourceRendered);
+            &QShortcut::activated, this, [this]() {
+                if (m_quickPreview->isVisible()) m_quickPreview->toggleSourceRendered();
+                else m_previewPane->toggleSourceRendered();
+            });
     connect(add(QKeySequence(m_config.shortcut("openPreviewExternal", "Ctrl+Shift+I"))),
-            &QShortcut::activated, m_previewPane, &PreviewPane::openCurrentPreviewExternally);
+            &QShortcut::activated, this, [this]() {
+                if (m_quickPreview->isVisible()) m_quickPreview->openCurrentPreviewExternally();
+                else m_previewPane->openCurrentPreviewExternally();
+            });
 
     const auto addPaneShortcut = [this, add](const QString &name, const QString &def, void (FilePane::*slot)()) {
         connect(add(QKeySequence(m_config.shortcut(name, def))), &QShortcut::activated,
@@ -492,6 +516,11 @@ void MainWindow::syncIconViewToggle()
 void MainWindow::setActivePane(FilePane *pane)
 {
     m_activePane = pane;
+    if (m_quickPreview) {
+        m_quickPreview->setNavigationView(pane->fileListView());
+        if (m_quickPreview->isVisible())
+            m_quickPreview->previewPaths(pane->quickPreviewPaths());
+    }
     m_leftPane->setActive(pane == m_leftPane);
     m_rightPane->setActive(pane == m_rightPane);
     syncIconViewToggle();

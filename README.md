@@ -1,16 +1,13 @@
 # tfx for Linux
 
 **Terminal-inspired interface File eXplorer for Linux**  
-Version: **0.8.8**
+Version: **0.9.0**
 
 English | [Japanese](README.ja.md)
 
 `tfx-for-linux` is a C++/Qt port of `tfx`: a keyboard-centric two-pane file manager for Linux desktops.
 
-<p align="center">
-  <img src="images/screenshot.png" width="880"
-       alt="tfx showing a single file pane with the folder sidebar, breadcrumb path and Name/Size/Modified/Mode columns">
-</p>
+![tfx showing a single file pane with the folder sidebar, breadcrumb path and Name/Size/Modified/Mode columns](images/screenshot.png)
 
 The default theme is translucent and rounded, in the spirit of
 [prism-fm](https://github.com/fukuyori/prism-fm) — a dark surface the desktop
@@ -26,36 +23,21 @@ This repository contains only the Linux Qt implementation. The original macOS Sw
 
 ## Screenshots
 
-<table>
-  <tr>
-    <td width="50%">
-      <img src="images/screenshot1.png"
-           alt="Two file panes side by side, each row of a modified file marked M in the Git status column">
-      <br><sub><b>Split panes.</b> Both sides list the same folder, with the Git
-      status column marking modified files.</sub>
-    </td>
-    <td width="50%">
-      <img src="images/screenshot2.png"
-           alt="Two file panes with the preview pane open on the right, showing an image's metadata and a thumbnail">
-      <br><sub><b>Preview pane.</b> Name, type, size, date and path for the
-      selection, with a live thumbnail underneath.</sub>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%">
-      <img src="images/screenshot3.png"
-           alt="A file pane above an embedded terminal running a shell in the pane's folder">
-      <br><sub><b>Terminal pane.</b> A real interactive shell whose working
-      directory follows the active pane.</sub>
-    </td>
-    <td width="50%">
-      <img src="images/screenshot4.png"
-           alt="The same window rendered in an amber and brown palette instead of the default grey">
-      <br><sub><b>Fully themeable.</b> The same window after changing
-      <code>[colors]</code> in <code>config.toml</code>.</sub>
-    </td>
-  </tr>
-</table>
+![Two file panes side by side, each row of a modified file marked M in the Git status column](images/screenshot1.png)
+
+**Split panes.** Both sides list the same folder, with the Git status column marking modified files.
+
+![Two file panes with the preview pane open on the right, showing an image's metadata and a thumbnail](images/screenshot2.png)
+
+**Preview pane.** Name, type, size, date and path for the selection, with a live thumbnail underneath.
+
+![A file pane above an embedded terminal running a shell in the pane's folder](images/screenshot3.png)
+
+**Terminal pane.** A real interactive shell whose working directory follows the active pane.
+
+![The same window rendered in an amber and brown palette instead of the default grey](images/screenshot4.png)
+
+**Fully themeable.** The same window after changing `[colors]` in `config.toml`.
 
 ## Requirements
 
@@ -151,6 +133,7 @@ test for the Linux Qt target.
   Back/Forward history are not carried over
 - Startup visibility control for preview, terminal, and folder sidebar
 - Startup window geometry via `--geometry` or `[startup] geometry`
+- **Quick preview**: press `Space` in the file list to show a temporary preview, `Space` / `Esc` to close, or `Enter` to open. Up/down selection changes update the preview. During type-ahead, Space continues the filename prefix. Folders show up to 500 descendant entries, excluding hidden items; multiple selections show an item list.
 - Preview pane with source/rendered switching, an external image viewer button, and a multi-selection summary
 - Preview keyboard shortcuts for source/rendered switching and opening the current preview externally
 - Markdown preview with GitHub-style tables and local image embedding
@@ -166,8 +149,8 @@ test for the Linux Qt target.
 - Drag-and-drop feedback that names where the drop lands: only folder rows are
   highlighted, framing the folder's icon and name rather than the whole row
   (dropping anywhere else goes to the listed folder, shown as a frame around
-  the pane), and a badge by the cursor reads "Move to <folder>" or
-  "Copy to <folder>", following Ctrl as you hold it. Affected panes refresh
+  the pane), and a badge by the cursor reads `Move to <folder>` or
+  `Copy to <folder>`, following Ctrl as you hold it. Affected panes refresh
   immediately
 - Conflict handling for paste/drop operations with overwrite, skip, and rename choices and an "Apply to all" checkbox for the rest of the batch; overwrite replaces the existing item atomically so a failed copy never destroys it
 - Clipboard-to-file paste for images, rich/plain text, URLs, CSV, and TSV, plus Paste as Plain Text

@@ -67,13 +67,14 @@ void FilePane::navigateTo(const QString &path, bool recordHistory)
     emit activated(this);
 }
 
+QWidget *FilePane::fileListView() const
+{
+    return m_viewStack->currentWidget();
+}
+
 void FilePane::focusFileList()
 {
-    QWidget *target = m_view;
-    if (m_viewStack && m_viewStack->currentWidget() == m_iconView) {
-        target = m_iconView;
-    }
-    target->setFocus(Qt::OtherFocusReason);
+    fileListView()->setFocus(Qt::OtherFocusReason);
 }
 
 void FilePane::goUp()

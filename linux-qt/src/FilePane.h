@@ -25,6 +25,7 @@ class BreadcrumbBar;
 #include <QHash>
 #include <QItemSelection>
 #include <QLabel>
+#include <QKeySequence>
 #include <QLineEdit>
 #include <QProcess>
 #include <QStack>
@@ -36,11 +37,16 @@ class FilePane : public QWidget
 {
     Q_OBJECT
 
+    QKeySequence m_quickPreviewShortcut{Qt::Key_Space};
+
 public:
     explicit FilePane(const QString &label, const QString &initialPath, QWidget *parent = nullptr);
     ~FilePane() override;
 
     QString currentPath() const;
+    QStringList quickPreviewPaths() const;
+    void openQuickPreviewSelection();
+    void setQuickPreviewShortcut(const QKeySequence &key) { m_quickPreviewShortcut = key; }
     QList<QUrl> selectedUrls() const;
     void setShowHiddenFiles(bool show);
     void setPathFilter(const QString &text);
@@ -62,6 +68,7 @@ public:
     // (re)opened so Back never walks into folders from before the split closed.
     void clearHistory();
     void navigateTo(const QString &path, bool recordHistory = true);
+    QWidget *fileListView() const;
     void focusFileList();
     // restoreSort=false re-applies only order/visibility/width. The model
     // emits layoutChanged while sorting, and re-reading the stored sort from
@@ -85,6 +92,7 @@ public:
     static QString displayNameForDirectory(const QString &path);
 
 signals:
+    void quickPreviewRequested();
     void activated(FilePane *pane);
     void directoryChanged(const QString &path);
     void selectionPreviewRequested(const QString &path);

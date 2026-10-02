@@ -71,6 +71,7 @@ size = 12
 [shortcuts]
 reload = "f5"
 openTerminal = "ctrl+shift+t"
+quickPreview = "Space"
 togglePreview = "ctrl+shift+p"
 togglePreviewSource = "ctrl+shift+r"
 openPreviewExternal = "ctrl+shift+i"
@@ -274,6 +275,7 @@ warnings and fall back to the defaults.
 | `reload` | `F5` | Reload the active pane. |
 | `focusSearch` | `Ctrl+F` | Focus the search field. |
 | `sortOptions` | `Ctrl+Shift+S` | Open the Sort Options chooser for the active pane. |
+| `quickPreview` | `Space` | Show a temporary preview from the file list; press again or Esc to close. |
 | `togglePreview` | `Ctrl+Shift+P` | Show/hide the preview pane. |
 | `togglePreviewSource` | `Ctrl+Shift+R` | Toggle rendered/source in the preview. |
 | `openPreviewExternal` | `Ctrl+Shift+I` | Open the current preview externally. |

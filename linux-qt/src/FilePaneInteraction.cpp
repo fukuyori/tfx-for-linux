@@ -1,7 +1,9 @@
 #include "FilePane.h"
 #include "UiText.h"
+#include "FilePaneSearchRoles.h"
 #include "core/TypeAhead.h"
 #include "models/FileColumns.h"
+#include "views/FileViews.h"
 
 #include <QAbstractItemView>
 #include <QApplication>
@@ -12,7 +14,37 @@
 #include <QLineEdit>
 #include <QListView>
 #include <QTableView>
+#include <QStackedWidget>
 #include <QTimer>
+
+void FilePane::openQuickPreviewSelection()
+{
+    if (m_viewStack->currentWidget() == m_searchView) {
+        const auto index = m_searchView->currentIndex();
+        if (index.isValid()) emit m_searchView->activated(index);
+    } else {
+        openSelected();
+    }
+}
+
+QStringList FilePane::quickPreviewPaths() const
+{
+    const auto *view = m_viewStack->currentWidget() == m_searchView
+        ? m_searchView : m_view;
+    QModelIndexList rows = selectedRowIndexes(view->selectionModel(), ColumnName);
+    if (rows.isEmpty() && view->currentIndex().isValid()) {
+        rows << view->currentIndex().siblingAtColumn(ColumnName);
+    }
+    QStringList paths;
+    for (const auto &row : rows) {
+        if (row.data().toString() == "..") continue;
+        const QString path = view == m_searchView
+            ? row.data(tfx::filepane::SearchPathRole).toString()
+            : m_model->filePath(m_proxyModel->mapToSource(row));
+        if (!path.isEmpty() && QFileInfo::exists(path)) paths << path;
+    }
+    return paths;
+}
 
 bool FilePane::eventFilter(QObject *watched, QEvent *event)
 {
@@ -37,6 +69,29 @@ bool FilePane::eventFilter(QObject *watched, QEvent *event)
         }
     }
     if (watched == m_view || watched == m_iconView || watched == m_searchView) {
+        if ((event->type() == QEvent::ShortcutOverride || event->type() == QEvent::KeyPress)
+            && QApplication::focusWidget() == watched) {
+            auto *key = static_cast<QKeyEvent *>(event);
+            // A space continues an active type-ahead prefix; otherwise it
+            // opens the quick preview. Reserve it before shortcut dispatch too.
+            const bool typeAheadSpace = watched != m_searchView
+                && key->key() == Qt::Key_Space && key->modifiers() == Qt::NoModifier
+                && !m_typeAheadPrefix.isEmpty() && m_typeAheadClock.isValid()
+                && m_typeAheadLastMs >= 0 && m_typeAheadClock.elapsed() - m_typeAheadLastMs <= 1000;
+            if (typeAheadSpace && event->type() == QEvent::ShortcutOverride) {
+                event->accept();
+                return true;
+            }
+            if (!typeAheadSpace && QKeySequence(key->keyCombination()) == m_quickPreviewShortcut) {
+                if (event->type() == QEvent::KeyPress && !key->isAutoRepeat()
+                    && !quickPreviewPaths().isEmpty()) {
+                    resetTypeAhead();
+                    emit quickPreviewRequested();
+                }
+                event->accept();
+                return true;
+            }
+        }
         if (event->type() == QEvent::FocusIn || event->type() == QEvent::MouseButtonPress) {
             emit activated(this);
         }
@@ -61,7 +116,7 @@ bool FilePane::eventFilter(QObject *watched, QEvent *event)
                     return true;
                 }
             }
-            if (keyEvent->key() == Qt::Key_Down
+            if (watched != m_searchView && keyEvent->key() == Qt::Key_Down
                 && !m_view->currentIndex().isValid()
                 && m_view->selectionModel()->selectedIndexes().isEmpty()) {
                 if (selectParentEntry()) {

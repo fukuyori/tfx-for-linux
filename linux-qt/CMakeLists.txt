@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(tfx-for-linux VERSION 0.8.8 LANGUAGES CXX)
+project(tfx-for-linux VERSION 0.9.0 LANGUAGES CXX)
 
 include(GNUInstallDirs)
 include(CTest)
@@ -99,6 +99,8 @@ qt_add_executable(tfx
     src/MainWindowTheme.cpp
     src/MainWindow.cpp
     src/MainWindow.h
+    src/QuickPreviewOverlay.cpp
+    src/QuickPreviewOverlay.h
     src/PreviewPane.cpp
     src/PreviewPane.h
     src/TerminalPane.cpp
@@ -260,6 +262,18 @@ if(BUILD_TESTING AND Qt6Test_FOUND)
     target_link_libraries(tfx_path_handling_test PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME path_handling COMMAND tfx_path_handling_test)
 
+    qt_add_executable(tfx_git_status_controller_test
+        tests/GitStatusControllerTest.cpp
+        src/controllers/GitStatusController.cpp
+        src/controllers/GitStatusController.h
+        src/core/GitService.cpp
+        src/core/FileOperations.cpp
+        src/UiText.cpp
+    )
+    target_include_directories(tfx_git_status_controller_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(tfx_git_status_controller_test PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME git_status_controller COMMAND tfx_git_status_controller_test)
+
     qt_add_executable(tfx_git_service_test
         tests/GitServiceTest.cpp
         src/core/GitService.cpp
@@ -331,6 +345,22 @@ if(BUILD_TESTING AND Qt6Test_FOUND)
     target_link_libraries(tfx_platform_security_test PRIVATE Qt6::Core Qt6::DBus Qt6::Gui Qt6::Test)
     add_test(NAME platform_security COMMAND tfx_platform_security_test)
     set_tests_properties(platform_security PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+    qt_add_executable(tfx_quick_preview_test
+        tests/QuickPreviewTest.cpp
+        src/QuickPreviewOverlay.cpp
+        src/QuickPreviewOverlay.h
+        src/PreviewPane.cpp
+        src/PreviewPane.h
+        src/UiText.cpp
+        src/core/DelimitedText.cpp
+        src/core/PreviewText.cpp
+        ${TFX_PLATFORM_SOURCES}
+    )
+    target_include_directories(tfx_quick_preview_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(tfx_quick_preview_test PRIVATE Qt6::Widgets Qt6::DBus Qt6::Test)
+    add_test(NAME quick_preview COMMAND tfx_quick_preview_test)
+    set_tests_properties(quick_preview PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
     qt_add_executable(tfx_preview_security_test
         tests/PreviewSecurityTest.cpp
@@ -410,6 +440,9 @@ if(BUILD_TESTING AND Qt6Test_FOUND)
         src/FilePaneUi.cpp
         src/UiText.cpp
     )
+    target_sources(tfx_file_pane_selection_test PRIVATE
+        src/QuickPreviewOverlay.cpp src/QuickPreviewOverlay.h
+        src/PreviewPane.cpp src/PreviewPane.h)
     target_include_directories(tfx_file_pane_selection_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(tfx_file_pane_selection_test PRIVATE Qt6::Core Qt6::DBus Qt6::Gui Qt6::Widgets Qt6::Test)
     add_test(NAME file_pane_selection COMMAND tfx_file_pane_selection_test)

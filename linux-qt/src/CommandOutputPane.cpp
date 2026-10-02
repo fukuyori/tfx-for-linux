@@ -39,7 +39,7 @@ CommandOutputPane::CommandOutputPane(QWidget *parent)
     auto *outputSection = new QWidget(this);
     auto *outputLayout = new QVBoxLayout(outputSection);
     outputLayout->setContentsMargins(0, 0, 0, 0);
-    outputLayout->setSpacing(6);
+    outputLayout->setSpacing(4);
     auto *headerLayout = new QHBoxLayout();
     headerLayout->setContentsMargins(0, 0, 0, 0);
     headerLayout->addWidget(m_summaryLabel, 1);
@@ -57,8 +57,8 @@ CommandOutputPane::CommandOutputPane(QWidget *parent)
     splitter->setSizes({120, 300});
 
     auto *layout = new QVBoxLayout(this);
-    layout->setContentsMargins(8, 8, 8, 8);
-    layout->setSpacing(6);
+    layout->setContentsMargins(8, 4, 8, 4);
+    layout->setSpacing(4);
     layout->addWidget(splitter, 1);
 
     connect(m_historyList, &QListWidget::currentRowChanged, this, &CommandOutputPane::showEntry);

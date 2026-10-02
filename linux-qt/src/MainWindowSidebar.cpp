@@ -561,7 +561,7 @@ void MainWindow::updatePinnedFolderArea()
     m_pinnedList->setFixedHeight(listHeight);
     m_pinnedList->setVisible(pinnedCount > 0);
 
-    const int spacerHeight = pinnedCount > 0 ? 6 : 4;
+    const int spacerHeight = pinnedCount > 0 ? 2 : 0;
     m_pinnedSpacer->setFixedHeight(spacerHeight);
     if (m_pinnedCollapsed) {
         m_pinnedList->setVisible(false);

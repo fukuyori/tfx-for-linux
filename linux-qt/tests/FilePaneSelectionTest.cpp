@@ -1,8 +1,11 @@
 #include "FilePane.h"
+#include "QuickPreviewOverlay.h"
+#include <QPlainTextEdit>
 #include "models/FileColumns.h"
 #include "models/FileSystemProxyModel.h"
 
 #include <QClipboard>
+#include <QListView>
 #include <QStandardPaths>
 #include <QTableView>
 #include <QTemporaryDir>
@@ -20,6 +23,9 @@ private slots:
     void init();
     void cleanup();
 
+    void quickPreviewKeyboard();
+    void quickPreviewPreservesTypeAheadSpaces();
+    void quickPreviewRestoresSearchFocus();
     void ctrlClickBuildsMultiSelection();
     void ctrlClickMultiSelectionSurvivesDeferredHandlers();
     void copySelectedPutsAllUrlsOnClipboard();
@@ -40,6 +46,106 @@ private:
     QTemporaryDir *m_dir = nullptr;
     FilePane *m_pane = nullptr;
 };
+
+void FilePaneSelectionTest::quickPreviewKeyboard()
+{
+    QSignalSpy preview(m_pane, &FilePane::quickPreviewRequested);
+    clickRow(rowForName("a.txt"));
+    fileView()->setFocus();
+    QTest::keyClick(fileView(), Qt::Key_Space);
+    QCOMPARE(preview.count(), 1);
+    QCOMPARE(m_pane->quickPreviewPaths(), QStringList({m_dir->filePath("a.txt")}));
+    clickRow(rowForName("b.txt"), Qt::ControlModifier);
+    QCOMPARE(m_pane->quickPreviewPaths().size(), 2);
+    clickRow(rowForName(".."));
+    QTest::keyClick(fileView(), Qt::Key_Space);
+    QCOMPARE(preview.count(), 1);
+    m_pane->setQuickPreviewShortcut(QKeySequence(Qt::Key_F3));
+    clickRow(rowForName("a.txt"));
+    QTest::keyClick(fileView(), Qt::Key_F3);
+    QCOMPARE(preview.count(), 2);
+    m_pane->renameSelected();
+    QTRY_VERIFY(qobject_cast<QLineEdit *>(QApplication::focusWidget()));
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Space);
+    QCOMPARE(preview.count(), 2);
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+    m_pane->setViewMode(true);
+    m_pane->focusFileList();
+    auto *icons = m_pane->findChild<QListView *>("fileIcons");
+    QVERIFY(icons);
+    QTest::keyClick(icons, Qt::Key_F3);
+    QCOMPARE(preview.count(), 3);
+    QCOMPARE(m_pane->quickPreviewPaths(), QStringList({m_dir->filePath("a.txt")}));
+    m_pane->startSearch("folder2");
+    QTRY_COMPARE(fileView()->model()->rowCount(), 1);
+    clickRow(0);
+    fileView()->setFocus();
+    QTest::keyClick(fileView(), Qt::Key_F3);
+    QCOMPARE(preview.count(), 4);
+    QCOMPARE(m_pane->quickPreviewPaths(), QStringList({m_dir->filePath("folder2")}));
+    m_pane->openQuickPreviewSelection();
+    QCOMPARE(m_pane->currentPath(), m_dir->path());
+    QTRY_COMPARE(m_pane->quickPreviewPaths(), QStringList({m_dir->filePath("folder2")}));
+}
+
+void FilePaneSelectionTest::quickPreviewPreservesTypeAheadSpaces()
+{
+    for (const QString &name : {"my document.txt", "my diary.txt"}) {
+        QFile file(m_dir->filePath(name));
+        QVERIFY(file.open(QIODevice::WriteOnly));
+    }
+    QTRY_VERIFY(rowForName("my document.txt") >= 0);
+    QTRY_VERIFY(rowForName("my diary.txt") >= 0);
+    QSignalSpy preview(m_pane, &FilePane::quickPreviewRequested);
+    fileView()->setFocus();
+    QTest::keyClicks(fileView(), "my doc");
+    QCOMPARE(preview.count(), 0);
+    QCOMPARE(m_pane->quickPreviewPaths(), QStringList({m_dir->filePath("my document.txt")}));
+    QTest::qWait(1050);
+    QTest::keyClick(fileView(), Qt::Key_Space);
+    QCOMPARE(preview.count(), 1);
+}
+
+void FilePaneSelectionTest::quickPreviewRestoresSearchFocus()
+{
+    m_pane->startSearch("folder");
+    QTRY_COMPARE(fileView()->model()->rowCount(), 2);
+    auto *searchView = fileView();
+    searchView->selectRow(0);
+    m_pane->focusFileList();
+    QCOMPARE(QApplication::focusWidget(), searchView);
+    QuickPreviewOverlay overlay(m_pane);
+    overlay.setNavigationView(m_pane->fileListView());
+    connect(&overlay, &QuickPreviewOverlay::dismissed, m_pane, &FilePane::focusFileList);
+    overlay.present(m_pane->quickPreviewPaths());
+    QPlainTextEdit *listing = nullptr;
+    for (auto *editor : overlay.findChildren<QPlainTextEdit *>()) {
+        if (editor->isVisible()) listing = editor;
+    }
+    QVERIFY(listing);
+    listing->setFocus();
+    QTest::keyClick(listing, Qt::Key_Escape);
+    QVERIFY(!overlay.isVisible());
+    QCOMPARE(QApplication::focusWidget(), searchView);
+    QTest::keyClick(searchView, Qt::Key_Down);
+    QCOMPARE(searchView->currentIndex().row(), 1);
+
+    m_pane->cancelSearch();
+    clickRow(rowForName("a.txt"));
+    overlay.setNavigationView(m_pane->fileListView());
+    connect(m_pane, &FilePane::selectionPreviewRequested, &overlay, [this, &overlay]() {
+        if (overlay.isVisible()) overlay.previewPaths(m_pane->quickPreviewPaths());
+    });
+    overlay.present(m_pane->quickPreviewPaths());
+    clickRow(rowForName(".."));
+    QVERIFY(m_pane->quickPreviewPaths().isEmpty());
+    QVERIFY(overlay.isVisible());
+    clickRow(rowForName("a.txt"));
+    QVERIFY(overlay.isVisible());
+    m_pane->focusFileList();
+    QTest::keyClick(fileView(), Qt::Key_Space);
+    QVERIFY(!overlay.isVisible());
+}
 
 void FilePaneSelectionTest::initTestCase()
 {

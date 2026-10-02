@@ -29,7 +29,7 @@ signals:
     void statusesReady(const QHash<QString, QString> &statuses); // absolute path -> badge
 
 private:
-    void startRefresh(const QString &gitDirectory);
+    void startRefresh(QString gitDirectory);
     void startStatus(const QString &gitProgram, const QString &gitDirectory, const QString &prefix);
     void stopProcess(QProcess *&process);
     void applyStatusOutput(const QString &directory, const QString &prefix, const QString &output);

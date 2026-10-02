@@ -4,6 +4,7 @@
 #include "CommandOutputPane.h"
 #include "FilePane.h"
 #include "PreviewPane.h"
+#include "QuickPreviewOverlay.h"
 #include "TerminalPane.h"
 
 #include <QFileSystemModel>
@@ -167,6 +168,7 @@ private:
     FilePane *m_rightPane;
     FilePane *m_activePane;
     PreviewPane *m_previewPane;
+    QuickPreviewOverlay *m_quickPreview = nullptr;
     TerminalPane *m_terminalPane;
     CommandOutputPane *m_commandOutputPane;
     QLabel *m_fileOperationSummary = nullptr;

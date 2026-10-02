@@ -38,46 +38,54 @@ QString MainWindow::buildThemeStyleSheet() const
             font-size: 12px;
         }
         QMenuBar { background: #11161A; color: #D9E1E8; border: 0; }
-        QMenuBar::item { padding: 5px 10px; border-radius: 6px; }
+        QMenuBar::item { padding: 3px 10px; border-radius: 6px; }
         QMenuBar::item:selected { background: #1F2830; }
         QMenu {
             background: #11161A;
             color: #D9E1E8;
             border: 1px solid #2A333A;
             border-radius: 8px;
-            padding: 6px;
+            padding: 4px;
         }
         QMenu::item {
-            padding: 7px 24px 7px 20px;
+            padding: 4px 24px 4px 20px;
             border-radius: 6px;
         }
         QMenu::item:selected { background: #243947; color: #FFFFFF; }
         QMenu::separator {
             height: 1px;
             background: #2A333A;
-            margin: 6px 10px;
+            margin: 4px 10px;
         }
         QToolBar#topToolbar {
             background: #151A1E;
             border: 0;
-            padding: 7px 10px;
-            spacing: 7px;
+            padding: 3px 8px;
+            spacing: 6px;
         }
         QLineEdit#pathEdit {
             background: #0F1418;
             color: #D9E1E8;
             border: 1px solid #2A333A;
             border-radius: 8px;
-            padding: 7px 12px;
+            padding: 4px 10px;
             font-weight: 500;
         }
-        QComboBox#searchEdit,
-        QComboBox#searchEdit QLineEdit {
+        QComboBox#searchEdit {
             background: #10161A;
             color: #D9E1E8;
             border: 1px solid #2A333A;
             border-radius: 8px;
-            padding: 7px 11px;
+            padding: 4px 10px;
+            selection-background-color: #243947;
+        }
+        /* The combobox owns its border and padding; the embedded editor
+           must not add a second inset around the same text. */
+        QComboBox#searchEdit QLineEdit {
+            background: transparent;
+            color: #D9E1E8;
+            border: 0;
+            padding: 0;
             selection-background-color: #243947;
         }
         QComboBox#searchEdit::drop-down {
@@ -94,7 +102,7 @@ QString MainWindow::buildThemeStyleSheet() const
         }
         QDockWidget::title {
             background: #11161A;
-            padding: 6px 10px;
+            padding: 3px 8px;
             border: 0;
             text-align: left;
         }
@@ -170,7 +178,7 @@ QString MainWindow::buildThemeStyleSheet() const
             color: #9EABB6;
             font-size: 11px;
             font-weight: 600;
-            padding: 14px 6px 6px 6px;
+            padding: 6px 6px 3px 6px;
         }
         QToolButton#sectionHeader {
             color: #9EABB6;
@@ -178,7 +186,7 @@ QString MainWindow::buildThemeStyleSheet() const
             font-weight: 600;
             border: 0;
             background: transparent;
-            padding: 14px 6px 6px 6px;
+            padding: 6px 6px 3px 6px;
         }
         QListWidget, QTreeView {
             background: #171C20;
@@ -224,22 +232,22 @@ QString MainWindow::buildThemeStyleSheet() const
             color: #B9C4CC;
             border: 0;
             border-bottom: 1px solid #2A333A;
-            padding: 7px 10px;
+            padding: 4px 10px;
             font-size: 11px;
             font-weight: 600;
         }
         QTabBar#paneTabs {
             background: transparent;
             border: 0;
-            min-height: 26px;
+            min-height: 24px;
         }
         QTabBar#paneTabs::tab {
             background: transparent;
             color: #9EABB6;
             border: 0;
             border-radius: 8px;
-            padding: 4px 12px;
-            margin: 3px 3px 3px 0;
+            padding: 2px 12px;
+            margin: 2px 3px 2px 0;
         }
         QTabBar#paneTabs::tab:hover { background: #1F2830; }
         QTabBar#paneTabs::tab:selected {
@@ -311,7 +319,7 @@ QString MainWindow::buildThemeStyleSheet() const
             background: #10161A;
             color: #B9C4CC;
             border-top: 1px solid #2A333A;
-            padding: 5px 10px;
+            padding: 3px 10px;
             font-weight: 600;
         }
         QToolButton, QPushButton {
@@ -319,7 +327,7 @@ QString MainWindow::buildThemeStyleSheet() const
             color: #D9E1E8;
             border: 1px solid #303A42;
             border-radius: 3px;
-            padding: 4px 7px;
+            padding: 3px 7px;
         }
         QToolButton#toolbarIconButton {
             min-width: 31px;
@@ -352,8 +360,8 @@ QString MainWindow::buildThemeStyleSheet() const
         }
         QMainWindow::separator {
             background: #20272D;
-            width: 7px;
-            height: 7px;
+            width: 5px;
+            height: 5px;
         }
         QMainWindow::separator:hover {
             background: #243947;
@@ -401,7 +409,7 @@ QString MainWindow::buildThemeStyleSheet() const
             background: transparent;
             color: #9EABB6;
             font-weight: 600;
-            padding: 4px 2px;
+            padding: 2px 2px;
         }
         QWidget#terminalPane {
             background: #050607;
@@ -416,7 +424,7 @@ QString MainWindow::buildThemeStyleSheet() const
         }
         QLabel#terminalTitle {
             color: #9EABB6;
-            padding: 4px 6px;
+            padding: 2px 6px;
             font-weight: 500;
         }
         QTabWidget#terminalTabs::pane {
@@ -428,7 +436,7 @@ QString MainWindow::buildThemeStyleSheet() const
             color: #9EABB6;
             border: 1px solid #2A333A;
             border-bottom: 0;
-            padding: 3px 12px;
+            padding: 2px 12px;
             margin-right: 2px;
         }
         QTabWidget#terminalTabs > QTabBar::tab:selected {
@@ -624,6 +632,16 @@ void MainWindow::applyPaneThemeSettings()
         QColor(m_config.colors.dropTargetBackground);
     m_pinnedList->viewport()->update();
 
+    const QKeySequence quickKey(m_config.shortcut("quickPreview", "Space"));
+    m_leftPane->setQuickPreviewShortcut(quickKey);
+    m_rightPane->setQuickPreviewShortcut(quickKey);
+    m_quickPreview->setShortcut(quickKey);
+    m_quickPreview->setStyleSheet(QString(
+        "QWidget#quickPreviewOverlay { background: %1; border: 1px solid %2; border-radius: 10px; }")
+        .arg(m_config.colors.panelBackground, m_config.colors.activeBorder));
+    m_quickPreview->previewPane()->setPreviewConfig(m_config.preview.defaultMode,
+                                    m_config.preview.extensionModes,
+                                    m_config.preview.markdownExternalImages);
     m_previewPane->setPreviewConfig(m_config.preview.defaultMode,
                                     m_config.preview.extensionModes,
                                     m_config.preview.markdownExternalImages);

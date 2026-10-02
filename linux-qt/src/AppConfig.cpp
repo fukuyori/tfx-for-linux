@@ -51,6 +51,7 @@ QHash<QString, QString> defaultShortcuts()
     return {
         {"reload", normalizedShortcut("f5")},
         {"openTerminal", normalizedShortcut("ctrl+shift+t")},
+        {"quickPreview", normalizedShortcut("Space")},
         {"togglePreview", normalizedShortcut("ctrl+shift+p")},
         {"togglePreviewSource", normalizedShortcut("ctrl+shift+r")},
         {"openPreviewExternal", normalizedShortcut("ctrl+shift+i")},
@@ -195,6 +196,7 @@ QString AppConfig::defaultConfigText()
         "[shortcuts]\n"
         "reload = \"f5\"\n"
         "openTerminal = \"ctrl+shift+t\"\n"
+        "quickPreview = \"Space\"\n"
         "togglePreview = \"ctrl+shift+p\"\n"
         "togglePreviewSource = \"ctrl+shift+r\"\n"
         "openPreviewExternal = \"ctrl+shift+i\"\n"

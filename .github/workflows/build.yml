@@ -25,15 +25,22 @@ jobs:
       - name: Install dependencies
         run: |
           apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y git cmake g++ qt6-base-dev libqtermwidget6-2-dev libutf8proc-dev
+          DEBIAN_FRONTEND=noninteractive apt-get install -y git cmake g++ qt6-base-dev libqtermwidget6-2-dev libutf8proc-dev locales
+          localedef -i en_US -f UTF-8 en_US.UTF-8
 
       - name: Configure
-        run: cmake -S linux-qt -B build
+        run: cmake -S linux-qt -B build -DBUILD_TESTING=ON
 
       - name: Build
-        run: cmake --build build --parallel
+        # With Unix Makefiles, --parallel without a count allows unlimited
+        # compiler processes, including all of the test targets.
+        run: cmake --build build --parallel 2
 
       - name: Test
+        # QCollator's numeric sorting is unavailable in the C locale.
+        env:
+          LANG: en_US.UTF-8
+          LC_ALL: en_US.UTF-8
         run: ctest --test-dir build --output-on-failure
 
       - name: Install smoke test

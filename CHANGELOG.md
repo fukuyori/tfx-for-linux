@@ -2,6 +2,29 @@
 
 This file records notable changes to `tfx-for-linux`.
 
+## [0.9.0] - 2026-10-02
+
+### Added
+
+- Quick preview with Space to show or close, Escape to close, and Enter to
+  perform the normal open action. Supports files, folder listings, multiple
+  selections, and a configurable `quickPreview` shortcut.
+
+### Changed
+
+- More compact vertical spacing across toolbars, tabs, pane headers, sidebars,
+  previews, and command output, preserving font sizes and file-list row heights.
+- README screenshots and captions now use Markdown instead of HTML layouts.
+
+### Fixed
+
+- Quick preview preserves input in other widgets, restores search-result focus,
+  and allows spaces in filename type-ahead.
+- Down-arrow navigation in search results no longer selects the parent entry
+  in the normal file list.
+- Throttled Git refreshes retain the queried directory and keep status badges
+  visible while fetching updated results.
+
 ## [0.8.8] - 2026-09-09
 
 ### Added

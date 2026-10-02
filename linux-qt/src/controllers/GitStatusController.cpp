@@ -69,8 +69,11 @@ void GitStatusController::refresh(const QString &directory)
     startRefresh(gitDirectory);
 }
 
-void GitStatusController::startRefresh(const QString &gitDirectory)
+void GitStatusController::startRefresh(QString gitDirectory)
 {
+    // The throttle passes m_pendingDirectory. Keep our own copy before
+    // clearing it, otherwise that reference becomes an empty query path.
+    const bool directoryChanged = gitDirectory != m_directory;
     m_pendingDirectory.clear();
     m_throttle->stop();
     m_lastStart.start();
@@ -80,11 +83,16 @@ void GitStatusController::startRefresh(const QString &gitDirectory)
     stopProcess(m_prefixProcess);
     stopProcess(m_branchProcess);
 
-    // Clear badges immediately; they are repopulated when the run completes.
-    emit statusesReady({});
+    // Keep the last result during refreshes of the same directory. Only a
+    // successful status query replaces it (including a clean, empty result).
+    if (directoryChanged) {
+        emit statusesReady({});
+        emit branchChanged(QString());
+    }
 
     const QString gitProgram = QStandardPaths::findExecutable("git");
     if (gitProgram.isEmpty() || gitDirectory.isEmpty()) {
+        emit statusesReady({});
         emit branchChanged(QString());
         return;
     }
@@ -131,8 +139,13 @@ void GitStatusController::startRefresh(const QString &gitDirectory)
         }
         const QString prefix = QString::fromLocal8Bit(process->readAllStandardOutput()).trimmed();
         process->deleteLater();
-        if (status != QProcess::NormalExit || code != 0 || gitDirectory != m_directory) {
-            return; // not a repository, or a newer refresh superseded this one
+        if (gitDirectory != m_directory) {
+            return; // a newer refresh superseded this one
+        }
+        if (status != QProcess::NormalExit || code != 0) {
+            // Repository metadata may have been removed without navigation.
+            emit statusesReady({});
+            return;
         }
         startStatus(gitProgram, gitDirectory, prefix);
     });

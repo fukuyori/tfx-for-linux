@@ -57,8 +57,8 @@ void FilePane::setupPaneChrome(const QString &initialPath)
 QWidget *FilePane::createHeaderLayout()
 {
     auto *headerLayout = new QHBoxLayout();
-    headerLayout->setContentsMargins(8, 4, 8, 4);
-    headerLayout->setSpacing(8);
+    headerLayout->setContentsMargins(8, 2, 8, 2);
+    headerLayout->setSpacing(6);
     // The LEFT/RIGHT badge is kept as state (active-pane styling hooks) but
     // no longer shown; the title-bar background marks the active pane.
     headerLayout->addWidget(m_badgeLabel);

@@ -17,6 +17,8 @@ public:
     explicit PreviewPane(QWidget *parent = nullptr);
 
 public:
+    void setShowsFileInfo(bool show) { m_showsFileInfo = show; m_title->setVisible(show); }
+
     // Preview behaviour from [preview] / [preview.extensions] / [preview.markdown].
     void setPreviewConfig(const QString &defaultMode,
                           const QHash<QString, QString> &extensionModes,
@@ -50,6 +52,7 @@ private:
     QToolButton *m_openExternal;
     QString m_currentImagePath;
     QString m_externalPreviewUrl;
+    bool m_showsFileInfo = true;
     bool m_renderAvailable = false;
     bool m_prefersRendered = true;
 

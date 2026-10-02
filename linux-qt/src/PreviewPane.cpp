@@ -216,14 +216,14 @@ PreviewPane::PreviewPane(QWidget *parent)
 
     auto *modeLayout = new QHBoxLayout();
     modeLayout->setContentsMargins(0, 0, 0, 0);
-    modeLayout->setSpacing(6);
+    modeLayout->setSpacing(4);
     modeLayout->addWidget(m_sourceToggle);
     modeLayout->addWidget(m_openExternal);
     modeLayout->addStretch(1);
 
     auto *layout = new QVBoxLayout(this);
-    layout->setContentsMargins(10, 8, 10, 8);
-    layout->setSpacing(6);
+    layout->setContentsMargins(8, 6, 8, 6);
+    layout->setSpacing(4);
     layout->addLayout(modeLayout);
     layout->addWidget(m_title);
     layout->addWidget(m_stack, 1);
@@ -244,7 +244,7 @@ void PreviewPane::previewPath(const QString &path)
     m_currentImagePath.clear();
     m_externalPreviewUrl.clear();
     m_openExternal->setVisible(false);
-    m_title->setVisible(true);
+    m_title->setVisible(m_showsFileInfo);
     if (!info.exists()) {
         m_title->setText(UiText::t("No selection", "選択なし"));
         m_text->clear();
@@ -294,7 +294,7 @@ void PreviewPane::previewSelection(const QStringList &paths)
     m_currentImagePath.clear();
     m_externalPreviewUrl.clear();
     m_openExternal->setVisible(false);
-    m_title->setVisible(true);
+    m_title->setVisible(m_showsFileInfo);
     setRenderAvailable(false);
 
     qint64 totalSize = 0;
@@ -587,7 +587,7 @@ void PreviewPane::showPreferredTextView()
     } else {
         m_stack->setCurrentWidget(m_text);
     }
-    m_title->setVisible(m_stack->currentWidget() != m_rendered);
+    m_title->setVisible(m_showsFileInfo && m_stack->currentWidget() != m_rendered);
     m_sourceToggle->setChecked(m_stack->currentWidget() == m_rendered && m_renderAvailable);
     m_sourceToggle->setToolTip(m_stack->currentWidget() == m_text
         ? UiText::t("Show rendered preview", "レンダリング表示")
